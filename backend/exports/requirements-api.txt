@@ -1,0 +1,5 @@
+# Extra runtime/test dependencies for the domain API (Agent 6). Pure-python PDF; RDKit is already a project dependency.
+fpdf2==2.9.0
+rdkit==2026.9.1
+# tests only
+hypothesis==6.170.14
