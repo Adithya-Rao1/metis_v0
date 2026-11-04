@@ -19,7 +19,7 @@ from backend.jobs.deps import (
     row_to_prediction,
     scope,
 )
-from backend.jobs.queue import JobQueue, Progress
+from backend.jobs.queue import MAX_ACTIVE_PER_USER, JobQueue, Progress, QuotaExceeded
 from backend.schemas.contracts import DEFAULT_N, MAX_ENDPOINTS, Endpoint, Strict, allowed_ensemble_sizes
 from backend.schemas.interfaces import ModelRegistry, PredictionDetail
 
@@ -97,7 +97,10 @@ def predict(
                     ).scalar_one()
                 progress(pid)
 
-    rec = queue.submit(owner, project_id, len(comps) * len(endpoints), estimate, work)
+    try:
+        rec = queue.submit(owner, project_id, len(comps) * len(endpoints), estimate, work, max_active=MAX_ACTIVE_PER_USER)
+    except QuotaExceeded:
+        raise HTTPException(status_code=429, detail=f"too many prediction jobs in progress (max {MAX_ACTIVE_PER_USER}); wait for one to finish", headers={"Retry-After": "10"}) from None
     return {"job_id": rec.id, "state": rec.state, "total": rec.total, "estimated_seconds": estimate, "ensemble_n": n, "label": "predicted"}
 
 

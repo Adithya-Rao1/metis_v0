@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -15,8 +16,9 @@ ALWAYS_REFUSED = {"FreeSolv"}
 ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
 # A cleared entry may never look like FreeSolv (any id) or carry non-commercial / no-derivatives terms.
 _EXCLUDED_SOURCE_RE = re.compile(r"free[\W_]*solv|mobleylab", re.I)
-_NONCOMMERCIAL_RE = re.compile(r"non[\s_-]*commercial|(?<![a-z])nc(?![a-z])|(?<![a-z])nd(?![a-z])|by-?nc|research[\s-]*only|academic[\s-]*only", re.I)
-_PERMISSIVE_RE = re.compile(r"cc0|cc[\s-]*by(?![\s-]*n)|mit\b|apache|bsd|public[\s-]*domain|odc-?by|pddl|unlicense", re.I)
+# Exact allow-list of NORMALISED permissive licence identifiers (see normalise_licence). Anything else is not cleared.
+ALLOWED_LICENCES = frozenset({"cc0", "cc0-1.0", "cc-by-4.0", "cc-by-sa-4.0", "mit", "apache-2.0", "bsd-3-clause",
+                              "public-domain"})
 _JUNK_CONFIRMERS = {"", "false", "true", "none", "null", "nan", "n/a", "na", "unknown", "x", "tbd", "todo"}
 
 
@@ -58,14 +60,19 @@ def load_manifest(path: Path | str = MANIFEST_PATH) -> dict[str, DatasetEntry]:
     return out
 
 
+def normalise_licence(text: str) -> str:
+    """Unicode NFKC + case folding, surrounding space stripped, runs of whitespace/underscores -> '-'.
+    'CC BY 4.0' -> 'cc-by-4.0'. The result must EQUAL an allow-list entry; no substring/regex matching."""
+    t = unicodedata.normalize("NFKC", text or "").casefold().strip()
+    return re.sub(r"[\s_]+", "-", t)
+
+
 def _validate_cleared(e: DatasetEntry) -> None:
     if e.id in ALWAYS_REFUSED or any(_EXCLUDED_SOURCE_RE.search(x or "") for x in (e.id, e.name, e.source_url)):
         raise LicenseError(f"{e.id}: FreeSolv (or an alias/source of it) can never be cleared")
     lic = e.license_as_stated or ""
-    if _NONCOMMERCIAL_RE.search(lic):
-        raise LicenseError(f"{e.id}: non-commercial / no-derivatives licence {lic!r} cannot be cleared")
-    if not _PERMISSIVE_RE.search(lic):
-        raise LicenseError(f"{e.id}: licence {lic!r} is not recognised as permissive; cannot be cleared")
+    if normalise_licence(lic) not in ALLOWED_LICENCES:
+        raise LicenseError(f"{e.id}: licence {lic!r} is not on the permissive allow-list {sorted(ALLOWED_LICENCES)}; cannot be cleared")
     try:
         d = date.fromisoformat((e.date_checked or "").strip())
     except ValueError:

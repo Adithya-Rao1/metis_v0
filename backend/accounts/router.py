@@ -21,6 +21,7 @@ from backend.accounts.deps import (
     Session_,
     authed_session,
     client_ip,
+    csrf_bind,
     csrf_protect,
     current_user,
     current_user_no_terms,
@@ -57,6 +58,11 @@ def _norm_email(v: str) -> str:
     return v
 
 
+def _login_email(v: str) -> str:
+    """Same canonical form as registration (NFKC + strip + lower) without rejecting: bad input just fails to log in."""
+    return unicodedata.normalize("NFKC", v).strip().lower()
+
+
 class _Body(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -74,6 +80,15 @@ class RegisterIn(_Body):
 
 class LoginIn(_Body):
     email: str = Field(max_length=254)
+    password: str = Field(max_length=security.MAX_PASSWORD)
+
+
+class EmailIn(_Body):
+    email: str = Field(max_length=254)
+
+
+class ResetIn(_Body):
+    token: str = Field(min_length=10, max_length=200)
     password: str = Field(max_length=security.MAX_PASSWORD)
 
 
@@ -101,8 +116,8 @@ def _audit(s: Any, uid: uuid.UUID, action: str, resource: str | None = None) -> 
     )
 
 
-def _set_cookies(resp: Response, cfg: AccountsConfig, session_token: str | None) -> str:
-    csrf = security.make_csrf_token()
+def _set_cookies(resp: Response, cfg: AccountsConfig, session_token: str | None, bind: str | None = None) -> str:
+    csrf = security.make_csrf_token(bind or security.ANON_BIND)
     if session_token:
         resp.set_cookie(
             COOKIE_SESSION,
@@ -128,7 +143,7 @@ def _set_cookies(resp: Response, cfg: AccountsConfig, session_token: str | None)
 @router.get("/auth/csrf")
 def csrf(response: Response, request: Request) -> dict:
     """Issue a CSRF cookie for pre-login mutating calls (register, login, verify)."""
-    return {"csrf_token": _set_cookies(response, get_config(request), None)}
+    return {"csrf_token": _set_cookies(response, get_config(request), None, csrf_bind(request))}
 
 
 @router.get("/auth/terms")
@@ -165,9 +180,84 @@ def register(body: RegisterIn, request: Request) -> dict:
         created = False  # email already registered: same response, no signal to the caller
     if created:
         mailer.send_verification(body.email, token)
-    else:
+    elif not _resend_verification(factory, cfg, mailer, body.email):
         mailer.send_already_registered(body.email)
     return {"status": "verification_sent"}
+
+
+def _resend_verification(factory: Any, cfg: AccountsConfig, mailer: Any, email: str) -> bool:
+    """If `email` belongs to an UNVERIFIED account, mint a fresh token and mail it to that address.
+
+    The stored password hash is never touched, so a stranger who registers someone else's address cannot
+    change what the real owner's row looks like; the mail only ever goes to the address owner.
+    """
+    with request_session(factory, None) as s:
+        row = s.execute(text("SELECT * FROM auth_lookup(:e)"), {"e": email}).one_or_none()
+        if row is None or row.email_verified:
+            return False
+        token = security.new_token()
+        s.execute(
+            text("SELECT auth_issue_token(:u, 'verify_email', :t, make_interval(hours => :h))"),
+            {"u": row.id, "t": security.token_hash(token), "h": cfg.verify_ttl_hours},
+        )
+    mailer.send_verification(email, token)
+    return True
+
+
+@router.post("/auth/resend-verification", status_code=202, dependencies=[Depends(csrf_protect)])
+def resend_verification(body: EmailIn, request: Request) -> dict:
+    cfg, factory, mailer = get_config(request), get_factory(request), get_mailer(request)
+    email = _login_email(body.email)
+    rate_limit(factory, security.rl_key("ip", "resend", client_ip(request, cfg)), *cfg.rl_resend_ip)
+    rate_limit(factory, security.rl_key("email", "resend", email), *cfg.rl_resend_email)
+    _resend_verification(factory, cfg, mailer, email)  # same response whether or not it applied
+    return {"status": "verification_sent"}
+
+
+# ------------------------------------------------------------ password reset
+@router.post("/auth/forgot", status_code=202, dependencies=[Depends(csrf_protect)])
+def forgot_password(body: EmailIn, request: Request) -> dict:
+    cfg, factory, mailer = get_config(request), get_factory(request), get_mailer(request)
+    email = _login_email(body.email)
+    rate_limit(factory, security.rl_key("ip", "forgot", client_ip(request, cfg)), *cfg.rl_forgot_ip)
+    rate_limit(factory, security.rl_key("email", "forgot", email), *cfg.rl_forgot_email)
+    token = security.new_token()
+    send = False
+    with request_session(factory, None) as s:
+        row = s.execute(text("SELECT * FROM auth_lookup(:e)"), {"e": email}).one_or_none()
+        if row is not None and row.email_verified:
+            s.execute(
+                text("SELECT auth_issue_token(:u, 'reset_password', :t, make_interval(secs => :s))"),
+                {"u": row.id, "t": security.token_hash(token), "s": cfg.reset_ttl_s},
+            )
+            send = True
+    if send:
+        mailer.send_reset(email, token)
+    return {"status": "reset_sent"}
+
+
+@router.post("/auth/reset", dependencies=[Depends(csrf_protect)])
+def reset_password(body: ResetIn, request: Request) -> dict:
+    cfg, factory = get_config(request), get_factory(request)
+    rate_limit(factory, security.rl_key("ip", "reset", client_ip(request, cfg)), *cfg.rl_reset_ip)
+    problem = security.password_problem(body.password, "")
+    if problem:  # checked before the token is spent
+        raise HTTPException(422, problem)
+    pw_hash = security.hash_password(body.password, cfg.bcrypt_cost)
+    with request_session(factory, None) as s:
+        uid = s.execute(
+            text("SELECT auth_consume_token(:t, 'reset_password')"), {"t": security.token_hash(body.token)}
+        ).scalar_one()
+    if uid is None:
+        raise HTTPException(400, "invalid_or_expired_token")
+    with request_session(factory, uid) as s:
+        email = s.execute(text("SELECT email_lower FROM app_user WHERE id = :u"), {"u": uid}).scalar_one()
+        if security.password_problem(body.password, email):
+            raise HTTPException(422, "Password is too easy to guess")
+        # Changing the hash also invalidates every existing session (tokens carry a hash fingerprint).
+        s.execute(text("UPDATE app_user SET password_hash = :h WHERE id = :u"), {"h": pw_hash, "u": uid})
+        _audit(s, uid, "password_reset", f"app_user:{uid}")
+    return {"status": "password_reset"}
 
 
 # ------------------------------------------------------------------ verify
@@ -193,7 +283,7 @@ def _invalid() -> HTTPException:
 @router.post("/auth/login", dependencies=[Depends(csrf_protect)])
 def login(body: LoginIn, request: Request, response: Response) -> dict:
     cfg, factory = get_config(request), get_factory(request)
-    email = body.email.strip().lower()
+    email = _login_email(body.email)
     rate_limit(factory, security.rl_key("ip", "login", client_ip(request, cfg)), *cfg.rl_login_ip)
     rate_limit(factory, security.rl_key("email", "login", email), *cfg.rl_login_email)
     with request_session(factory, None) as s:
@@ -205,13 +295,18 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
     now = datetime.now(UTC)
     locked = row.locked_until is not None and row.locked_until > now
     with request_session(factory, None) as s:
+        if not ok and row.locked_until is not None and row.locked_until <= now:
+            # F-60: a lapsed lock must not leave the counter at 5 (one more miss would re-lock at once).
+            # auth_record_login(.., true) is the only API-reachable counter reset and only acts on a lapsed
+            # lock; the failure is then counted from zero. (Proper fix is SQL-side, see handoff.)
+            s.execute(text("SELECT auth_record_login(:u, true)"), {"u": row.id})
         s.execute(text("SELECT auth_record_login(:u, :ok)"), {"u": row.id, "ok": ok})
     if not ok or locked:
         raise _invalid()
     if not row.email_verified:
         raise HTTPException(403, "email_not_verified")
-    token, _jti, _exp = security.make_session_token(row.id, cfg.session_ttl_s)
-    csrf_token = _set_cookies(response, cfg, token)
+    token, jti, _exp = security.make_session_token(row.id, cfg.session_ttl_s, security.pw_version(row.password_hash))
+    csrf_token = _set_cookies(response, cfg, token, str(jti))
     with request_session(factory, row.id) as s:
         t = s.execute(text("SELECT tier FROM app_user WHERE id = :u"), {"u": row.id}).scalar_one()
     return {"user": {"id": str(row.id), "tier": t, "email_verified": True}, "csrf_token": csrf_token}

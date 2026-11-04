@@ -3,6 +3,7 @@ git-ignored artifacts dir. Members are hash-verified against the manifest before
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from uuid import UUID
 
@@ -12,6 +13,11 @@ from ml.registry.predictor import predict_with_bundle
 from ml.train.bundle import load_bundle
 
 REGISTRY_ROOT = Path(__file__).resolve().parent
+
+
+def model_version_id(endpoint: str, version: str, weights_sha256: str) -> UUID:
+    """Deterministic id shared by the registry, publish() and the model_version row (ml.registry.sync_db)."""
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"metis:{endpoint}:{version}:{weights_sha256}")
 
 
 class NotTrained(RuntimeError):
@@ -73,10 +79,13 @@ class FileModelRegistry:
 
     def _bundle(self, endpoint: str):
         e = self._entry(endpoint)
-        key = (endpoint, e["weights_sha256"])
+        vid = model_version_id(endpoint, e["card"]["version"], e["weights_sha256"])
+        if str(vid) != e["model_version_id"]:
+            raise ValueError("manifest model_version_id does not match endpoint/version/weights hash")
+        key = (endpoint, e["weights_sha256"], e["bundle_sha256"])
         if key not in self._bundles:
-            self._bundles[key] = load_bundle(self.root / e["bundle_dir"], expected_weights_sha256=e["weights_sha256"])
-        return self._bundles[key], UUID(e["model_version_id"]), e
+            self._bundles[key] = load_bundle(self.root / e["bundle_dir"], e["bundle_sha256"], expected_weights_sha256=e["weights_sha256"])
+        return self._bundles[key], vid, e
 
     def predict(self, endpoint: str, canonical_smiles: str, ensemble_n: int) -> PredictionDetail:
         if ensemble_n not in ENSEMBLE_SIZES:

@@ -34,6 +34,8 @@ class AddCompounds(Strict):
 def _run(request: dict) -> dict:
     try:
         return sandbox.run(request)
+    except sandbox.WorkerBusy:
+        raise HTTPException(status_code=503, detail="structure processing is busy; try again shortly", headers={"Retry-After": "5"}) from None
     except sandbox.WorkerError:
         log.warning("structure worker failed")
         raise HTTPException(status_code=503, detail="structure processing failed or timed out") from None

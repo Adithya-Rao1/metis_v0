@@ -522,7 +522,6 @@ def test_something_creates_the_app_login_role():
     )
 
 
-@defect("F-18", "LOW", "no .dockerignore: build context (repo root) ships deploy/.env, private/, .git to the builder and any stray .env under backend/ is COPYed into the image")
 def test_dockerignore_excludes_secrets():
     p = ROOT / ".dockerignore"
     assert p.exists()

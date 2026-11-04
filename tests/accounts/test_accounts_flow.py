@@ -46,12 +46,62 @@ def test_register_stores_only_token_hash_and_tier_free(client, su):
 
 def test_register_response_uniform_for_existing_email(client, client2):
     a = client.register("dup@example.com")
-    b = client2.register("DUP@example.com")  # case-insensitive duplicate
+    assert client.verify("dup@example.com").status_code == 200
+    b = client2.register("DUP@example.com")  # case-insensitive duplicate of a verified account
     assert a.status_code == b.status_code == 202 and a.json() == b.json()
     assert [k for k, _, _ in client.mailer.outbox] == ["verify", "exists"]
 
 
-@pytest.mark.parametrize("pw", ["short", "a" * 129, "1234567890", "aaaaaaaaaaaa", "password123"])
+def test_reregister_unverified_resends_verification_and_keeps_hash(client, client2, su):
+    client.register("dup@example.com", pw="first correct horse")
+    h1 = su.execute("SELECT password_hash FROM app_user").fetchone()[0]
+    r = client2.register("dup@example.com", pw="attacker chosen pass")
+    assert r.status_code == 202
+    assert [k for k, _, _ in client.mailer.outbox] == ["verify", "verify"]
+    assert su.execute("SELECT password_hash FROM app_user").fetchone()[0] == h1
+
+
+def test_resend_verification_uniform(client, client2):
+    client.register("r@example.com")
+    a = client.post("/auth/resend-verification", {"email": "R@example.com"})
+    b = client2.post("/auth/resend-verification", {"email": "nobody@example.com"})
+    assert a.status_code == b.status_code == 202 and a.json() == b.json()
+    assert [k for k, _, _ in client.mailer.outbox] == ["verify", "verify"]
+    assert client.verify("r@example.com").status_code == 200
+    client.post("/auth/resend-verification", {"email": "r@example.com"})  # verified: silent no-op
+    assert len(client.mailer.outbox) == 2
+
+
+def test_password_reset_flow_revokes_sessions(client, client2):
+    client.register("p@example.com")
+    client.verify("p@example.com")
+    assert client.login("p@example.com").status_code == 200
+    assert client.get("/auth/me").status_code == 200
+    r = client2.post("/auth/forgot", {"email": "P@example.com"})
+    assert r.status_code == 202
+    assert client2.post("/auth/forgot", {"email": "ghost@example.com"}).json() == r.json()
+    kind, _, tok = client2.mailer.outbox[-1]
+    assert kind == "reset"
+    assert client2.post("/auth/reset", {"token": tok, "password": "password1234"}).status_code == 422
+    assert client2.post("/auth/reset", {"token": tok, "password": "brand new horse staple"}).status_code == 200
+    assert client2.post("/auth/reset", {"token": tok, "password": "another new horse staple"}).status_code == 400
+    assert client.get("/auth/me").status_code == 401  # old session dead
+    assert client2.login("p@example.com", "brand new horse staple").status_code == 200
+    assert client2.login("p@example.com").status_code == 401
+
+
+def test_login_email_normalised_like_register(client):
+    assert client.register("Ａlice@example.com").status_code == 202
+    client.verify("alice@example.com")
+    assert client.login("Ａlice@example.com").status_code == 200
+
+
+def test_password_equal_to_email_local_part_rejected(client):
+    assert client.register("longlocalpart@example.com", pw="longlocalpart").status_code == 422
+    assert client.register("Mixed.Name99@example.com", pw="mixed.name99").status_code == 422
+
+
+@pytest.mark.parametrize("pw", ["short", "a" * 129, "1234567890", "aaaaaaaaaaaa", "password123", "Password123!", "qwerty123456"])
 def test_password_policy(client, su, pw):
     r = client.register(pw=pw)
     assert r.status_code == 422

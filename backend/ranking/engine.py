@@ -16,7 +16,7 @@ rank are returned with the per-property stacked breakdown. There is no verdict f
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from pydantic import BaseModel
@@ -31,7 +31,11 @@ class RankingError(ValueError):
 @dataclass(frozen=True)
 class EndpointInfo:
     default_range: tuple[float, float]
-    median_width: Optional[float] = None  # median calibration interval width (regression only)
+    median_width: Optional[float] = None  # median calibration interval width (regression only), N-independent fallback
+    median_width_by_n: dict[int, float] = field(default_factory=dict)  # ensemble N -> median width
+
+    def width_for(self, ensemble_n: int) -> Optional[float]:
+        return self.median_width_by_n.get(ensemble_n, self.median_width)
 
 
 class PropertyBreakdown(BaseModel):
@@ -81,7 +85,7 @@ def confidence(pred: Prediction, median_width: Optional[float]) -> float:
             raise RankingError("classification prediction without probability")
         return 1.0 - binary_entropy(pred.probability)
     if median_width is None or not median_width > 0:
-        raise RankingError(f"no median calibration width for endpoint {pred.endpoint}")
+        raise RankingError(f"no median calibration width for endpoint {pred.endpoint} at ensemble size {pred.ensemble_n}")
     if pred.interval_low is None or pred.interval_high is None:
         raise RankingError("regression prediction without interval")
     width = pred.interval_high - pred.interval_low
@@ -155,7 +159,7 @@ def rank_compounds(
             else:
                 raise RankingError(f"no desirability range for endpoint {w.endpoint}")
             d = desirability(point_value(pred), lo, hi, w.higher_is_better)
-            cc = confidence(pred, ei.median_width if ei else None)
+            cc = confidence(pred, ei.width_for(pred.ensemble_n) if ei else None)
             share = w.weight / w_total
             s += share * d
             c += share * cc

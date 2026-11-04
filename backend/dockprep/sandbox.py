@@ -17,7 +17,8 @@ import time
 from pathlib import Path
 
 from .errors import DockprepError
-from .limits import MAX_CONCURRENT_JOBS, SANDBOX_CPU_S, SANDBOX_MEM_BYTES, SANDBOX_TIMEOUT_S
+from .limits import (MAX_CONCURRENT_JOBS, OVERSIZE_BYTES, OVERSIZE_CPU_S, OVERSIZE_TIMEOUT_S, QUEUE_WAIT_S, SANDBOX_CPU_S, SANDBOX_MEM_BYTES,
+                     SANDBOX_TIMEOUT_S)
 
 log = logging.getLogger("metis.dockprep")
 _WORKER = str(Path(__file__).with_name("worker.py"))
@@ -25,12 +26,21 @@ _slots = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
 MAX_RESULT_BYTES = 80 * 1024 * 1024
 
 
+def budget_for(payload: dict, timeout: int = SANDBOX_TIMEOUT_S) -> tuple[int, int]:
+    """(cpu_s, wall_s). Oversized structures get a smaller budget so one request cannot hold a slot for the full limit."""
+    size = len(payload.get("data_b64") or "") * 3 // 4
+    if size > OVERSIZE_BYTES:
+        return min(SANDBOX_CPU_S, OVERSIZE_CPU_S), min(timeout, OVERSIZE_TIMEOUT_S)
+    return SANDBOX_CPU_S, timeout
+
+
 def run_sandboxed(op: str, payload: dict, timeout: int = SANDBOX_TIMEOUT_S) -> dict:
-    if not _slots.acquire(blocking=False):
+    cpu_s, timeout = budget_for(payload, timeout)
+    if not _slots.acquire(timeout=QUEUE_WAIT_S):
         raise DockprepError("busy", "Docking prep is busy; try again shortly.", 503)
     t0 = time.monotonic()
     try:
-        env = {"PATH": os.environ.get("PATH", ""), "METIS_DP_CPU": str(SANDBOX_CPU_S), "METIS_DP_MEM": str(SANDBOX_MEM_BYTES)}
+        env = {"PATH": os.environ.get("PATH", ""), "METIS_DP_CPU": str(cpu_s), "METIS_DP_MEM": str(SANDBOX_MEM_BYTES)}
         for k in ("METIS_PDB2PQR", "METIS_FPOCKET"):
             if k in os.environ:
                 env[k] = os.environ[k]

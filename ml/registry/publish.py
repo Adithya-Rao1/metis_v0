@@ -7,7 +7,6 @@ import math
 import os
 import re
 import time
-import uuid
 from pathlib import Path
 
 from backend.schemas.contracts import ENSEMBLE_SIZES
@@ -15,8 +14,9 @@ from backend.schemas.interfaces import ModelCard
 from ml.data import cards
 from ml.data.manifest import MANIFEST_PATH, assert_trainable
 from ml.registry.predictor import predict_with_bundle
-from ml.registry.registry import REGISTRY_ROOT
-from ml.train.bundle import load_bundle, sha256_file, weights_sha256
+from ml.registry.registry import REGISTRY_ROOT, model_version_id
+from ml.benchmarks.protocol import test_set_sha256
+from ml.train.bundle import bundle_files_sha256, bundle_sha256, dataset_sha256, load_bundle, weights_sha256
 
 _PLACEHOLDER = re.compile(r"placeholder|todo|tbd|lorem|xxx|fixme|n/a|not yet", re.I)
 
@@ -88,8 +88,10 @@ def build_card(meta: dict, bundle, version_id, benchmark: dict, manifest_path, r
                  "size": next(d["n"] for d in meta["datasets"] if d["id"] == e.id),
                  "split": f"{meta['split']} (train/cal/test = {split_sizes[0]}/{split_sizes[1]}/{split_sizes[2]})"}
                 for e in entries.values()]
+    widths: dict[str, float] = {}
     if kind == "regression":
         cov = {n: v["coverage"] for n, v in benchmark["coverage_by_n"].items()}
+        widths = {n: float(v["median_cal_width"]) for n, v in benchmark["coverage_by_n"].items()}  # F-72: ranking confidence
     else:  # classification: 1 - ECE of the Venn-Abers probability on the held-out test set
         cov = {n: min(max(1 - v["venn_abers"]["ece"], 0.01), 0.99) for n, v in benchmark["reliability_by_n"].items()}
     bm = {k: benchmark[k] for k in ("split", "split_sizes", "metrics", "paired_5x2cv", "noise_ceiling", "gse_note",
@@ -97,15 +99,59 @@ def build_card(meta: dict, bundle, version_id, benchmark: dict, manifest_path, r
     return ModelCard(endpoint=meta["endpoint"], version=meta["version"], kind=kind, units=meta.get("units"),
                      datasets=datasets, limitations=limitations or cards.LIMITATIONS[kind], split_type=meta["split"],
                      benchmark=bm, coverage_by_n=cov, runtime_by_n_seconds=runtime_by_n,
-                     default_range=tuple(meta["default_range"]), weights_sha256=meta["weights_sha256"])
+                     default_range=tuple(meta["default_range"]), median_calibration_width_by_n=widths, weights_sha256=meta["weights_sha256"])
+
+
+def verify_datasets(meta: dict, manifest_path) -> None:
+    """F-104: derive every dataset's identity from the cleared manifest by id and require meta.json to agree."""
+    ds = meta.get("datasets")
+    if not isinstance(ds, list) or not ds:
+        raise PublishRefused("meta.json lists no datasets")
+    ids = [d.get("id") for d in ds]
+    if len(set(ids)) != len(ids):
+        raise PublishRefused("duplicate dataset ids in meta.json")
+    rows = meta.get("dataset_of_row")
+    for d in ds:
+        e = assert_trainable(d["id"], manifest_path)  # license gate; raises LicenseError / KeyError
+        if e.kind != meta["kind"]:
+            raise PublishRefused(f"dataset {e.id} is {e.kind}, bundle is {meta['kind']}")
+        for k, want in (("name", e.name), ("source_url", e.source_url), ("license_as_stated", e.license_as_stated), ("kind", e.kind)):
+            if d.get(k) != want:
+                raise PublishRefused(f"meta.json dataset {e.id} {k}={d.get(k)!r} does not match the cleared manifest ({want!r})")
+        if rows is not None:
+            if len(rows) != len(meta["all_smiles"]):
+                raise PublishRefused("meta.json dataset_of_row length mismatch")
+            sel = [i for i, r in enumerate(rows) if r == e.id]
+            if len(sel) != d.get("n") or dataset_sha256([meta["all_smiles"][i] for i in sel], [meta["all_y"][i] for i in sel]) != d.get("sha256"):
+                raise PublishRefused(f"dataset {e.id}: rows in the bundle do not match its recorded n/sha256")
+        else:
+            raise PublishRefused("meta.json has no per-row dataset assignment (dataset_of_row); cannot verify provenance")
+    if set(rows) != set(ids):
+        raise PublishRefused("bundle rows reference datasets not listed in meta.json")
+
+
+def verify_benchmark(meta: dict, benchmark: dict) -> None:
+    """F-100: the benchmark must describe exactly this bundle's split, seed, ensemble, params and test compounds."""
+    if benchmark.get("endpoint") != meta["endpoint"] or benchmark.get("split") != meta["split"] or benchmark.get("kind") != meta["kind"]:
+        raise PublishRefused("benchmark report does not match this bundle (endpoint/kind/split)")
+    if list(benchmark.get("split_sizes") or []) != list(meta["split_sizes"]):
+        raise PublishRefused("benchmark split sizes differ from the bundle's split")
+    if benchmark.get("seed") != meta["base_seed"]:
+        raise PublishRefused("benchmark seed differs from the bundle's seed")
+    if benchmark.get("n_members") != meta["n_members"]:
+        raise PublishRefused("benchmark n_members differs from the bundle's")
+    if benchmark.get("member_params") != meta.get("member_params", {}):
+        raise PublishRefused("benchmark member params differ from the bundle's")
+    want = test_set_sha256([meta["all_smiles"][i] for i in meta["split_indices"]["test"]])
+    if benchmark.get("test_sha256") != want:
+        raise PublishRefused("benchmark test set differs from the bundle's held-out test set")
 
 
 def publish(bundle_dir: Path | str, benchmark: dict, registry_root: Path | str = REGISTRY_ROOT,
             manifest_path=MANIFEST_PATH, limitations: str | None = None) -> ModelCard:
     bundle_dir, registry_root = Path(bundle_dir).resolve(), Path(registry_root).resolve()
     meta = json.loads((bundle_dir / "meta.json").read_text())
-    for d in meta["datasets"]:
-        assert_trainable(d["id"], manifest_path)  # license gate; raises LicenseError
+    verify_datasets(meta, manifest_path)  # license gate + ids/names/licences derived from the manifest
     if registry_root / "artifacts" not in bundle_dir.parents:
         raise PublishRefused("bundle must live under <registry_root>/artifacts/")
     if meta["code_commit"] == "unknown":
@@ -113,14 +159,15 @@ def publish(bundle_dir: Path | str, benchmark: dict, registry_root: Path | str =
     actual = weights_sha256(bundle_dir / "members")
     if actual != meta["weights_sha256"]:
         raise PublishRefused("weights hash does not match bundle meta")
-    if benchmark.get("endpoint") != meta["endpoint"] or benchmark.get("split") != meta["split"] or benchmark.get("kind") != meta["kind"]:
-        raise PublishRefused("benchmark report does not match this bundle (endpoint/kind/split)")
+    verify_benchmark(meta, benchmark)
     if benchmark.get("ns") is None or set(benchmark["ns"]) != set(ENSEMBLE_SIZES):
         raise PublishRefused("benchmark must cover N in (3,5,10,20)")
     t = time.perf_counter()
-    bundle = load_bundle(bundle_dir, expected_weights_sha256=actual)
+    files_sha = bundle_files_sha256(bundle_dir)
+    bsha = bundle_sha256(bundle_dir)
+    bundle = load_bundle(bundle_dir, bsha, expected_weights_sha256=actual)
     load_s = time.perf_counter() - t
-    vid = uuid.uuid5(uuid.NAMESPACE_URL, f"metis:{meta['endpoint']}:{meta['version']}:{actual}")
+    vid = model_version_id(meta["endpoint"], meta["version"], actual)
     test_smiles = [meta["all_smiles"][i] for i in meta["split_indices"]["test"]][:5]
     per = measure_runtime(bundle, vid, test_smiles)
     card = build_card(meta, bundle, vid, benchmark, manifest_path, per, limitations)
@@ -128,13 +175,14 @@ def publish(bundle_dir: Path | str, benchmark: dict, registry_root: Path | str =
     entry = {
         "version": meta["version"], "model_version_id": str(vid),
         "bundle_dir": str(bundle_dir.relative_to(registry_root)), "weights_sha256": actual,
+        "bundle_sha256": bsha, "bundle_files_sha256": files_sha,
         "card": json.loads(card.model_dump_json()),
         "runtime": {"fixed_overhead_seconds": load_s, "seconds_per_compound_by_n": per,
                     "measured_on_n_compounds": len(test_smiles)},
         "provenance": {"datasets": meta["datasets"], "code_commit": meta["code_commit"], "seeds": {
             "base_seed": meta["base_seed"], "member_seeds": meta["member_seeds"]}, "backend": meta["backend"],
             "member_params": meta["member_params"],
-            "member_files_sha256": {p.name: sha256_file(p) for p in sorted((bundle_dir / "members").iterdir()) if p.is_file()}},
+            "member_files_sha256": {k.split("/", 1)[1]: v for k, v in files_sha.items() if k.startswith("members/")}},
         "calibration_by_n": {n: {k: v for k, v in c.items() if k != "err_model"}
                              for n, c in json.loads((bundle_dir / "calibration.json").read_text())["conformal"].items()}
         if meta["kind"] == "regression" else {

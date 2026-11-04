@@ -12,7 +12,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .limits import SUBPROCESS_TIMEOUT_S
+from .errors import DockprepError
+from .limits import MAX_POCKET_GRID_CELLS, SUBPROCESS_TIMEOUT_S
 from .pdbio import Atom, write_pdb
 
 _DIRS = np.array([d for d in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
@@ -44,8 +45,9 @@ def geometric_pockets(atoms: list[Atom], min_points: int = 30, max_pockets: int 
     g = 1.0
     origin = heavy.min(axis=0) - 12.0
     dims = tuple(int(x) + 1 for x in (heavy.max(axis=0) + 12.0 - origin) / g)
-    if dims[0] * dims[1] * dims[2] > 40_000_000:
-        return []
+    if dims[0] * dims[1] * dims[2] > MAX_POCKET_GRID_CELLS:
+        raise DockprepError("too_extended", "Structure extent is too large for pocket detection (grid limit exceeded); "
+                            "select fewer chains or define the site by residues, ligand or box.", 422)
     idx = np.rint((heavy - origin) / g).astype(int)
     solid = _stamp(idx, dims, 2, 4.0)           # protein body: within 2.0 A of an atom centre
     near = _stamp(idx, dims, 3, 9.0)            # too close for a ligand atom: within 3.0 A

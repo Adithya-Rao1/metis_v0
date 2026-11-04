@@ -76,6 +76,12 @@ def cv5x2_paired_t(smiles, y, kind, member_cls, member_params, n_members=3, seed
             "loss": "rmse" if kind == "regression" else "1-auroc", "comparison": "ensemble mean vs RF(Morgan)"}
 
 
+def test_set_sha256(test_smiles) -> str:
+    """Order-independent digest of the held-out test compounds; publish compares it with the bundle's test set."""
+    import hashlib
+    return hashlib.sha256("\n".join(sorted(test_smiles)).encode()).hexdigest()
+
+
 def run_benchmark(smiles, y, kind: str, *, split_method: str, member_cls, member_params=None, endpoint: str = "endpoint",
                   dates=None, n_members: int = POOL_SIZE, seed: int = 0, noise_sd: float | None = None,
                   frac=(0.6, 0.2, 0.2), rf_trees: int = 50, cv_members: int = 3, run_cv: bool = True,
@@ -91,7 +97,8 @@ def run_benchmark(smiles, y, kind: str, *, split_method: str, member_cls, member
     Pc, Pt = pool.predict_members(ca_s), pool.predict_members(te_s)
     ns = [n for n in N_VALUES if n <= n_members]
     rep: dict = {"endpoint": endpoint, "kind": kind, "split": split_method, "split_sizes": [len(tr), len(ca), len(te)],
-                 "seed": seed, "n_members": n_members, "ns": ns, "random_split_results": "never reported",
+                 "seed": seed, "n_members": n_members, "ns": ns,
+                 "member_params": dict(member_params or {}), "test_sha256": test_set_sha256(te_s), "random_split_results": "never reported",
                  "ensemble_note": "metrics use the mean of all pool members"}
     ytr, yte = y[tr], y[te]
     rf = baselines.rf_baseline(tr_s, ytr, kind, n_estimators=rf_trees, seed=seed)

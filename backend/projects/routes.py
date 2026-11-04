@@ -126,22 +126,38 @@ def add_measurement(project_id: uuid.UUID, body: MeasurementCreate, sc: Scope = 
     return {"id": row["id"], "compound_id": body.compound_id, "endpoint": body.endpoint, "value": body.value, "unit": body.unit, "assay": body.assay, "label": "measured", "created_at": row["created_at"]}
 
 
+@router.get("/projects/{project_id}/ranking")
+def get_ranking_config(project_id: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
+    """The persisted ranking config (null if none was saved yet)."""
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        cfg = s.execute(text("SELECT ranking_config FROM project WHERE id = :pid AND owner_id = :uid"), {"pid": project_id, "uid": sc.user.id}).scalar_one()
+    return {"config": cfg, "persisted": cfg is not None}
+
+
 @router.put("/projects/{project_id}/ranking")
 def put_ranking(project_id: uuid.UUID, config: RankingConfig, sc: Scope = Depends(scope), registry: ModelRegistry = Depends(get_registry)) -> dict:
-    """Validate the ranking config and return the ranking computed from the latest stored predictions.
-
-    The config is NOT persisted: the project table has no column for it (needs a migration; see handoff).
-    """
+    """Validate and persist the ranking config (project.ranking_config) and return the ranking computed from the
+    latest stored predictions. A config that cannot be ranked (422) is not persisted. Predictions made with a
+    model version other than the current one are flagged in `stale_predictions` / `stale_model_version`."""
     with sc.session() as s:
         require_project(s, sc.user.id, project_id)
         try:
-            ranked = rank_project(s, registry, sc.user.id, project_id, config)
+            ranked, stale = rank_project(s, registry, sc.user.id, project_id, config)
         except RankingError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
+        s.execute(
+            text("UPDATE project SET ranking_config = CAST(:c AS jsonb) WHERE id = :pid AND owner_id = :uid"),
+            {"c": config.model_dump_json(), "pid": project_id, "uid": sc.user.id},
+        )
+    stale_by_c: dict[str, list[str]] = {}
+    for x in stale:
+        stale_by_c.setdefault(x["compound_id"], []).append(x["endpoint"])
     return {
         "config": config.model_dump(mode="json"),
-        "persisted": False,
+        "persisted": True,
         "formula": "R_j = (1 - lam) S_j + lam C_j",
-        "ranking": [r.model_dump(mode="json") for r in ranked],
+        "stale_model_version": bool(stale),
+        "stale_predictions": stale,
+        "ranking": [{**r.model_dump(mode="json"), "stale_endpoints": stale_by_c.get(r.compound_id, [])} for r in ranked],
     }
-

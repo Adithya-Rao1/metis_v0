@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,6 +32,27 @@ def weights_sha256(members_dir: Path) -> str:
     for p in sorted(Path(members_dir).iterdir()):
         if p.is_file():
             h.update(p.name.encode() + b"\0" + sha256_file(p).encode() + b"\n")
+    return h.hexdigest()
+
+
+def bundle_files_sha256(root: Path | str) -> dict[str, str]:
+    """sha256 of EVERY file in the bundle (members, calibration.json, train_data.json (similarity index source),
+    meta.json, anything else), keyed by posix relative path. Symlinks are refused."""
+    root = Path(root)
+    out: dict[str, str] = {}
+    for p in sorted(root.rglob("*")):
+        if p.is_symlink():
+            raise ValueError(f"symlink in bundle: {p}")
+        if p.is_file():
+            out[p.relative_to(root).as_posix()] = sha256_file(p)
+    return out
+
+
+def bundle_sha256(root: Path | str) -> str:
+    """One digest over the sorted (relative path, file sha256) list of the whole bundle."""
+    h = hashlib.sha256()
+    for name, digest in bundle_files_sha256(root).items():
+        h.update(name.encode() + b"\0" + digest.encode() + b"\n")
     return h.hexdigest()
 
 
@@ -126,13 +148,18 @@ def save_calibration(root: Path, conformal, class_cal, err_models, extra: dict) 
     (root / "calibration.json").write_text(json.dumps(d))
 
 
-def load_bundle(root: Path | str, expected_weights_sha256: str | None = None) -> Bundle:
-    """Loads a bundle. If expected_weights_sha256 is given the members are hash-verified BEFORE any
-    deserialisation (sklearn members are joblib files)."""
+def load_bundle(root: Path | str, expected_bundle_sha256: str, expected_weights_sha256: str | None = None) -> Bundle:
+    """Loads a bundle. The whole-bundle hash is MANDATORY and verified BEFORE any file is parsed or deserialised
+    (sklearn members are joblib files = arbitrary code on load). The expected value must come from an out-of-band
+    record (the registry manifest), never be recomputed from the same directory."""
     root = Path(root)
+    if not isinstance(expected_bundle_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_bundle_sha256):
+        raise ValueError("a verified bundle sha256 is required to load a bundle")
+    if bundle_sha256(root) != expected_bundle_sha256:
+        raise ValueError("bundle hash mismatch: refusing to load (a bundle file was added, removed or modified)")
     meta = json.loads((root / "meta.json").read_text())
-    actual = weights_sha256(root / "members")
-    if expected_weights_sha256 is not None and actual != expected_weights_sha256:
+    if weights_sha256(root / "members") != meta["weights_sha256"] or (
+            expected_weights_sha256 is not None and weights_sha256(root / "members") != expected_weights_sha256):
         raise ValueError("weights hash mismatch: refusing to load members")
     cal = json.loads((root / "calibration.json").read_text())
     td = json.loads((root / "train_data.json").read_text())

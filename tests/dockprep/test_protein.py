@@ -139,3 +139,75 @@ def test_fallback_without_pdb2pqr_logs_method(monkeypatch, pdb_1m17):
     r = prepare_protein(pdb_1m17.encode(), add_h=True, ph=7.4)
     e = next(x for x in r["change_log"] if x["step"] == "hydrogens")
     assert "not available" in e["action"] and r["report"]["hydrogens"]["hydrogens_added"] == 0
+
+
+# ---- Wave 2 QA regressions (F-90, F-91, F-92) ----
+def _ca_line(i, x, y, z):
+    return "ATOM  %5d  CA  ALA A%4d    %8.3f%8.3f%8.3f  1.00 20.00           C" % (i % 100000, i % 10000, x, y, z)
+
+
+def test_prepare_protein_scales_linearly():
+    import random
+    import time
+
+    from backend.dockprep.protein import prepare_protein
+
+    random.seed(1)
+    lines = [_ca_line(i, random.uniform(0, 150), random.uniform(0, 150), random.uniform(0, 150)) for i in range(1, 8001)]
+    t = time.time()
+    prepare_protein(("\n".join(lines) + "\nEND\n").encode(), add_h=False)
+    assert time.time() - t < 3.0
+
+
+def test_geometric_pockets_extent_bounded_fails_fast():
+    import time
+
+    import pytest
+
+    from backend.dockprep.errors import DockprepError
+    from backend.dockprep.pdbio import parse_pdb
+    from backend.dockprep.pockets import geometric_pockets
+
+    lines = [_ca_line(i + 1, 300.0 * (i % 2) + i * 0.1, 0.0, 300.0 * (i // 2 % 2)) for i in range(40)]
+    lines += [_ca_line(100 + i, i * 0.1, 300.0, 0.0) for i in range(5)]
+    st = parse_pdb("\n".join(lines) + "\nEND\n")
+    t = time.time()
+    with pytest.raises(DockprepError) as ei:
+        geometric_pockets(st.atoms)
+    assert ei.value.code == "too_extended" and time.time() - t < 2.0
+
+
+def test_altloc_policy_is_mean_occupancy_and_log_says_so():
+    from backend.dockprep.pdbio import parse_pdb
+    from backend.dockprep.protein import ChangeLog, resolve_altlocs
+
+    def ln(i, name, alt, occ, x):
+        return "ATOM  %5d %-4s%1s%3s A%4d    %8.3f%8.3f%8.3f%6.2f 20.00           %s" % (i, name, alt, "LYS", 5, x, 0, 0, occ, name[0])
+
+    st = parse_pdb("\n".join([ln(1, "CD", "A", .4, 1), ln(2, "CE", "A", .4, 2), ln(3, "NZ", "A", .4, 3), ln(4, "CD", "B", .6, 1.1)]) + "\nEND\n")
+    log = ChangeLog()
+    out = resolve_altlocs(st.atoms, log)
+    e = log.entries[0]
+    assert e["params"]["kept"] == "B" and "mean occupancy" in e["detail"] and "mean occupancy" in e["params"]["policy"]
+    assert len(out) == 1
+
+
+def test_sandbox_budget_and_queue_timeout(monkeypatch):
+    import pytest
+
+    from backend.dockprep import sandbox
+    from backend.dockprep.errors import DockprepError
+
+    small = sandbox.budget_for({"data_b64": "A" * 100})
+    big = sandbox.budget_for({"data_b64": "A" * (4 * 1024 * 1024)})
+    assert big[0] < small[0] and big[1] < small[1]
+    monkeypatch.setattr(sandbox, "QUEUE_WAIT_S", 0.05)
+    for _ in range(sandbox.MAX_CONCURRENT_JOBS):
+        assert sandbox._slots.acquire(blocking=False)
+    try:
+        with pytest.raises(DockprepError) as ei:
+            sandbox.run_sandboxed("ligand", {"smiles": "CCO"})
+        assert ei.value.status == 503
+    finally:
+        for _ in range(sandbox.MAX_CONCURRENT_JOBS):
+            sandbox._slots.release()

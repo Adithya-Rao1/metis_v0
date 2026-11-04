@@ -98,7 +98,11 @@ def run_training(cfg: dict, *, manifest_path=MANIFEST_PATH, loader: Callable[[di
             "split_indices": {"train": [int(i) for i in tr], "cal": [int(i) for i in ca], "test": [int(i) for i in te]},
             "datasets": [{"id": e.id, "sha256": B.dataset_sha256([s for s, d in zip(smiles, ds_of) if d == e.id],
                                                                   [v for v, d in zip(y, ds_of) if d == e.id]),
-                          "n": sum(1 for d in ds_of if d == e.id)} for e in entries],
+                          "n": sum(1 for d in ds_of if d == e.id),
+                          # snapshot of the cleared manifest entry; publish re-derives and compares (F-104)
+                          "name": e.name, "source_url": e.source_url, "license_as_stated": e.license_as_stated,
+                          "kind": e.kind} for e in entries],
+            "dataset_of_row": ds_of,
             "units": entries[0].units, "default_range": [float(y[tr].min()), float(y[tr].max())],
             "code_commit": B.code_commit(), "weights_sha256": B.weights_sha256(root / "members"),
             "all_smiles": smiles, "all_y": [float(v) for v in y]}

@@ -87,22 +87,25 @@ def resolve_altlocs(atoms: list[Atom], log: ChangeLog) -> list[Atom]:
     out: list[Atom] = []
     for k in order:
         ats = by_res[k]
-        labels: dict[str, float] = {}
+        sums: dict[str, float] = {}
+        counts: dict[str, int] = {}
         for a in ats:
             if a.altloc:
-                labels[a.altloc] = labels.get(a.altloc, 0.0) + a.occ
-        if not labels:
+                sums[a.altloc] = sums.get(a.altloc, 0.0) + a.occ
+                counts[a.altloc] = counts.get(a.altloc, 0) + 1
+        if not sums:
             out.extend(ats)
             continue
-        keep = max(labels, key=lambda lab: (round(labels[lab], 6), -ord(lab[0])))   # highest occupancy; tie -> earliest label
-        n_labels = {lab: round(v / max(1, sum(1 for a in ats if a.altloc == lab)), 2) for lab, v in labels.items()}
+        labels = {lab: sums[lab] / counts[lab] for lab in sums}                      # MEAN occupancy per label
+        keep = max(labels, key=lambda lab: (round(labels[lab], 6), -ord(lab[0])))   # highest mean; tie -> earliest label
+        n_labels = {lab: round(v, 2) for lab, v in labels.items()}
         for a in ats:
             if not a.altloc or a.altloc == keep:
                 a.altloc = ""
                 out.append(a)
         log.add("altloc", "resolved alternate locations", rid(*k) + f" {ats[0].resname}",
                 f"kept altloc {keep} (highest mean occupancy); discarded {sorted(set(labels) - {keep})}",
-                kept=keep, mean_occupancy_by_altloc=n_labels, policy="highest occupancy, ties to first label")
+                kept=keep, mean_occupancy_by_altloc=n_labels, policy="highest mean occupancy over the atoms carrying each label, ties to first label")
     return out
 
 
@@ -356,7 +359,8 @@ def prepare_protein(data: bytes, chains: list[str] | None = None, remove_waters:
             keep_ids.add((h["chain"], h["resseq"], h["icode"], h["resname"]))
     atoms = [a for a in atoms if not (a.record == "HETATM" and a.resname not in WATER and not is_het_polymer(a) and (a.chain, a.resseq, a.icode, a.resname) not in keep_ids)]
     prot = [a for a in atoms if a.record == "ATOM" or is_het_polymer(a)]
-    het_kept = [a for a in atoms if a not in prot]
+    prot_ids = {id(a) for a in prot}                      # identity set: O(n), not O(n^2) dataclass-equality list scans
+    het_kept = [a for a in atoms if id(a) not in prot_ids]
     if not prot:
         raise DockprepError("bad_structure", "No protein atoms remain after preparation.", 422)
     missing = detect_missing(prot, st, sel, log)

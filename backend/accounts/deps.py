@@ -6,6 +6,9 @@ Identity reaches Postgres only through `backend.core.db.request_session` (SET LO
 
 from __future__ import annotations
 
+import hmac
+import logging
+import random
 import threading
 import time
 import uuid
@@ -22,6 +25,7 @@ from backend.accounts.mailer import ConsoleMailer, Mailer
 from backend.core.db import make_engine, make_session_factory, request_session
 from backend.schemas.interfaces import UserCtx
 
+log = logging.getLogger("metis.accounts")
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 TERMS_DOCS = ("terms", "privacy", "disclaimer")
 _lock = threading.Lock()
@@ -62,12 +66,43 @@ def client_ip(request: Request, cfg: AccountsConfig) -> str:
     return (request.client.host if request.client else "unknown")[:64]
 
 
+def csrf_bind(request: Request) -> str:
+    """CSRF tokens are bound to the session jti when a valid session cookie is present, else to "anon"."""
+    token = request.cookies.get(COOKIE_SESSION)
+    claims = security.read_session_token(token) if token else None
+    return claims["jti"] if claims else security.ANON_BIND
+
+
 def csrf_protect(request: Request) -> None:
     """Double-submit check on every mutating request, including pre-login ones."""
     if request.method in SAFE_METHODS:
         return
-    if not security.csrf_valid(request.cookies.get(COOKIE_CSRF), request.headers.get(CSRF_HEADER)):
+    cfg = get_config(request)
+    if not security.csrf_valid(
+        request.cookies.get(COOKIE_CSRF),
+        request.headers.get(CSRF_HEADER),
+        csrf_bind(request),
+        cfg.session_ttl_s,
+    ):
         raise HTTPException(403, "csrf_failed")
+
+
+PURGE_PROBABILITY = 0.01
+PURGE_MIN_AGE_S = 7200  # longer than every configured window (max 3600 s)
+
+
+def purge_expired_buckets(factory: sessionmaker[Session], older_than_s: int = PURGE_MIN_AGE_S) -> int:
+    """Opportunistic cleanup (F-65): drop buckets whose window ended long ago. Never raises."""
+    try:
+        with request_session(factory, None) as s:
+            res = s.execute(
+                text("DELETE FROM rate_limit_bucket WHERE window_start < now() - make_interval(secs => :age)"),
+                {"age": older_than_s},
+            )
+            return res.rowcount or 0
+    except Exception:  # best effort; the limiter must keep working
+        log.warning("rate_limit_bucket purge failed (needs SELECT(window_start) grant?)")
+        return 0
 
 
 def rate_limit(factory: sessionmaker[Session], key_hash: str, limit: int, window_s: int) -> None:
@@ -77,6 +112,8 @@ def rate_limit(factory: sessionmaker[Session], key_hash: str, limit: int, window
         hits = s.execute(
             text("SELECT rate_limit_hit(:k, to_timestamp(:w))"), {"k": key_hash, "w": window_start}
         ).scalar_one()
+    if random.random() < PURGE_PROBABILITY:
+        purge_expired_buckets(factory, max(2 * window_s, PURGE_MIN_AGE_S))
     if hits > limit:
         retry = max(1, window_s - (int(time.time()) - window_start))
         raise HTTPException(429, "rate_limited", headers={"Retry-After": str(retry)})
@@ -103,12 +140,15 @@ def _authenticate(request: Request) -> Session_:
     with request_session(factory, uid) as s:
         row = s.execute(
             text(
-                "SELECT tier, email_verified_at IS NOT NULL AS v FROM app_user "
+                "SELECT tier, email_verified_at IS NOT NULL AS v, password_hash FROM app_user "
                 "WHERE id = :u AND deleted_at IS NULL"
             ),
             {"u": uid},
         ).one_or_none()
     if row is None or not row.v:
+        raise HTTPException(401, "not_authenticated")
+    pwv = claims.get("pwv")  # absent only on tokens we no longer issue; present tokens die on password change
+    if pwv is not None and not hmac.compare_digest(str(pwv), security.pw_version(row.password_hash)):
         raise HTTPException(401, "not_authenticated")
     return Session_(UserCtx(id=uid, tier=row.tier, email_verified=row.v), jti, int(claims["exp"]))
 

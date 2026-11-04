@@ -1,7 +1,9 @@
 """Job queue interface and an in-process implementation.
 
 State is held in memory only (lost on restart); RESULTS are persisted by the job function to the prediction
-table. Durable jobs need a migration (job table) and a worker process: see the Agent 6 handoff.
+table. The `job` table from migration 0003 is not yet wired up (durable jobs need a separate worker process).
+Bounds: finished records are evicted oldest-first wherever they sit; a hard cap on tracked records; a per-user
+quota of queued/running jobs (`max_active`, the route answers 429).
 Jobs are owner-scoped: `get` returns None for anyone but the owner (callers answer 404).
 """
 
@@ -18,6 +20,11 @@ from typing import Literal, Optional, Protocol
 
 State = Literal["queued", "running", "done", "failed"]
 MAX_TRACKED = 500
+MAX_ACTIVE_PER_USER = 10
+
+
+class QuotaExceeded(Exception):
+    """The owner already has the maximum number of queued/running jobs."""
 
 
 @dataclass
@@ -42,7 +49,7 @@ JobFn = Callable[[Progress], None]
 
 
 class JobQueue(Protocol):
-    def submit(self, owner_id: uuid.UUID, project_id: uuid.UUID, total: int, estimate_seconds: float, fn: JobFn) -> JobRecord: ...
+    def submit(self, owner_id: uuid.UUID, project_id: uuid.UUID, total: int, estimate_seconds: float, fn: JobFn, max_active: Optional[int] = None) -> JobRecord: ...
     def get(self, owner_id: uuid.UUID, job_id: uuid.UUID) -> Optional[JobRecord]: ...
 
 
@@ -53,18 +60,17 @@ class InProcessJobQueue:
         self._futures: dict[uuid.UUID, object] = {}
         self._lock = threading.Lock()
 
-    def submit(self, owner_id: uuid.UUID, project_id: uuid.UUID, total: int, estimate_seconds: float, fn: JobFn) -> JobRecord:
+    def submit(self, owner_id: uuid.UUID, project_id: uuid.UUID, total: int, estimate_seconds: float, fn: JobFn, max_active: Optional[int] = None) -> JobRecord:
         rec = JobRecord(uuid.uuid4(), owner_id, project_id, total, estimate_seconds=estimate_seconds)
         with self._lock:
+            if max_active is not None and sum(1 for j in self._jobs.values() if j.owner_id == owner_id and j.state in ("queued", "running")) >= max_active:
+                raise QuotaExceeded()
             self._jobs[rec.id] = rec
-            while len(self._jobs) > MAX_TRACKED:
-                oldest = next(iter(self._jobs))
-                if self._jobs[oldest].state in ("queued", "running"):
-                    break
-                self._jobs.pop(oldest)
-                self._futures.pop(oldest, None)
+            self._evict()
 
         def run() -> None:
+            if rec.state == "failed":  # dropped while queued (overload)
+                return
             rec.state = "running"
             try:
                 def progress(pid: uuid.UUID) -> None:
@@ -77,8 +83,30 @@ class InProcessJobQueue:
                 rec.state = "failed"
                 rec.error = f"job failed ({type(exc).__name__})"
 
-        self._futures[rec.id] = self._pool.submit(run)
+        with self._lock:
+            self._futures[rec.id] = self._pool.submit(run)
         return rec
+
+    def _evict(self) -> None:
+        """Caller holds the lock. Drop finished records oldest-first (regardless of unfinished ones ahead of them);
+        if still over the hard cap, drop the oldest still-queued jobs (cancelled, never started) as a last resort."""
+        if len(self._jobs) <= MAX_TRACKED:
+            return
+        for jid in [j for j, r in self._jobs.items() if r.state in ("done", "failed")]:
+            if len(self._jobs) <= MAX_TRACKED:
+                return
+            self._jobs.pop(jid)
+            self._futures.pop(jid, None)
+        for jid in [j for j, r in self._jobs.items() if r.state == "queued"]:
+            if len(self._jobs) <= MAX_TRACKED:
+                return
+            fut = self._futures.get(jid)
+            if fut is not None and not fut.cancel():  # type: ignore[attr-defined]
+                continue
+            self._jobs[jid].state = "failed"
+            self._jobs[jid].error = "job dropped (server overloaded)"
+            self._jobs.pop(jid)
+            self._futures.pop(jid, None)
 
     def get(self, owner_id: uuid.UUID, job_id: uuid.UUID) -> Optional[JobRecord]:
         with self._lock:

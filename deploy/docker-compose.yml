@@ -53,6 +53,11 @@ services:
       METIS_OBJECT_STORE_ACCESS_KEY: ${METIS_OBJECT_STORE_ACCESS_KEY:?set METIS_OBJECT_STORE_ACCESS_KEY}
       METIS_OBJECT_STORE_SECRET_KEY: ${METIS_OBJECT_STORE_SECRET_KEY:?set METIS_OBJECT_STORE_SECRET_KEY}
       METIS_OBJECT_STORE_BUCKET: ${METIS_OBJECT_STORE_BUCKET:-metis}
+      # Client-IP handling for rate limits. Default false: the socket peer address is used. Set to "true" ONLY
+      # when the app is reachable exclusively through your own reverse proxy that appends the real client IP as
+      # the LAST X-Forwarded-For hop (only that last hop is trusted). If the proxy is in front and this stays
+      # false, every client shares the proxy IP and the per-IP login/register limits lock everyone out together.
+      METIS_ACCOUNTS_TRUST_PROXY: ${METIS_ACCOUNTS_TRUST_PROXY:-false}
     ports: ["127.0.0.1:8000:8000"]
     read_only: true
     tmpfs: [/tmp]

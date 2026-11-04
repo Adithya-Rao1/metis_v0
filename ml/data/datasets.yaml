@@ -1,5 +1,11 @@
 # Dataset license manifest. Gate G1: every TDC entry stays 'pending' until written confirmation is recorded
 # (date_checked + confirmed_by). Do not edit status to 'cleared' without that record.
+# Schema: id, name, source_url, endpoint, kind (regression|classification), units, license_as_stated, license_status
+# (cleared|pending|excluded), date_checked (ISO date), confirmed_by, notes.
+# A 'cleared' entry's license_as_stated must, after Unicode NFKC normalisation + case folding (whitespace -> '-'),
+# EXACTLY equal one of: cc0, cc0-1.0, cc-by-4.0, cc-by-sa-4.0, mit, apache-2.0, bsd-3-clause, public-domain
+# (e.g. "CC BY 4.0", "CC0-1.0", "Public Domain"). Anything else, including extra words such as "NoCommercial" or
+# "(not for commercial use)", is NOT cleared. Pending/excluded entries may carry free text.
 datasets:
   - id: hERG
     name: hERG (Wang et al.)

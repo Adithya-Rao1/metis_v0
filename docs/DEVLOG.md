@@ -19,3 +19,10 @@
 - QA (Agent 9) found 3 HIGH, ~18 MEDIUM, many LOW (details in git-ignored private/qa_wave1.md). Fixed before this commit: prepared-statement break after DISCARD ALL, app container receiving owner credentials, CI unable to go green, log-redaction gaps, DSN/secret echoes, migration races and checksums, FreeSolv alias / junk `cleared` gate bypass, NaN labels, empty-train splits, login credentials in URL, prototype-key crash, docking overflow, heading/label issues, table clipping, missing model-page calibration content and export/report screen (fixture), screenshots moved out of web root, CSP header file.
 - STILL OPEN (strict xfail, documented): F-17/F-18 (.dockerignore), F-19/F-20/F-21/F-23, MinIO root keys reach the app container, playwright unpinned in CI, Docker build unverified, draw-structure editor is a placeholder, ranking desirability d_ij and the 'fails a hard limit' display need a spec decision, remaining conformance gaps G-02, G-04..G-13 (see private/qa_wave1.md).
 - Tests: 517 passed + 18 xfailed (python), 59 (browser), 48 + 3 xfailed (browser security).
+
+## 2026-11-04 Wave 2 QA fixes
+- QA found 0 critical, 6 high, 16 medium, 10 low. Fixed: F-60..F-68, F-70, F-71/71b, F-72..F-74, F-76..F-80, F-90..F-92, F-100..F-104, F-110, F-111 (strict-xfail markers removed; regression tests stay). F-18 (.dockerignore) from Wave 1 closed too.
+- Open (tracked in BACKLOG): F-75 (weights unbounded at contract level), F-105 (Prediction.coverage means 1-ECE for classifiers, nominal 0.9 for regression).
+- Need migration 0004 (integrator): GRANT SELECT(window_start) on rate_limit_bucket (purge fails silently without it); purge session_revocation; SQL-side lock reset in auth_record_login (F-60 now leaves a spurious login_ok audit row); unverified-account expiry and password replacement for stale unverified rows (F-61 residual); a way for reset to clear a lock.
+- Not done: Docker image never built (no Docker locally); jobs still in memory (job table unwired); lint uses per-file ignores in pyproject (ruff format only on backend/core).
+- Suite: 914 passed, 2 skipped, 20 xfailed before the last two marker removals; ML/red-team rerun 169 passed.

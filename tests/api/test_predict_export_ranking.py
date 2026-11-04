@@ -238,7 +238,7 @@ def test_ranking_endpoint(client, queue, loaded):
     r = client.put(f"/projects/{pid}/ranking", json=cfg, headers=H("a"))
     assert r.status_code == 200, r.text
     j = r.json()
-    assert j["persisted"] is False and j["formula"] == "R_j = (1 - lam) S_j + lam C_j" and len(j["ranking"]) == 3
+    assert j["persisted"] is True and j["stale_model_version"] is False and j["formula"] == "R_j = (1 - lam) S_j + lam C_j" and len(j["ranking"]) == 3
     ranks = [x["blended_rank"] for x in j["ranking"]]
     assert sorted(ranks)[0] == 1
     passers = [x for x in j["ranking"] if x["passes_limits"]]
@@ -250,6 +250,10 @@ def test_ranking_endpoint(client, queue, loaded):
     assert client.put(f"/projects/{pid}/ranking", json={**cfg, "lam": 2}, headers=H("a")).status_code == 422
     bad = {"weights": [{"endpoint": "sol", "weight": 1, "higher_is_better": True}]}
     assert client.put(f"/projects/{pid}/ranking", json=bad, headers=H("a")).status_code == 422  # no predictions yet for sol
+    # the last valid config is persisted and returned; the rejected one did not overwrite it
+    g = client.get(f"/projects/{pid}/ranking", headers=H("a")).json()
+    assert g["persisted"] is True and g["config"]["lam"] == 0.25 and g["config"]["weights"][0]["endpoint"] == "logd"
+    assert client.get(f"/projects/{pid}/ranking", headers=H("b")).status_code == 404
 
 
 def test_ranking_needs_median_width(client, queue, app, loaded):
@@ -268,3 +272,131 @@ def test_ranking_needs_median_width(client, queue, app, loaded):
     app.dependency_overrides[deps.get_registry] = lambda: NoWidth()
     r = client.put(f"/projects/{pid}/ranking", json={"weights": [{"endpoint": "logd", "weight": 1, "higher_is_better": True}]}, headers=H("a"))
     assert r.status_code == 422 and "median calibration width" in r.text
+
+
+def _put_logd(client, pid):
+    return client.put(f"/projects/{pid}/ranking", json={"weights": [{"endpoint": "logd", "weight": 1, "higher_is_better": True}]}, headers=H("a"))
+
+
+def test_ranking_config_none_before_first_put(client, project):
+    assert client.get(f"/projects/{project}/ranking", headers=H("a")).json() == {"config": None, "persisted": False}
+
+
+def test_ranking_reads_card_field_by_n(client, queue, app, loaded):
+    from backend.jobs import deps
+    from api_support import FakeRegistry
+
+    pid, _ = loaded
+    run_job(client, queue, pid, endpoints=["logd"], ensemble_n=5)
+
+    class Card(FakeRegistry):
+        def _card(self, e):
+            c = super()._card(e)
+            c.benchmark.pop("median_calibration_width", None)
+            return c.model_copy(update={"median_calibration_width_by_n": {"5": 4.0}} if e == "logd" else {})
+
+    app.dependency_overrides[deps.get_registry] = lambda: Card()
+    r = _put_logd(client, pid)
+    assert r.status_code == 200, r.text
+    assert r.json()["ranking"][0]["breakdown"][0]["confidence"] == pytest.approx(1 - 1.0 / (2 * 4.0))  # fake interval width is 1.0
+
+    class OtherN(Card):  # width only for another N -> clear 422
+        def _card(self, e):
+            c = super()._card(e)
+            return c.model_copy(update={"median_calibration_width_by_n": {"20": 4.0}}) if e == "logd" else c
+
+    app.dependency_overrides[deps.get_registry] = lambda: OtherN()
+    r = _put_logd(client, pid)
+    assert r.status_code == 422 and "median calibration width" in r.text
+
+
+def test_ranking_uses_each_predictions_own_n(client, queue, app, loaded):
+    from backend.jobs import deps
+    from api_support import FakeRegistry
+
+    pid, comps = loaded
+    run_job(client, queue, pid, endpoints=["logd"], ensemble_n=3)
+    run_job(client, queue, pid, endpoints=["logd"], ensemble_n=10)  # newest per (compound, endpoint) wins -> all N=10
+
+    class Card(FakeRegistry):
+        def _card(self, e):
+            c = super()._card(e)
+            return c.model_copy(update={"median_calibration_width_by_n": {"3": 100.0, "10": 1.0}}) if e == "logd" else c
+
+    app.dependency_overrides[deps.get_registry] = lambda: Card()
+    r = _put_logd(client, pid).json()
+    assert all(x["breakdown"][0]["confidence"] == pytest.approx(0.5) for x in r["ranking"])  # 1 - 1/(2*1)
+
+
+def test_ranking_flags_stale_model_version(client, queue, app, loaded):
+    import uuid as _u
+    from backend.jobs import deps
+    from api_support import FakeRegistry
+
+    pid, _ = loaded
+    run_job(client, queue, pid, endpoints=["logd"])
+    assert _put_logd(client, pid).json()["stale_model_version"] is False
+
+    class Newer(FakeRegistry):
+        version_id = _u.UUID("22222222-2222-2222-2222-222222222222")
+
+    app.dependency_overrides[deps.get_registry] = lambda: Newer()
+    j = _put_logd(client, pid).json()
+    assert j["stale_model_version"] is True and len(j["stale_predictions"]) == 3
+    assert all("stale" in x["reason"] for x in j["stale_predictions"])
+    assert all(x["stale_endpoints"] == ["logd"] for x in j["ranking"])
+
+
+def test_per_user_job_quota_429(client, app, loaded):
+    import threading
+    from backend.jobs import deps
+    from backend.jobs.queue import MAX_ACTIVE_PER_USER, InProcessJobQueue
+    from api_support import FakeRegistry
+
+    pid, _ = loaded
+    ev = threading.Event()
+
+    class Slow(FakeRegistry):
+        def predict(self, *a, **k):
+            ev.wait(10)
+            return super().predict(*a, **k)
+
+    q = InProcessJobQueue(max_workers=1)
+    app.dependency_overrides[deps.get_registry] = lambda: Slow()
+    app.dependency_overrides[deps.get_queue] = lambda: q
+    codes = [client.post(f"/projects/{pid}/predict", json={"endpoints": ["logd"]}, headers=H("a")).status_code for _ in range(MAX_ACTIVE_PER_USER + 3)]
+    other = client.post("/projects", json={"name": "b"}, headers=H("b")).json()["id"]
+    client.post(f"/projects/{other}/compounds", json={"smiles": ["CCO"]}, headers=H("b"))
+    code_b = client.post(f"/projects/{other}/predict", json={"endpoints": ["logd"]}, headers=H("b")).status_code
+    ev.set()
+    assert codes[:MAX_ACTIVE_PER_USER] == [202] * MAX_ACTIVE_PER_USER and codes[MAX_ACTIVE_PER_USER:] == [429] * 3
+    assert code_b == 202  # quota is per user
+
+
+def test_job_queue_evicts_finished_behind_unfinished():
+    import threading
+    import uuid as _u
+    from backend.jobs.queue import MAX_TRACKED, InProcessJobQueue
+
+    q, ev, u, p = InProcessJobQueue(max_workers=2), threading.Event(), _u.uuid4(), _u.uuid4()
+    for _ in range(2):
+        q.submit(u, p, 1, 0, lambda pr: ev.wait(10))
+    for _ in range(MAX_TRACKED + 50):
+        q.submit(u, p, 1, 0, lambda pr: None)
+    n = len(q._jobs)
+    ev.set()
+    assert n <= MAX_TRACKED
+
+
+def test_compound_sandbox_busy_is_503(client, project, monkeypatch):
+    from backend.compounds import sandbox
+
+    taken = [sandbox._slots.acquire(blocking=False) for _ in range(sandbox.MAX_CONCURRENT)]
+    try:
+        r = client.post(f"/projects/{project}/compounds", json={"smiles": ["CCO"]}, headers=H("a"))
+        assert r.status_code == 503 and "busy" in r.text
+    finally:
+        for t in taken:
+            if t:
+                sandbox._slots.release()
+    assert client.post(f"/projects/{project}/compounds", json={"smiles": ["CCO"]}, headers=H("a")).status_code == 201

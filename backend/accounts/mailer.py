@@ -12,6 +12,7 @@ log = logging.getLogger("metis.accounts.mail")
 class Mailer(Protocol):
     def send_verification(self, to: str, token: str) -> None: ...
     def send_already_registered(self, to: str) -> None: ...
+    def send_reset(self, to: str, token: str) -> None: ...
 
 
 class ConsoleMailer:
@@ -22,6 +23,9 @@ class ConsoleMailer:
 
     def send_already_registered(self, to: str) -> None:
         log.info("already-registered notice queued (console mailer)")
+
+    def send_reset(self, to: str, token: str) -> None:
+        log.info("password reset mail queued (console mailer)")
 
 
 class InMemoryMailer:
@@ -35,3 +39,6 @@ class InMemoryMailer:
 
     def send_already_registered(self, to: str) -> None:
         self.outbox.append(("exists", to, None))
+
+    def send_reset(self, to: str, token: str) -> None:
+        self.outbox.append(("reset", to, token))

@@ -5,11 +5,15 @@ import importlib
 
 from fastapi import FastAPI
 
+from backend.accounts.hardening import install as install_hardening
+
 ROUTERS = ("backend.accounts", "backend.projects", "backend.dockprep")
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Metis", docs_url=None, redoc_url=None, openapi_url=None)
+
+    install_hardening(app)
 
     @app.get("/health")
     def health() -> dict:
