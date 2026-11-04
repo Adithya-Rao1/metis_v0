@@ -1,0 +1,2 @@
+# 0003 Structure drawing editor: Ketcher (owner decision, 2026-11-04)
+Ketcher (EPAM). npm registry lists ketcher-core, ketcher-react and ketcher-standalone 3.18.0 as Apache-2.0 (checked 2026-11-04). Still to do before shipping: read the LICENSE/NOTICE files in the released package, vendor it with pinned version and hash (no CDN at runtime), and check third-party notices it bundles. The standalone build runs in the browser without a server. Placeholder editor stays until the wiring wave.

@@ -64,3 +64,11 @@ def test_ranking_config_defaults_and_bounds():
         RankingConfig(weights=w, lam=1.5)
     with pytest.raises(ValidationError):
         RankingConfig(weights=[PropertyWeight(endpoint="sol", weight=0, higher_is_better=True)])
+
+
+def test_desirability_range_optional_but_paired_and_ordered():
+    PropertyWeight(endpoint="sol", weight=1, higher_is_better=True)
+    PropertyWeight(endpoint="sol", weight=1, higher_is_better=True, target_min=-6, target_max=-2)
+    for kw in (dict(target_min=-6), dict(target_min=-2, target_max=-6), dict(target_min=1, target_max=1)):
+        with pytest.raises(ValidationError):
+            PropertyWeight(endpoint="sol", weight=1, higher_is_better=True, **kw)

@@ -93,6 +93,18 @@ class PropertyWeight(Strict):
     endpoint: Endpoint
     weight: float = Field(ge=0)
     higher_is_better: bool
+    # Desirability range: value <= target_min (or >= for lower-is-better) scores 0, the other end scores 1, linear between.
+    # None means "use the model's default range from its training data"; users may edit it (decision 0002).
+    target_min: Optional[float] = None
+    target_max: Optional[float] = None
+
+    @model_validator(mode="after")
+    def _range_ok(self):
+        if (self.target_min is None) != (self.target_max is None):
+            raise ValueError("set both target_min and target_max, or neither")
+        if self.target_min is not None and self.target_min >= self.target_max:
+            raise ValueError("target_min must be below target_max")
+        return self
 
 
 class HardLimit(Strict):

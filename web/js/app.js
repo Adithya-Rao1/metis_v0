@@ -69,7 +69,7 @@ function refresh(rebuild = true) {
       onclick: (ev) => { if (!ev.target.closest("a,button,input")) showCompound(c.id, false); },
       onkeydown: (ev) => { if ((ev.key === "Enter" || ev.key === " ") && ev.target === tr) { ev.preventDefault(); showCompound(c.id, false); } } });
     tr.append(el("td", { class: "nowrap", "data-testid": "rank" }, `${r.blendedRank} (${r.propertyOnlyRank})`,
-      r.passes ? null : el("span", { class: "limit-note", text: "fails a hard limit" })));
+      r.passes ? null : el("span", { class: "limit-note", text: "fail · breaks a hard limit" })));
     tr.append(el("td", {}, el("div", { class: "molcell nowrap-row" },
       el("img", { class: "mol", src: c.svg, alt: `2D structure of ${c.name}` }),
       el("div", { class: "stackcol" },
