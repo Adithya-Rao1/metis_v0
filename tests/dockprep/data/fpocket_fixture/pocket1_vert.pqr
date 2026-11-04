@@ -1,0 +1,5 @@
+HEADER    1 - Pocket Vertices
+ATOM      1  O   STP C   1      20.100   1.000  52.000  0.00  3.50          O
+ATOM      2  O   STP C   1      22.100   0.000  53.000  0.00  3.60          O
+ATOM      3  O   STP C   1      24.100  -1.000  54.000  0.00  3.70          O
+END
