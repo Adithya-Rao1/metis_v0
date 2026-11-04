@@ -13,3 +13,4 @@ node_modules/
 *.ckpt
 data/
 .pytest_cache/
+.tmpvenv/

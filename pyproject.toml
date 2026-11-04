@@ -1,0 +1,29 @@
+[project]
+name = "metis"
+version = "0.1.0"
+description = "Metis v1 backend"
+requires-python = ">=3.12"
+
+# pytest is configured in pytest.ini (takes precedence over this file).
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = [".venv", ".tmpvenv", "web", "node_modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S608", "E501", "B017"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["backend/core"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".tmpvenv", "web"]
