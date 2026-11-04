@@ -9,46 +9,47 @@
 <body>
 <main>
  <div class="screen-head"><h1>Docking preparation</h1>
-  <p class="muted">Prepares files for Vina or GNINA. Does not run docking. Every change is logged.</p></div>
- <div class="frame">
+  <p class="muted">Prepares files for Vina or GNINA. Does not run docking. Every change is logged and downloaded with the files. Nothing you upload here is stored.</p></div>
+ <div id="page-state"></div>
+ <div class="frame" id="dock-frame" hidden>
   <div class="panel">
     <div>
-      <div class="pair mb10">
-        <div class="viewer-wrap"><div class="viewer" id="viewer" aria-label="3D view: protein, ligand, search box, site residues"></div>
-          <p class="caption">3D: protein, ligand, search box and site residues (PDB 1M17 chain A; experimental coordinates from the PDB entry).</p></div>
-        <div><img class="mol big" id="lig2d" alt="2D depiction of the ligand erlotinib" src="fixtures/svg/c1.svg"><p class="legend">2D ligand (erlotinib, from the PDB entry).</p></div>
-      </div>
-      <div class="checks">
+      <form id="dock-form" method="post" action="#js-required" novalidate>
         <fieldset class="bare"><legend><b>1. Docking engine</b></legend>
           <label><input type="radio" name="eng" value="vina" checked> AutoDock Vina</label>
           <label><input type="radio" name="eng" value="gnina"> GNINA</label>
           <p class="legend" id="eng-note"></p></fieldset>
         <fieldset class="bare mt8"><legend><b>2. Protein</b></legend>
-          <div class="inline"><label for="src-pdb"><input id="src-pdb" type="radio" name="src" value="pdb" checked> PDB ID</label> <label class="sr" for="pdbid">PDB ID</label><input id="pdbid" class="mono" size="6" value="1M17"></div>
-          <div class="parsed" id="pdbinfo" aria-live="polite"></div>
-          <div class="inline"><label for="src-up"><input id="src-up" type="radio" name="src" value="upload"> Upload file</label> <label class="sr" for="up">Protein file (.pdb or .cif)</label><input id="up" type="file" accept=".pdb,.cif" disabled></div>
+          <div class="inline"><label for="src-pdb"><input id="src-pdb" type="radio" name="src" value="pdb" checked> PDB ID</label> <label class="sr" for="pdbid">PDB ID</label><input id="pdbid" class="mono" size="6" maxlength="8" placeholder="1M17" autocomplete="off"></div>
+          <div class="inline"><label for="src-up"><input id="src-up" type="radio" name="src" value="upload"> Upload file</label> <label class="sr" for="up">Protein file (.pdb)</label><input id="up" type="file" accept=".pdb,.ent" disabled></div>
+          <div class="inline"><label for="chains">Chains to keep (blank: all)</label> <input id="chains" class="mono" size="6" placeholder="A"></div>
           <label><input type="checkbox" id="waters" checked> Remove waters</label>
-          <label><input type="checkbox" id="alt" checked> Keep first alternate location only</label>
-          <div class="inline"><label for="chains">Chains to keep</label> <input id="chains" class="mono" size="4" value="A"></div>
-          <div class="inline"><label for="hyd"><input type="checkbox" id="hyd" checked> Add hydrogens, assign protonation at pH</label> <label class="sr" for="ph">Protonation pH</label><input id="ph" class="num mono" type="number" step="0.1" value="7.4"></div></fieldset>
-      </div>
+          <label><input type="checkbox" id="hets" checked> Remove other heteroatoms (ligands, ions)</label>
+          <div class="inline"><label for="keep-hets">Keep these residue names</label> <input id="keep-hets" class="mono" size="12" placeholder="HEM, ZN" autocomplete="off"></div>
+          <div class="inline"><label for="hyd"><input type="checkbox" id="hyd" checked> Add hydrogens, assign protonation at pH</label> <label class="sr" for="ph">Protonation pH</label><input id="ph" class="num mono" type="number" step="0.1" min="0" max="14" value="7.4"></div></fieldset>
+        <fieldset class="bare mt8"><legend><b>3. Binding site</b></legend>
+          <label><input type="checkbox" name="mode" value="ligand" id="m-ligand"> From the co-crystal ligand <input id="ligand-id" class="mono" size="8" placeholder="A:999" aria-label="Co-crystal ligand residue, for example A:999"></label>
+          <label><input type="checkbox" name="mode" value="residues" id="m-residues"> From residues <input id="residues" class="mono" size="18" placeholder="A:790, A:793" aria-label="Residues, for example A:790, A:793"></label>
+          <label><input type="checkbox" name="mode" value="detect" id="m-detect" checked> Detect pockets</label>
+          <label><input type="checkbox" name="mode" value="box" id="m-box"> Manual box</label>
+          <div class="inline"><span class="legend">Center</span> <input class="num mono" type="number" step="any" id="bx" aria-label="Box center x"> <input class="num mono" type="number" step="any" id="by" aria-label="Box center y"> <input class="num mono" type="number" step="any" id="bz" aria-label="Box center z">
+            <span class="legend">Size</span> <input class="num mono" type="number" step="any" id="sx" aria-label="Box size x"> <input class="num mono" type="number" step="any" id="sy" aria-label="Box size y"> <input class="num mono" type="number" step="any" id="sz" aria-label="Box size z"></div>
+          <div class="inline"><label for="padding">Padding (A)</label> <input id="padding" class="num mono" type="number" step="0.5" min="0" max="20" value="4"></div></fieldset>
+        <fieldset class="bare mt8"><legend><b>4. Ligand (optional)</b></legend>
+          <div class="inline"><label for="lig-project">Project compound</label> <select id="lig-project"><option value="">None</option></select> <label class="sr" for="lig-compound">Compound</label><select id="lig-compound" disabled></select></div>
+          <div class="inline"><label for="lig-smiles">or SMILES</label> <input id="lig-smiles" class="mono" size="24" autocomplete="off"></div>
+          <div id="lig2d"></div></fieldset>
+        <p class="mt8"><button class="btn primary" type="submit" id="prep">Prepare files</button></p>
+        <p class="legend" id="prep-msg" role="status" aria-live="polite"></p>
+      </form>
     </div>
     <div>
-      <b>3. Binding site</b>
-      <div class="tablewrap"><table id="sites"><thead><tr><th scope="col">Use</th><th scope="col">Source</th><th scope="col">Site</th><th scope="col">Score</th></tr></thead><tbody></tbody></table></div>
-      <div class="kv mt8"><span>Box center (A)</span><span class="mono" id="bc"></span><span>Box size (A)</span><span class="mono" id="bs"></span></div>
-      <div class="note-box mt8"><b>Site confidence:</b> highlighted residues are shown beside the site. <span id="fixnote"></span> No site-confidence value has been computed.</div>
-      <div class="note-box mt8"><b>Change log</b> (downloaded with the files): <ul id="log" class="loglist"></ul></div>
-      <h3>Download</h3>
-      <div class="toolbar flush">
-        <button class="btn" type="button" id="dl-box">Box parameters</button>
-        <button class="btn" type="button" id="dl-log">Change log</button>
-        <button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Ligands (PDBQT or SDF)</button>
-        <button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Protein (PDBQT)</button>
-      </div>
+      <div class="viewer-wrap"><div class="viewer" id="viewer" aria-label="3D view: protein, search box and ligand"></div>
+        <p class="caption" id="viewer-cap">The prepared protein, search box and ligand appear here. Experimental coordinates are only changed as listed in the change log.</p></div>
+      <div id="result" aria-live="polite"></div>
     </div>
   </div>
-  <div class="foot"><span>Download: ligands (PDBQT or SDF), protein (PDBQT), box parameters, change log</span></div>
+  <div class="foot"><span>Downloads: ligands (PDBQT and SDF), protein (PDBQT and PDB), docking config and box parameters, change log</span></div>
  </div>
 </main>
 <script src="vendor/3Dmol-min.js"></script>

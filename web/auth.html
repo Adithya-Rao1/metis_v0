@@ -10,21 +10,22 @@
 <main>
  <div class="authbox">
   <noscript><p class="note-box">JavaScript is required for this form. Nothing is sent without it.</p></noscript>
-  <h1>Sign up / Log in</h1>
+  <h1 id="auth-h">Sign up / Log in</h1>
   <p class="draft-note" role="note" data-testid="draft-note"><strong>DRAFT.</strong> The Terms of Service, Privacy Policy and Disclaimer linked below are drafts. They are not legal advice and need lawyer review before launch.</p>
-  <div class="tabs flush" role="tablist" aria-label="Account action">
+  <p id="auth-banner" class="note-box" role="status" aria-live="polite" hidden></p>
+  <div class="tabs flush" role="tablist" aria-label="Account action" id="tabs">
     <button class="tab" role="tab" id="tab-signup" aria-controls="p-signup" aria-selected="true" type="button">Sign up</button>
     <button class="tab" role="tab" id="tab-login" aria-controls="p-login" aria-selected="false" tabindex="-1" type="button">Log in</button>
   </div>
   <section id="p-signup" class="pt12" role="tabpanel" aria-labelledby="tab-signup">
-    <form id="signup" method="post" action="#signup-unavailable" novalidate>
+    <form id="signup" method="post" action="#js-required" novalidate>
       <div class="field"><label for="su-email">Email</label><input id="su-email" name="email" type="email" autocomplete="email" required>
         <span class="legend">A verification email is required before any data is stored. A .edu address unlocks the larger ensemble sizes after verification.</span></div>
       <div class="field"><label for="su-pass">Password</label><input id="su-pass" name="password" type="password" autocomplete="new-password" minlength="12" required>
         <span class="legend">At least 12 characters.</span></div>
       <div class="consent-row">
         <input id="accept" name="accept" type="checkbox" aria-describedby="accept-links">
-        <label for="accept" id="accept-label">I accept the Terms of Service, Privacy Policy and Disclaimer.</label>
+        <label for="accept" id="accept-label">I accept the Terms of Service, Privacy Policy and Disclaimer<span id="terms-version"></span>.</label>
       </div>
       <p id="accept-links" class="legend">Read the drafts:
         <a href="legal/terms.html" target="_blank" rel="noopener">Terms of Service (draft)</a>,
@@ -35,14 +36,63 @@
     </form>
   </section>
   <section id="p-login" class="pt12" role="tabpanel" aria-labelledby="tab-login" hidden>
-    <form id="login" method="post" action="#login-unavailable" novalidate>
+    <form id="login" method="post" action="#js-required" novalidate>
       <div class="field"><label for="li-email">Email</label><input id="li-email" name="email" type="email" autocomplete="email" required></div>
       <div class="field"><label for="li-pass">Password</label><input id="li-pass" name="password" type="password" autocomplete="current-password" required></div>
       <button class="btn primary" id="login-submit" type="submit">Log in</button>
       <p id="login-msg" class="legend mt8" role="status" aria-live="polite"></p>
     </form>
+    <p class="legend mt8"><a href="#forgot" id="to-forgot">Forgot your password?</a> | <a href="#resend" id="to-resend">Send the verification email again</a></p>
   </section>
-  <p class="legend mt16">Fixture mode: these forms are not connected to a backend. Nothing is sent or stored. <a href="app.html">Open the fixture project</a>.</p>
+  <section id="p-forgot" class="pt12" hidden aria-labelledby="forgot-h">
+    <h2 id="forgot-h">Reset your password</h2>
+    <form id="forgot" method="post" action="#js-required" novalidate>
+      <div class="field"><label for="fg-email">Email</label><input id="fg-email" name="email" type="email" autocomplete="email" required></div>
+      <button class="btn primary" type="submit">Send reset link</button>
+      <p id="forgot-msg" class="legend mt8" role="status" aria-live="polite"></p>
+    </form>
+    <p class="legend"><a href="auth.html">Back to log in</a></p>
+  </section>
+  <section id="p-resend" class="pt12" hidden aria-labelledby="resend-h">
+    <h2 id="resend-h">Send the verification email again</h2>
+    <form id="resend" method="post" action="#js-required" novalidate>
+      <div class="field"><label for="rs-email">Email</label><input id="rs-email" name="email" type="email" autocomplete="email" required></div>
+      <button class="btn primary" type="submit">Send verification email</button>
+      <p id="resend-msg" class="legend mt8" role="status" aria-live="polite"></p>
+    </form>
+    <p class="legend"><a href="auth.html">Back to log in</a></p>
+  </section>
+  <section id="p-reset" class="pt12" hidden aria-labelledby="reset-h">
+    <h2 id="reset-h">Choose a new password</h2>
+    <form id="reset" method="post" action="#js-required" novalidate>
+      <div class="field"><label for="rp-pass">New password</label><input id="rp-pass" name="password" type="password" autocomplete="new-password" minlength="12" required>
+        <span class="legend">At least 12 characters. Resetting signs you out everywhere.</span></div>
+      <button class="btn primary" type="submit">Set new password</button>
+      <p id="reset-msg" class="legend mt8" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+  <section id="p-verify" class="pt12" hidden aria-labelledby="verify-h">
+    <h2 id="verify-h">Email verification</h2>
+    <p id="verify-msg" role="status" aria-live="polite">Verifying...</p>
+    <p class="legend"><a href="auth.html">Go to log in</a></p>
+  </section>
+  <section id="p-terms" class="pt12" hidden aria-labelledby="terms-h">
+    <h2 id="terms-h">The terms have changed</h2>
+    <p>Accept the current Terms of Service, Privacy Policy and Disclaimer to keep using Metis.</p>
+    <form id="reaccept" method="post" action="#js-required" novalidate>
+      <div class="consent-row">
+        <input id="reaccept-box" name="accept" type="checkbox">
+        <label for="reaccept-box">I accept the Terms of Service, Privacy Policy and Disclaimer, version <span id="reaccept-version"></span>.</label>
+      </div>
+      <p class="legend">Read the drafts:
+        <a href="legal/terms.html" target="_blank" rel="noopener">Terms of Service (draft)</a>,
+        <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy (draft)</a>,
+        <a href="legal/disclaimer.html" target="_blank" rel="noopener">Disclaimer (draft)</a>.</p>
+      <button class="btn primary" id="reaccept-submit" type="submit" disabled>Accept and continue</button>
+      <p id="reaccept-msg" class="legend mt8" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+  <p class="legend mt16">New here? See the <a href="index.html">home page</a>.</p>
  </div>
 </main>
 <script type="module" src="js/auth.js"></script>

@@ -66,26 +66,48 @@ def test_vendor_versions_and_hashes():
     assert (WEB / "fonts" / "OFL.txt").exists() and (WEB / "vendor" / "LICENSE-3Dmol.txt").exists()
 
 
-def test_fixtures_labeled_and_match_frozen_contract():
-    from backend.schemas.contracts import Prediction, MAX_COMPOUNDS
-    proj = json.loads((WEB / "fixtures" / "project.json").read_text())
-    assert proj["fixture"] is True and "FIXTURE" in proj["fixture_label"]
-    assert len(proj["compounds"]) <= MAX_COMPOUNDS
-    keep = ["endpoint", "kind", "model_version_id", "ensemble_n", "value", "interval_low", "interval_high", "probability",
-            "coverage", "sample_size", "method_note", "breakdown"]
-    for c in proj["compounds"]:
-        assert c["conformer"]["label"] == "computed conformer, not an experimental structure"
-        assert "ETKDG" in c["conformer"]["method"] and "MMFF" in c["conformer"]["method"]
-        assert (WEB / c["svg"]).exists() and (WEB / c["svg_highlight"]).exists()
-        assert max(c["fragment"]["atom_indices"]) < c["conformer"]["molblock"].count("\n")
-        for ep, p in c["predictions"].items():
-            d = {k: p[k] for k in keep}
-            d["breakdown"] = {k: v for k, v in p["breakdown"].items() if k != "ranges"}
-            Prediction(**d)
-            for lo, hi in p["breakdown"]["ranges"]:
-                assert 0 <= lo <= hi <= 1
-    for name in ["models", "docking", "training"]:
-        assert json.loads((WEB / "fixtures" / f"{name}.json").read_text())["fixture"] is True
+def test_ketcher_is_vendored_with_pinned_version_hashes_and_licence():
+    v = (WEB / "vendor" / "VERSIONS.txt").read_text()
+    k = WEB / "vendor" / "ketcher"
+    assert "Ketcher 3.18.0" in v and "Apache-2.0" in v
+    for rel in ["static/js/main.e47c48ad.js", "static/js/127.aa15387f.chunk.js", "static/js/609.d5254829.chunk.js", "static/js/114.cd66d630.chunk.js",
+                "static/css/main.96b87be0.css", "index.html", "LICENSE", "NOTICE"]:
+        assert hashlib.sha256((k / rel).read_bytes()).hexdigest() in v, rel
+    assert "Apache License" in (k / "LICENSE").read_text()[:400] and "Version 2.0" in (k / "LICENSE").read_text()[:400]
+    # no CDN at runtime: the editor page references only its own files
+    idx = (k / "index.html").read_text()
+    assert not re.search(r"https?://", idx.replace("http://www.w3.org", ""))
+
+
+def test_fixture_data_is_only_for_the_home_page_demo():
+    fx = sorted(p.relative_to(WEB / "fixtures").as_posix() for p in (WEB / "fixtures").rglob("*") if p.is_file())
+    assert fx == ["structures/1m17_chainA_pocket.pdb", "structures/1m17_meta.json", "structures/erlotinib_1m17.sdf"]
+    users = [p.name for p in (WEB / "js").glob("*.js") if "fixtures/" in p.read_text()]
+    assert users == ["home.js"]
+    for p in WEB.glob("*.html"):
+        assert "fixtures/" not in p.read_text(), p.name
+        assert "FIXTURE" not in p.read_text(), p.name
+
+
+def test_only_the_api_client_talks_to_the_network():
+    """One small client (web/js/api.js). Other scripts may not call fetch/XMLHttpRequest, except the home page demo that reads its own static files."""
+    allowed = {"api.js", "home.js"}
+    for p in (WEB / "js").glob("*.js"):
+        t = p.read_text()
+        if p.name in allowed:
+            continue
+        assert not re.search(r"\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource", t), p.name
+    api = (WEB / "js" / "api.js").read_text()
+    assert 'credentials: "same-origin"' in api and 'CSRF_HEADER = "X-CSRF-Token"' in api and 'COOKIE_CSRF = "metis_csrf"' in api
+    from backend.accounts.config import COOKIE_CSRF, CSRF_HEADER
+    assert (CSRF_HEADER, COOKIE_CSRF) == ("X-CSRF-Token", "metis_csrf")           # the client constants mirror the backend's
+    assert 'API_BASE = "/api"' in api and "http" not in re.sub(r"//.*", "", api)  # same-origin only
+
+
+def test_no_dom_injection_sinks_in_own_scripts():
+    banned = re.compile(r"\.innerHTML|\.outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function|\.srcdoc|createContextualFragment|setTimeout\(\s*[\"'`]")
+    for p in (WEB / "js").glob("*.js"):
+        assert not banned.search(p.read_text()), p.name
 
 
 def test_legal_copies_rendered_with_draft_note_and_disclaimer_matches_docs():

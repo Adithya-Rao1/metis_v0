@@ -13,3 +13,23 @@ IBM Plex Sans, latin subset, weights 400/500/600 (woff2)
   sha256 plex-sans-500.woff2: 5ef914e59b0047a261844d96acabb60c34d3acab6b85ea24198726ce4781fd37
   sha256 plex-sans-600.woff2: 31535a91ce3f6b8ed3ddedadab1e49957e2220263a640df1a3f14f6fdfe15eb6
   license: SIL Open Font License 1.1, Copyright 2017 IBM Corp. with Reserved Font Name "Plex" (fonts/OFL.txt).
+
+Ketcher 3.18.0 (EPAM Life Sciences), standalone build, vendored for "Draw structure" (decision 0003)
+  directory: vendor/ketcher/ (only the files the editor page needs: index.html, static/js/main, three lazy chunks, main.css, icons, manifest)
+  source: https://github.com/epam/ketcher/releases/download/v3.18.0/ketcher-standalone-3.18.0.zip (downloaded 2026-11-04)
+    sha256 of that zip: 484e7f10a0e74808ae5f43f0e6448db6f4d884bdd2189aa271108474167a3e7e
+  file hashes (sha256):
+    static/js/main.e47c48ad.js: b8716a39486e7259e7c2cfcd29278044768d22cb60018589b1d5c1175c27f583
+    static/js/127.aa15387f.chunk.js: 6d10519a52025d6f181bfb4aed8bf937171ee1efc2d3429273b638f7c94337d4
+    static/js/609.d5254829.chunk.js: 0c8f0f966b89cee9cdcd9de859fed430eafd46de89134319f8be5f135fe87ee7
+    static/js/114.cd66d630.chunk.js: fa3aa63280958a4b8c07203e69fede3b7c6367af47773d062083cb09abbb1cca
+    static/css/main.96b87be0.css: ec2018005014cba5df4a14abf86a3fc43be54711a711fab2cd989439214e35b1
+    index.html: 7541f4a58a3d8616ecd3d4c3bc80c3ec365b10748136686b54a104c041358174
+    LICENSE: 3d54b234fa88c11d1d96380ff5fe29f3c5d8e1078ef914dfe8185ce4b1fbeac7
+    NOTICE: ab82986438fc66fa2b40836415b734ff018b1e42ee3a18434b27bdf1c42eb368
+  license: Apache-2.0. The release zip ships no LICENSE file (only third-party notices, static/js/main.e47c48ad.js.LICENSE.txt);
+    LICENSE and NOTICE here are the repository files at tag v3.18.0 (https://raw.githubusercontent.com/epam/ketcher/v3.18.0/LICENSE),
+    and the package.json of ketcher-standalone 3.18.0 on npm declares "license": "Apache-2.0". NOTICE lists LGPL-2.1 and other
+    dependency licences: see docs/WEB_WIRING.md and the handoff.
+  runtime: loaded only in a same-origin iframe from add.html; needs style-src 'unsafe-inline' (inline style attributes), which is granted
+    to /vendor/ketcher/* only (web/_headers). It makes no network requests.

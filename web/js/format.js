@@ -1,7 +1,8 @@
 // Prediction cell formatting. Every cell: value + interval (or calibrated probability) + N + coverage / sample size.
-export const fmtInt = (n) => n.toLocaleString("en-US");
-export const fmtVal = (p, kind) => (kind === "classification" ? p.toFixed(2) : p.toFixed(1));
+export const fmtInt = (n) => Number(n).toLocaleString("en-US");
+export const fmtVal = (v, kind) => (kind === "classification" ? Number(v).toFixed(2) : Number(v).toFixed(1));
 
+// pred: the API's Prediction object (backend/schemas/contracts.py).
 export function cellText(pred) {
   if (pred.kind === "regression") {
     return {
@@ -10,7 +11,7 @@ export function cellText(pred) {
     };
   }
   return {
-    main: `${pred.probability.toFixed(2)} (cal.)`,
+    main: `${Number(pred.probability).toFixed(2)} (cal.)`,
     sub: `calibrated probability | N=${pred.ensemble_n} | n=${fmtInt(pred.sample_size)} near this score`,
   };
 }
@@ -20,3 +21,5 @@ export function limitText(lim) {
   if (lim.min != null && lim.max == null) return `limit: > ${lim.min}`;
   return `limit: ${lim.min} to ${lim.max}`;
 }
+
+export const num = (v) => (v === "" || v == null || !Number.isFinite(Number(v)) ? null : Number(v));

@@ -1,71 +1,71 @@
-import { el, loadJSON, qs, renderChrome } from "./chrome.js";
-import { SharedViewer, CONFORMER_LABEL } from "./viewer.js";
+// Model and data page, from GET /models (public). Nothing is invented: if no model is published the page says so.
+import { el, qs, renderChrome, showEmpty, showError, showLoading } from "./chrome.js";
+import { get } from "./api.js";
 
-const data = await loadJSON("fixtures/models.json");
-const training = await loadJSON("fixtures/training.json");
-const reqId = qs("e", "herg");
-const id = Object.hasOwn(data.models, reqId) ? reqId : "herg";
-const m = data.models[id];
-renderChrome({ current: "model.html", crumb: `Models / ${m.label}` });
-document.getElementById("h").textContent = `Model and data page (${m.label})`;
-document.title = `${m.label} model | Metis`;
-document.getElementById("picker").replaceChildren(...Object.values(data.models).map((x) =>
-  el("a", { class: "chip", href: `model.html?e=${x.id}`, ...(x.id === id ? { "aria-current": "page" } : {}), text: x.label })));
+const $ = (id) => document.getElementById(id);
+let user = null;
+try { user = await get("/auth/me"); } catch (e) { user = null; }
+renderChrome({ current: "model.html", crumb: "Models", user });
+const rep = $("report");
 
-// G-01: calibration / coverage / noise-ceiling / significance blocks. FIXTURE layout content (zeros), not results.
-function calibrationBlocks(m) {
-  const reg = m.kind !== "classification";
-  const tbl = (cap, heads, rows) => el("div", { class: "tablewrap" }, el("table", {}, el("caption", { text: cap }),
-    el("thead", {}, el("tr", {}, heads.map((x) => el("th", { scope: "col", text: x })))),
-    el("tbody", {}, rows.map((r) => el("tr", {}, r.map((c) => el("td", { class: "mono", text: c })))))));
-  const bins = ["0.0 to 0.2", "0.2 to 0.4", "0.4 to 0.6", "0.6 to 0.8", "0.8 to 1.0"];
-  return [
-    el("h2", { id: "calibration", text: "Calibration (FIXTURE content, placeholders)" }),
-    el("p", { class: "legend", "data-testid": "fixture-calibration", text: "FIXTURE: every number below is a zero placeholder showing the layout. No calibration has been computed." }),
-    tbl(reg ? "Reliability diagram data: nominal vs. observed interval coverage, held-out scaffold split." : "Reliability diagram data: mean predicted probability vs. observed fraction positive per bin, held-out scaffold split.",
-      reg ? ["Nominal coverage", "Observed coverage", "n"] : ["Predicted probability bin", "Observed fraction", "n"],
-      reg ? ["50%", "80%", "90%", "95%"].map((x) => [x, "0.00 (placeholder)", "0"]) : bins.map((x) => [x, "0.00 (placeholder)", "0"])),
-    el("div", { class: "kv" }, el("span", { text: "Expected calibration error (ECE)" }), el("span", { class: "mono", "data-testid": "ece", text: "0.00 (placeholder)" })),
-    tbl("Interval coverage by similarity bin (similarity of the query to its nearest training compounds). Sample sizes are never hidden.",
-      ["Similarity bin (Tanimoto to nearest training compound)", "Interval coverage", "Compounds in bin (n)"],
-      [["0.0 to 0.3 (far from training data)", "0.0% (placeholder)", "0"], ["0.3 to 0.5", "0.0% (placeholder)", "0"], ["0.5 to 0.7", "0.0% (placeholder)", "0"], ["0.7 to 1.0 (near training data)", "0.0% (placeholder)", "0"]]),
-    reg ? el("div", { class: "kv" }, el("span", { text: "Noise ceiling (best achievable error given assay noise)" }), el("span", { class: "mono", "data-testid": "noise-ceiling", text: "R2 ceiling 0.00, RMSE floor 0.00 (placeholder)" }))
-        : el("div", { class: "kv" }, el("span", { text: "Noise ceiling" }), el("span", { class: "mono", "data-testid": "noise-ceiling", text: "Not defined for a classification label; label agreement between sources is reported instead (placeholder)" })),
-    tbl("Significance of the difference from the baseline: 5x2cv paired t-test over scaffold splits.",
-      ["Comparison", "t statistic", "p value", "Result"],
-      [["Metis ensemble vs. baseline (5x2cv paired t-test)", "0.00", "n/a", "placeholder: test not yet run"]]),
-  ];
+async function load() {
+  showLoading(rep, "Loading models");
+  let data;
+  try { data = await get("/models"); } catch (e) { return showError(rep, e, load); }
+  const models = data.models;
+  if (!models.length) {
+    $("picker").replaceChildren();
+    showEmpty(rep, "No models have been published yet. Model pages appear here once a trained, benchmarked and calibrated model is released. Nothing on this page is a placeholder.");
+    rep.firstChild.id = "no-models";
+    return;
+  }
+  const want = qs("e");
+  const m = models.find((x) => x.endpoint === want) || models[0];
+  document.title = `${m.endpoint} model | Metis`;
+  $("h").textContent = `Model and data page (${m.endpoint})`;
+  document.querySelector(".crumb").textContent = `Models / ${m.endpoint}`;
+  $("picker").replaceChildren(...models.map((x) =>
+    el("a", { class: "chip", href: `model.html?e=${encodeURIComponent(x.endpoint)}`, ...(x.endpoint === m.endpoint ? { "aria-current": "page" } : {}), text: x.endpoint })));
+  render(m);
 }
 
-const rep = document.getElementById("report");
-rep.append(
-  el("p", { class: "draft-note", role: "note", "data-testid": "fixture-model-note", text: data.note }),
-  el("div", { class: "rgrid" },
-    ...m.datasets.map((d) => el("div", { class: "rcard", "data-dataset": d.name }, el("span", { class: "t", text: "Training data" }), el("span", { class: "n", text: d.name }),
-      el("span", { class: "legend", text: `${d.n}. ${d.source}.` }), el("span", { class: "legend", text: `License: ${d.license}.` }))),
-    el("div", { class: "rcard" }, el("span", { class: "t", text: "Split used for evaluation" }), el("span", { class: "n", text: "Scaffold" }), el("span", { class: "legend", text: `${m.split} Calibration set n = ${m.calibration_n}.` })),
-    el("div", { class: "rcard" }, el("span", { class: "t", text: "Interval coverage, held out" }), el("span", { class: "n", text: String(m.heldout_coverage) }), el("span", { class: "legend", text: `Target ${Math.round(m.target_coverage * 100)}% (placeholder).` }))),
-  el("h2", { id: "how-computed", text: "Benchmark against baselines (scaffold split; metric ranges shown in full on release)" }),
-  el("div", { class: "tablewrap" }, el("table", {}, el("caption", { text: "Baseline sits on the first row. If the model does not beat it, this page says so." }),
-    el("thead", {}, el("tr", {}, el("th", { scope: "col", text: "Model" }), m.metrics.map((x) => el("th", { scope: "col", text: x })), el("th", { scope: "col", text: "vs. baseline" }))),
-    el("tbody", {}, m.benchmark.map((r) => el("tr", {}, el("td", { text: r.model }), r.values.map((v) => el("td", { class: "mono", text: v.toFixed(2) })), el("td", { text: r.note })))))),
-  el("div", { class: "tablewrap" }, el("table", {}, el("caption", { text: "Coverage and runtime at each ensemble size offered (placeholders)." }),
-    el("thead", {}, el("tr", {}, ["Ensemble size N", "Interval coverage (held out)", "Time per compound"].map((x) => el("th", { scope: "col", text: x })))),
-    el("tbody", {}, m.ensemble_table.map((r) => el("tr", {}, el("td", { text: String(r.n) }), el("td", { class: "mono", text: r.coverage }), el("td", { class: "mono", text: r.runtime })))))),
-  ...calibrationBlocks(m),
-  el("div", { class: "note-box", id: "limitations" }, el("b", { text: "Known limitations of this dataset" }), " (written per dataset, linked to source): ", m.limitations, el("br"), m.attribution_check),
-  el("p", { class: "legend", text: "Dataset licenses are shown as recorded. Where the status is pending, no claim about reuse is made." }),
-  el("h2", { text: "Training examples" }),
-  el("div", { class: "viewer-dock flush" },
-    el("div", { class: "viewer-wrap" }, el("div", { class: "viewer", id: "viewer", "aria-label": "3D viewer" }), el("p", { class: "caption", id: "viewer-cap", text: "Press 3D on an example." })),
-    el("div", { id: "examples", class: "checks" })));
+const fmt = (v) => (typeof v === "number" ? (Number.isInteger(v) ? String(v) : v.toPrecision(4)) : typeof v === "boolean" ? (v ? "yes" : "no") : v == null ? "n/a" : String(v));
+const safeUrl = (u) => { try { const x = new URL(u); return x.protocol === "https:" || x.protocol === "http:" ? x.href : null; } catch (e) { return null; } };
 
-const viewer = new SharedViewer(document.getElementById("viewer"));
-const ex = document.getElementById("examples");
-m.examples.forEach((tid) => {
-  const t = training.compounds.find((x) => x.id === tid);
-  ex.append(el("div", { class: "molcell" }, el("img", { class: "mol", src: t.svg, alt: `2D structure of example ${t.id}` }),
-    el("span", { class: "mono", text: t.id }),
-    el("button", { class: "btn small", type: "button", "aria-label": `Show 3D structure of example ${t.id}`, text: "3D",
-      onclick: () => { viewer.showMolblock(t.conformer_molblock); document.getElementById("viewer-cap").textContent = `${t.id} (stand-in example). ${CONFORMER_LABEL}.`; } })));
-});
+// Flatten nested JSON (benchmark metrics) into [path, value] rows, preserving every key.
+function flatten(obj, prefix = "") {
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === "object" && !Array.isArray(v)) out.push(...flatten(v, path));
+    else out.push([path, Array.isArray(v) ? v.map(fmt).join(", ") : fmt(v)]);
+  }
+  return out;
+}
+const tbl = (cap, heads, rows, id) => el("div", { class: "tablewrap" }, el("table", { id }, el("caption", { text: cap }),
+  el("thead", {}, el("tr", {}, heads.map((x) => el("th", { scope: "col", text: x })))),
+  el("tbody", {}, rows.map((r) => el("tr", {}, r.map((c) => (c && c.nodeType ? el("td", {}, c) : el("td", { class: "mono", text: String(c) }))))))));
+
+function render(m) {
+  const ns = Object.keys(m.coverage_by_n).sort((a, b) => Number(a) - Number(b));
+  const keys = [...new Set(m.datasets.flatMap((d) => Object.keys(d)))];
+  rep.replaceChildren(
+    el("div", { class: "rgrid" },
+      el("div", { class: "rcard" }, el("span", { class: "t", text: "Endpoint and version" }), el("span", { class: "n", text: m.endpoint }), el("span", { class: "legend", text: `version ${m.version} | ${m.kind}${m.units ? " | " + m.units : ""}` })),
+      el("div", { class: "rcard", "data-testid": "split" }, el("span", { class: "t", text: "Split used for evaluation" }), el("span", { class: "n", text: m.split_type })),
+      el("div", { class: "rcard", "data-testid": "default-range" }, el("span", { class: "t", text: "Default ranking range (training data min to max)" }), el("span", { class: "n mono", text: `${fmt(m.default_range[0])} to ${fmt(m.default_range[1])}` }))),
+    el("h2", { id: "datasets", text: "Training datasets and licences" }),
+    tbl("Each dataset with its stated licence, size and split.", keys, m.datasets.map((d) => keys.map((k) => {
+      const v = d[k];
+      if (k === "url" || k === "source_url") { const h = safeUrl(v); return h ? el("a", { href: h, rel: "noopener noreferrer", target: "_blank", text: String(v) }) : fmt(v); }
+      return fmt(v);
+    })), "datasets-table"),
+    el("h2", { id: "how-computed", text: "Benchmark against baselines" }),
+    flatten(m.benchmark).length ? tbl(`Held-out ${m.split_type} split. Every metric the publisher recorded is listed; if the model does not beat its baseline, this table shows that.`, ["Metric", "Value"], flatten(m.benchmark), "benchmark-table") : el("p", { class: "legend", text: "No benchmark metrics were recorded for this model." }),
+    el("h2", { id: "coverage", text: "Coverage and runtime at each ensemble size" }),
+    tbl("Empirical interval coverage on held-out data, median calibration width where applicable, and time per compound at each N offered.", ["Ensemble size N", "Held-out coverage", "Median calibration width", "Runtime (s)"],
+      ns.map((n) => [n, fmt(m.coverage_by_n[n]), m.median_calibration_width_by_n?.[n] != null ? fmt(m.median_calibration_width_by_n[n]) : "n/a", m.runtime_by_n_seconds[n] != null ? fmt(m.runtime_by_n_seconds[n]) : "n/a"]), "coverage-table"),
+    el("div", { class: "note-box", id: "limitations" }, el("b", { text: "Known limitations" }), el("br"), m.limitations),
+    el("p", { class: "legend", "data-testid": "weights-hash", text: `Model weights sha256: ${m.weights_sha256}` }));
+}
+load();

@@ -37,20 +37,20 @@ export class SharedViewer {
     if (highlight.length) v.setStyle({ index: highlight }, { stick: { radius: 0.2, color: "#6aa5e6" }, sphere: { scale: 0.3, color: "#6aa5e6" } });
     this._done();
   }
-  showDocking({ pdb, sdf, shell, box, siteResidues = [] }) {
+  // Prepared receptor (PDB text), optional ligand (SDF text), search box and site residues ({chain, resi}).
+  showDocking({ pdb, sdf = null, box = null, siteResidues = [] }) {
     if (!this.ok) return;
     const v = this.v;
     v.removeAllModels(); v.removeAllShapes();
-    const p = v.addModel(pdb, "pdb");
+    v.addModel(pdb, "pdb");
     v.setStyle({ model: 0 }, { cartoon: { color: "#98a3ae", opacity: 0.8 } });
-    v.setStyle({ model: 0, resi: shell }, { stick: { radius: 0.1, colorscheme: "Jmol" } });
-    if (siteResidues.length) v.setStyle({ model: 0, resi: siteResidues }, { stick: { radius: 0.18, color: "#d6b658" } });
-    v.addModel(sdf, "sdf");
-    v.setStyle({ model: 1 }, { stick: { radius: 0.2, colorscheme: "greenCarbon" } });
-    if (box) { const [cx, cy, cz] = box.center, [w, h, d] = box.size;
-    v.addBox({ center: { x: cx, y: cy, z: cz }, dimensions: { w, h, d }, color: "#6aa5e6", wireframe: true, alpha: 1 }); }
-    v.zoomTo({ model: 1 }); v.zoom(0.55); v.render();
+    for (const r of siteResidues) v.setStyle({ model: 0, chain: r.chain, resi: r.resi }, { stick: { radius: 0.18, color: "#d6b658" } });
+    if (sdf) { v.addModel(sdf, "sdf"); v.setStyle({ model: 1 }, { stick: { radius: 0.2, colorscheme: "greenCarbon" } }); }
+    if (box) {
+      const [cx, cy, cz] = box.center, [w, h, d] = box.size;
+      v.addBox({ center: { x: cx, y: cy, z: cz }, dimensions: { w, h, d }, color: "#6aa5e6", wireframe: true, alpha: 1 });
+    }
+    v.zoomTo(); v.render();
     this.container.dataset.shown = "1";
-    return p;
   }
 }

@@ -11,6 +11,8 @@ import threading
 from pathlib import Path
 
 import pytest
+from mockapi import MockApi
+from mockapi import install as install_mock
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -63,10 +65,16 @@ def browser(request):
 def make_page(browser, base_url):
     ctxs = []
 
-    def _make(width=1440, height=900, **kw):
+    def _make(width=1440, height=900, api="default", **kw):
+        """`api`: a MockApi (default: a signed-in one with models, a project and predictions), or None for no API at all."""
         ctx = browser.new_context(viewport={"width": width, "height": height}, **kw)
         ctxs.append(ctx)
+        ctx.add_cookies([{"name": "metis_csrf", "value": "testtoken", "url": base_url}])
         page = ctx.new_page()
+        if api == "default":
+            api = MockApi()
+        if api is not None:
+            install_mock(page, api)
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
