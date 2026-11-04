@@ -1,9 +1,7 @@
 """Browser fixtures for the Wave 1 web red-team checks (Playwright; skipped when it is not installed).
 
-Run with the Playwright venv, cutting off the parent conftest (it needs pgserver/psycopg):
-  /Users/adithyarao/.superset/worktrees/metis_v0/agent3-design/.venv-web/bin/python -m pytest \
-      tests/security/web --confcutdir=tests/security/web -q
-Python 3.9 compatible on purpose (that venv is 3.9).
+Run: python -m pytest tests/web tests/security/web -q   (needs `pip install playwright` and a Playwright chromium).
+Shares one Playwright instance with tests/web (see the `browser` fixture).
 """
 from __future__ import annotations
 
@@ -49,14 +47,24 @@ def base_url():
 
 
 @pytest.fixture(scope="session")
-def browser():
+def browser(request):
+    # One Playwright per process: tests/web and tests/security/web share it (a second sync_playwright() fails
+    # while the first is open). Whichever fixture runs first creates it and closes it.
+    shared = getattr(request.config, "_metis_browser", None)
+    if shared is not None:
+        yield shared
+        return
     exe = _chromium()
     if not exe or sync_playwright is None:
         pytest.skip("no headless chromium available")
     with sync_playwright() as p:
         b = p.chromium.launch(executable_path=exe, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
-        yield b
-        b.close()
+        request.config._metis_browser = b
+        try:
+            yield b
+        finally:
+            request.config._metis_browser = None
+            b.close()
 
 
 @pytest.fixture()

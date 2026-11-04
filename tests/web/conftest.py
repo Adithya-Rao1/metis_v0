@@ -41,11 +41,22 @@ def base_url():
 
 
 @pytest.fixture(scope="session")
-def browser():
+def browser(request):
+    # One Playwright per process: tests/web and tests/security/web share it (a second sync_playwright() fails
+    # while the first is open). Whichever fixture runs first creates it and closes it.
+    shared = getattr(request.config, "_metis_browser", None)
+    if shared is not None:
+        yield shared
+        return
+
     with sync_playwright() as p:
         b = p.chromium.launch(executable_path=_chromium(), args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
-        yield b
-        b.close()
+        request.config._metis_browser = b
+        try:
+            yield b
+        finally:
+            request.config._metis_browser = None
+            b.close()
 
 
 @pytest.fixture()
