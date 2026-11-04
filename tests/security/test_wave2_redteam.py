@@ -279,7 +279,7 @@ class TestAccounts:
     def test_rate_limit_buckets_purged(self):
         src = "".join(p.read_text() for p in (ROOT / "backend").rglob("*.py")) + "".join(
             p.read_text() for p in (ROOT / "scripts").rglob("*.py"))
-        assert re.search(r"DELETE\s+FROM\s+rate_limit_bucket", src, re.I)
+        assert re.search(r"DELETE\s+FROM\s+rate_limit_bucket|rate_limit_purge\(", src, re.I)
 
     def test_nan_json_is_422_not_500(self, mk):
         from fastapi.testclient import TestClient

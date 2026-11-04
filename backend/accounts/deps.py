@@ -88,20 +88,16 @@ def csrf_protect(request: Request) -> None:
 
 
 PURGE_PROBABILITY = 0.01
-PURGE_MIN_AGE_S = 7200  # longer than every configured window (max 3600 s)
 
 
-def purge_expired_buckets(factory: sessionmaker[Session], older_than_s: int = PURGE_MIN_AGE_S) -> int:
-    """Opportunistic cleanup (F-65): drop buckets whose window ended long ago. Never raises."""
+def purge_expired_buckets(factory: sessionmaker[Session]) -> int:
+    """Opportunistic cleanup (F-65) through rate_limit_purge(): the 2 h floor is enforced inside the database,
+    so the app role cannot delete live buckets. Never raises."""
     try:
         with request_session(factory, None) as s:
-            res = s.execute(
-                text("DELETE FROM rate_limit_bucket WHERE window_start < now() - make_interval(secs => :age)"),
-                {"age": older_than_s},
-            )
-            return res.rowcount or 0
+            return int(s.execute(text("SELECT rate_limit_purge()")).scalar_one() or 0)
     except Exception:  # best effort; the limiter must keep working
-        log.warning("rate_limit_bucket purge failed (needs SELECT(window_start) grant?)")
+        log.warning("rate_limit_bucket purge failed")
         return 0
 
 
@@ -113,7 +109,7 @@ def rate_limit(factory: sessionmaker[Session], key_hash: str, limit: int, window
             text("SELECT rate_limit_hit(:k, to_timestamp(:w))"), {"k": key_hash, "w": window_start}
         ).scalar_one()
     if random.random() < PURGE_PROBABILITY:
-        purge_expired_buckets(factory, max(2 * window_s, PURGE_MIN_AGE_S))
+        purge_expired_buckets(factory)
     if hits > limit:
         retry = max(1, window_s - (int(time.time()) - window_start))
         raise HTTPException(429, "rate_limited", headers={"Retry-After": str(retry)})

@@ -44,3 +44,10 @@ Child rows carry `(parent_id, owner_id)` composite foreign keys, so a row can ne
 
 ## 0003 domain storage (Wave 2)
 `project.ranking_config` (jsonb, size-bounded), `compound.conformer_molblock/conformer_method` (must be set together; always labelled computed), `compound.seq` (stable ordering), `job` table (owner-scoped RLS, composite FK to the owner's project, state/progress updatable by the app, owner and ids not), `prediction.job_id`. Tests in tests/db.
+
+## 0004 wave 3 hardening
+- **New role `metis_janitor`** (NOLOGIN, BYPASSRLS, not a member of any login role). It owns three purge functions and holds only: `SELECT(window_start), DELETE` on `rate_limit_bucket`, `SELECT(expires_at), DELETE` on `session_revocation`, `SELECT(id, email_verified_at, deleted_at, created_at), DELETE` on `app_user`, and `INSERT` on `audit_log`. No access to tenant data, emails or password hashes. `metis_auth` gained **nothing** (it still cannot delete users; `test_metis_auth_role_is_minimal`).
+- `rate_limit_purge()` removes buckets older than 2 hours (floor inside the function; the app role lost its direct `DELETE` on the table). `session_purge_expired()` removes revocation rows whose token has expired. `auth_purge_unverified(interval)` deletes never-verified sign-ups older than the given age, with a 1-day floor inside the function; each deletion is audited.
+- `auth_record_login` (F-60): after a lock lapses the failure count restarts at 1, so one wrong password no longer re-locks the account; an active lock still ignores both successes and failures and writes no audit row.
+- `auth_reset_password(token_hash, new_hash)`: spends a single-use reset token, sets the hash, clears the lock and counters, audits, all in one statement chain. It is the only way to clear a lock, so unlocking needs possession of the mailbox. Unverified or deleted accounts are refused without saying why.
+- Not solved here (tracked in BACKLOG): a squatter's password stays on an unverified row until the owner verifies; the robust fix is to set the password at verification time.

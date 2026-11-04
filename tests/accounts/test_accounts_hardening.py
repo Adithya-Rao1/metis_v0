@@ -37,8 +37,6 @@ def test_csrf_expired_rejected(client, monkeypatch):
 
 
 def test_expired_buckets_purged(client, su, factory):
-    # Needs the column-level grant from the handoff (DELETE ... WHERE reads window_start); migration owner adds it.
-    su.execute("GRANT SELECT (window_start) ON rate_limit_bucket TO metis_app")
     su.execute(
         "INSERT INTO rate_limit_bucket (key_hash, window_start) VALUES (repeat('a', 64), now() - interval '1 day')"
     )

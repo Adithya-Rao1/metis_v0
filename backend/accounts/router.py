@@ -245,18 +245,18 @@ def reset_password(body: ResetIn, request: Request) -> dict:
         raise HTTPException(422, problem)
     pw_hash = security.hash_password(body.password, cfg.bcrypt_cost)
     with request_session(factory, None) as s:
+        # One transaction: sets the hash, clears any lock, spends the token and audits (migration 0004). If the
+        # email-based password rule below fails we raise, the transaction rolls back and the token stays valid.
         uid = s.execute(
-            text("SELECT auth_consume_token(:t, 'reset_password')"), {"t": security.token_hash(body.token)}
+            text("SELECT auth_reset_password(:t, :h)"), {"t": security.token_hash(body.token), "h": pw_hash}
         ).scalar_one()
-    if uid is None:
-        raise HTTPException(400, "invalid_or_expired_token")
-    with request_session(factory, uid) as s:
+        if uid is None:
+            raise HTTPException(400, "invalid_or_expired_token")
+        s.execute(text("SELECT set_config('metis.user_id', :u, true)"), {"u": str(uid)})
         email = s.execute(text("SELECT email_lower FROM app_user WHERE id = :u"), {"u": uid}).scalar_one()
         if security.password_problem(body.password, email):
             raise HTTPException(422, "Password is too easy to guess")
-        # Changing the hash also invalidates every existing session (tokens carry a hash fingerprint).
-        s.execute(text("UPDATE app_user SET password_hash = :h WHERE id = :u"), {"h": pw_hash, "u": uid})
-        _audit(s, uid, "password_reset", f"app_user:{uid}")
+        # The new hash also invalidates every existing session (tokens carry a hash fingerprint).
     return {"status": "password_reset"}
 
 
@@ -295,11 +295,6 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
     now = datetime.now(UTC)
     locked = row.locked_until is not None and row.locked_until > now
     with request_session(factory, None) as s:
-        if not ok and row.locked_until is not None and row.locked_until <= now:
-            # F-60: a lapsed lock must not leave the counter at 5 (one more miss would re-lock at once).
-            # auth_record_login(.., true) is the only API-reachable counter reset and only acts on a lapsed
-            # lock; the failure is then counted from zero. (Proper fix is SQL-side, see handoff.)
-            s.execute(text("SELECT auth_record_login(:u, true)"), {"u": row.id})
         s.execute(text("SELECT auth_record_login(:u, :ok)"), {"u": row.id, "ok": ok})
     if not ok or locked:
         raise _invalid()
