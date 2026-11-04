@@ -25,7 +25,7 @@ def test_every_user_owned_table_has_owner_and_forced_rls(su):
         EXISTS (SELECT 1 FROM information_schema.columns k WHERE k.table_name=c.relname AND k.column_name IN ('owner_id') )
           OR c.relname='app_user' AS has_owner
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='public' AND c.relkind='r' AND c.relname NOT IN ('model_version','audit_log','deletion_request')""").fetchall()
+      WHERE n.nspname='public' AND c.relkind='r' AND c.relname NOT IN ('model_version','audit_log','deletion_request','rate_limit_bucket')""").fetchall()
     assert rows
     for name, rls, force, has_owner in rows:
         assert has_owner, name
@@ -35,7 +35,7 @@ def test_every_user_owned_table_has_owner_and_forced_rls(su):
 def test_primary_keys_are_uuid_except_audit(su):
     rows = su.execute("""SELECT t.relname, format_type(a.atttypid,a.atttypmod)
       FROM pg_index i JOIN pg_class t ON t.oid=i.indrelid JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(i.indkey)
-      JOIN pg_namespace n ON n.oid=t.relnamespace WHERE i.indisprimary AND n.nspname='public' AND t.relname<>'audit_log'""").fetchall()
+      JOIN pg_namespace n ON n.oid=t.relnamespace WHERE i.indisprimary AND n.nspname='public' AND t.relname NOT IN ('audit_log','rate_limit_bucket')""").fetchall()
     assert rows and all(t == "uuid" for _, t in rows)
 
 
@@ -338,3 +338,41 @@ def test_app_role_cannot_escalate_tier_or_forge_users(app, su):
         c.execute("INSERT INTO app_user(email_lower,password_hash) VALUES ('x@y.com','$2b$04$h')")
     c.rollback()
     assert c.execute("UPDATE app_user SET password_hash='$2b$04$new'").rowcount == 1  # own password change allowed
+
+
+# ---- 0002: accounts support ----
+def test_rate_limit_function_increments_and_table_not_directly_writable(app, su):
+    c = app.as_user(None)
+    k = "c" * 64
+    assert c.execute("SELECT rate_limit_hit(%s, date_trunc('minute', now()))", (k,)).fetchone()[0] == 1
+    assert c.execute("SELECT rate_limit_hit(%s, date_trunc('minute', now()))", (k,)).fetchone()[0] == 2
+    c.commit()
+    for sql in ("INSERT INTO rate_limit_bucket(key_hash,window_start) VALUES ('%s',now())" % k, "UPDATE rate_limit_bucket SET hits=0", "SELECT * FROM rate_limit_bucket"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute(sql)
+        c.rollback()
+
+
+def test_edu_upgrade_requires_verified_edu_address(app, su):
+    edu, other, unverified = register(su, "a@uni.edu"), register(su, "b@gmail.com"), register(su, "c@x.edu")
+    su.execute("UPDATE app_user SET email_verified_at=now() WHERE id IN (%s,%s)", (edu, other))
+    c = app.as_user(None)
+    assert c.execute("SELECT auth_upgrade_edu(%s)", (edu,)).fetchone()[0] is True
+    assert c.execute("SELECT auth_upgrade_edu(%s)", (other,)).fetchone()[0] is False
+    assert c.execute("SELECT auth_upgrade_edu(%s)", (unverified,)).fetchone()[0] is False
+    c.commit()
+    assert su.execute("SELECT tier FROM app_user WHERE id=%s", (edu,)).fetchone()[0] == "edu"
+    assert su.execute("SELECT tier FROM app_user WHERE id=%s", (other,)).fetchone()[0] == "free"
+
+
+def test_session_revocation_is_per_user_and_checkable_pre_auth(app, su):
+    a, b = register(su, "a@x.com"), register(su, "b@x.com")
+    import uuid
+    j = uuid.uuid4()
+    ca = app.as_user(a)
+    ca.execute("INSERT INTO session_revocation(jti,owner_id,expires_at) VALUES (%s,%s,now()+interval '1 day')", (j, a))
+    ca.commit()
+    assert app.as_user(b).execute("SELECT count(*) FROM session_revocation").fetchone()[0] == 0
+    assert app.as_user(None).execute("SELECT session_is_revoked(%s)", (j,)).fetchone()[0] is True
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        app.as_user(b).execute("INSERT INTO session_revocation(jti,owner_id,expires_at) VALUES (%s,%s,now())", (uuid.uuid4(), a))

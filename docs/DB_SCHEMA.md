@@ -38,3 +38,6 @@ Child rows carry `(parent_id, owner_id)` composite foreign keys, so a row can ne
 - `edit`/`comment` permissions are stored but only `view` semantics are enforced at DB level; application-level enforcement is Wave 2.
 - Rate-limit storage and session revocation tables are Wave 2 (Agent 4) via the integrator.
 - Object-storage keys are not yet modeled.
+
+## 0002 accounts support (Wave 2)
+`rate_limit_bucket` (global, hashed keys only, written only through `rate_limit_hit`), `session_revocation` (RLS by owner; `session_is_revoked(jti)` callable pre-auth), `auth_upgrade_edu(user)` (verified email + `.edu` suffix checked inside SQL). Tests in tests/db.

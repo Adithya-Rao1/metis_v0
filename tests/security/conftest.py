@@ -4,7 +4,7 @@ import pytest
 import pgserver
 import psycopg
 
-MIGRATION = pathlib.Path(__file__).parents[2] / "backend/db/migrations/0001_baseline.sql"
+MIGRATIONS = sorted((pathlib.Path(__file__).parents[2] / "backend/db/migrations").glob("*.sql"))
 
 
 @pytest.fixture(scope="session")
@@ -12,7 +12,8 @@ def pg(tmp_path_factory):
     srv = pgserver.get_server(tmp_path_factory.mktemp("pg_rt"), cleanup_mode="stop")
     uri = srv.get_uri()
     with psycopg.connect(uri, autocommit=True) as c:
-        c.execute(MIGRATION.read_text())
+        for m in MIGRATIONS:
+            c.execute(m.read_text())
     yield uri
     srv.cleanup()
 
