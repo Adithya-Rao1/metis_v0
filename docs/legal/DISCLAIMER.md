@@ -1,0 +1,2 @@
+# Disclaimer — DRAFT v2026-01
+Metis predictions are computational estimates with stated uncertainty, not experimental measurements and not advice. Do not use them as the sole basis for safety, health, clinical, regulatory or purchasing decisions. Verify experimentally. Metis and its operators accept no responsibility for outcomes arising from use of the predictions, to the extent permitted by law.

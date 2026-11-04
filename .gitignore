@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+private/
+*.pem
+*.key
+.DS_Store
+node_modules/
+*.pt
+*.ckpt
+data/
+.pytest_cache/
