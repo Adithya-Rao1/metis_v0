@@ -41,7 +41,7 @@ def get_factory() -> sessionmaker[Session]:
 
 @lru_cache
 def get_queue() -> JobQueue:
-    return InProcessJobQueue()
+    return InProcessJobQueue(factory=get_factory())
 
 
 def get_registry() -> ModelRegistry:

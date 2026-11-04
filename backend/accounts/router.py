@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.accounts import security
 from backend.accounts.config import COOKIE_CSRF, COOKIE_SESSION, AccountsConfig
 from backend.accounts.deps import (
+    TERMS_DOCS,
     Session_,
     authed_session,
     client_ip,
@@ -32,6 +33,13 @@ from backend.accounts.deps import (
     terms_current,
 )
 from backend.core.db import request_session
+from backend.schemas.contracts import (
+    ENSEMBLE_SIZES,
+    MAX_COMPOUNDS,
+    MAX_ENDPOINTS,
+    TIER_MAX_N,
+    allowed_ensemble_sizes,
+)
 from backend.schemas.interfaces import UserCtx
 
 log = logging.getLogger("metis.accounts")
@@ -103,6 +111,11 @@ class ConsentIn(_Body):
 
 class TermsIn(_Body):
     version: str = Field(min_length=1, max_length=32)
+
+
+class ChangePasswordIn(_Body):
+    current_password: str = Field(max_length=security.MAX_PASSWORD)
+    new_password: str = Field(max_length=security.MAX_PASSWORD)
 
 
 class DeleteIn(_Body):
@@ -304,7 +317,48 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
     csrf_token = _set_cookies(response, cfg, token, str(jti))
     with request_session(factory, row.id) as s:
         t = s.execute(text("SELECT tier FROM app_user WHERE id = :u"), {"u": row.id}).scalar_one()
-    return {"user": {"id": str(row.id), "tier": t, "email_verified": True}, "csrf_token": csrf_token}
+    reaccept = not terms_current(factory, row.id, cfg.terms_version)
+    return {
+        "user": {"id": str(row.id), "tier": t, "email_verified": True},
+        "csrf_token": csrf_token,
+        "terms_reaccept_required": reaccept,
+    }
+
+
+# ---------------------------------------------------------- change password
+@router.post("/auth/change-password")
+def change_password(
+    body: ChangePasswordIn, sess: Annotated[Session_, Depends(authed_session)], request: Request, response: Response
+) -> dict:
+    """Authenticated + CSRF (via authed_session). Needs the current password. Every other session dies because the
+    session token carries a fingerprint of the password hash; this session continues with a re-issued cookie."""
+    cfg, factory, uid = get_config(request), get_factory(request), sess.user.id
+    rate_limit(factory, security.rl_key("user", "change_password", str(uid)), *cfg.rl_change_password_user)
+    with request_session(factory, uid) as s:
+        row = s.execute(
+            text("SELECT password_hash, email_lower FROM app_user WHERE id = :u AND deleted_at IS NULL"), {"u": uid}
+        ).one_or_none()
+    if row is None or not security.check_password(body.current_password, row.password_hash):
+        raise HTTPException(403, "password_incorrect")
+    if body.new_password == body.current_password:
+        raise HTTPException(422, "New password must differ from the current one")
+    problem = security.password_problem(body.new_password, row.email_lower)
+    if problem:
+        raise HTTPException(422, problem)
+    new_hash = security.hash_password(body.new_password, cfg.bcrypt_cost)
+    with request_session(factory, uid) as s:
+        s.execute(text("UPDATE app_user SET password_hash = :h WHERE id = :u"), {"h": new_hash, "u": uid})
+        s.execute(
+            text(
+                "INSERT INTO session_revocation (jti, owner_id, expires_at) VALUES (:j, :u, to_timestamp(:e)) "
+                "ON CONFLICT (jti) DO NOTHING"
+            ),
+            {"j": sess.jti, "u": uid, "e": sess.exp},
+        )
+        _audit(s, uid, "password_change", f"app_user:{uid}")
+    token, jti, _exp = security.make_session_token(uid, cfg.session_ttl_s, security.pw_version(new_hash))
+    csrf_token = _set_cookies(response, cfg, token, str(jti))
+    return {"status": "password_changed", "csrf_token": csrf_token}
 
 
 @router.post("/auth/logout", dependencies=[Depends(csrf_protect)])
@@ -334,11 +388,34 @@ def logout(request: Request, response: Response) -> dict:
 @router.get("/auth/me")
 def me(user: Annotated[UserCtx, Depends(current_user_no_terms)], request: Request) -> dict:
     ok = terms_current(get_factory(request), user.id, get_config(request).terms_version)
-    return {"id": str(user.id), "tier": user.tier, "email_verified": user.email_verified, "terms_current": ok}
+    return {
+        "id": str(user.id),
+        "tier": user.tier,
+        "email_verified": user.email_verified,
+        "terms_current": ok,
+        "terms_reaccept_required": not ok,
+    }
 
 
 # ------------------------------------------------------------------- terms
-@router.post("/terms/accept")
+def _terms_state(factory: Any, uid: uuid.UUID, required: str) -> dict:
+    with request_session(factory, uid) as s:
+        rows = s.execute(
+            text("SELECT document, version FROM terms_current WHERE owner_id = :u"), {"u": uid}
+        ).all()
+    have = {r.document: r.version for r in rows}
+    accepted = {d: have.get(d) for d in TERMS_DOCS}
+    ok = all(v == required for v in accepted.values())
+    return {"required_version": required, "accepted_versions": accepted, "reaccept_required": not ok}
+
+
+@router.get("/auth/terms/status")
+def terms_status(user: Annotated[UserCtx, Depends(current_user_no_terms)], request: Request) -> dict:
+    return _terms_state(get_factory(request), user.id, get_config(request).terms_version)
+
+
+@router.post("/auth/terms/accept")
+@router.post("/terms/accept")  # original path, kept for existing clients
 def accept_terms(
     body: TermsIn, user: Annotated[UserCtx, Depends(current_user_no_terms)], request: Request
 ) -> dict:
@@ -396,6 +473,35 @@ def set_consent(body: ConsentIn, user: Annotated[UserCtx, Depends(current_user)]
             )
         _audit(s, user.id, "consent_grant" if body.granted else "consent_revoke", f"consent:{body.scope}")
         return _consent_state(s, user.id)
+
+
+# ----------------------------------------------------------------- account
+@router.get("/account")
+def account(user: Annotated[UserCtx, Depends(current_user_no_terms)], request: Request) -> dict:
+    """Summary for the account page: tier, caps, verification, edu flag, consent and terms state."""
+    factory, cfg = get_factory(request), get_config(request)
+    with request_session(factory, user.id) as s:
+        row = s.execute(
+            text("SELECT tier, is_edu, email_verified_at IS NOT NULL AS v, created_at FROM app_user WHERE id = :u"),
+            {"u": user.id},
+        ).one()
+        consents = _consent_state(s, user.id)["consents"]
+    return {
+        "id": str(user.id),
+        "tier": row.tier,
+        "email_verified": row.v,
+        "is_edu": row.is_edu,
+        "created_at": row.created_at,
+        "caps": {
+            "max_ensemble_n": TIER_MAX_N[row.tier],
+            "allowed_ensemble_sizes": list(allowed_ensemble_sizes(row.tier)),
+            "all_ensemble_sizes": list(ENSEMBLE_SIZES),
+            "max_compounds_per_project": MAX_COMPOUNDS,
+            "max_endpoints_per_request": MAX_ENDPOINTS,
+        },
+        "consents": {k: v["granted"] for k, v in consents.items()},
+        "terms": _terms_state(factory, user.id, cfg.terms_version),
+    }
 
 
 # ---------------------------------------------------------- export / delete

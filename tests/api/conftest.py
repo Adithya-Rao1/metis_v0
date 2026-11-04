@@ -72,8 +72,8 @@ def users(su):
 
 
 @pytest.fixture
-def queue():
-    return InProcessJobQueue(max_workers=2)
+def queue(factory):
+    return InProcessJobQueue(max_workers=2, factory=factory)
 
 
 @pytest.fixture

@@ -40,6 +40,7 @@ class AccountsConfig(BaseSettings):
     rl_forgot_ip: tuple[int, int] = (10, 3600)
     rl_forgot_email: tuple[int, int] = (3, 3600)
     rl_reset_ip: tuple[int, int] = (20, 900)
+    rl_change_password_user: tuple[int, int] = (5, 900)
     reset_ttl_s: int = Field(default=3600, ge=60, le=86400)
 
 
