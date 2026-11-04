@@ -218,23 +218,23 @@ def test_redaction_keeps_ordinary_text():
 def test_f05_production_error_does_not_echo_secrets():
     with pytest.raises(ValueError) as ei:
         Settings(
-            env="production", redis_url="redis://:RedisPw77@r:6379/0", secret_key="Short-Secret-Key-Value"
+            env="production", redis_url="redis://:pwpwpw@r:6379/0", secret_key="abcabcabcabc"
         )
-    assert "RedisPw77" not in str(ei.value) and "Short-Secret-Key-Value" not in str(ei.value)
+    assert "pwpwpw" not in str(ei.value) and "abcabcabcabc" not in str(ei.value)
     assert "METIS_SECRET_KEY" in str(ei.value)
 
 
 def test_f05_get_settings_raises_clean_settings_error(monkeypatch):
     monkeypatch.setenv("METIS_ENV", "production")
-    monkeypatch.setenv("METIS_REDIS_URL", "redis://:RedisPw77@r:6379/0")
-    monkeypatch.setenv("METIS_SECRET_KEY", "Short-Secret-Key-Value")
+    monkeypatch.setenv("METIS_REDIS_URL", "redis://:pwpwpw@r:6379/0")
+    monkeypatch.setenv("METIS_SECRET_KEY", "abcabcabcabc")
     get_settings.cache_clear()
     try:
         with pytest.raises(SettingsError) as ei:
             get_settings()
     finally:
         get_settings.cache_clear()
-    assert "RedisPw77" not in str(ei.value) and "Short-Secret-Key-Value" not in str(ei.value)
+    assert "pwpwpw" not in str(ei.value) and "abcabcabcabc" not in str(ei.value)
 
 
 def test_f10_env_example_rejected_in_production():

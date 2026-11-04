@@ -1,0 +1,11 @@
+# Keep gitleaks' default rules; allow only the two deliberately fake values that appear in early test history
+# (they are in commits before they were replaced with obviously fake ones). Never add real values here.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "fake fixtures in tests/foundation/test_wave1_fixes.py and tests/security/test_wave1_redteam.py"
+regexes = [
+  '''Short-Secret-Key-Value''',
+  '''RedisPw77''',
+]

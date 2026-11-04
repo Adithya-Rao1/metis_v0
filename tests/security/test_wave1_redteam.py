@@ -179,8 +179,8 @@ def test_settings_validation_error_does_not_echo_secret_values():
     from backend.core.settings import Settings
 
     with pytest.raises(ValueError) as ei:
-        Settings(env="production", redis_url="redis://:RedisPw77@r:6379/0", secret_key="Short-Secret-Key-Value")
-    assert "RedisPw77" not in str(ei.value) and "Short-Secret-Key-Value" not in str(ei.value)
+        Settings(env="production", redis_url="redis://:pwpwpw@r:6379/0", secret_key="abcabcabcabc")
+    assert "pwpwpw" not in str(ei.value) and "abcabcabcabc" not in str(ei.value)
 
 
 def test_settings_rejects_env_example_placeholders_in_production():
