@@ -1,0 +1,23 @@
+<svg role='img' aria-label='Metis logo: benzene ring' version='1.1' baseProfile='full'
+              xmlns='http://www.w3.org/2000/svg'
+                      xmlns:rdkit='http://www.rdkit.org/xml'
+                      xmlns:xlink='http://www.w3.org/1999/xlink'
+                  xml:space='preserve'
+viewBox='0 0 128 128'>
+<!-- END OF HEADER -->
+<path class='bond-0 atom-0 atom-1' d='M 112.4,63.9 L 88.1,105.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-0 atom-0 atom-1' d='M 104.0,63.9 L 83.9,98.6' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-1 atom-1 atom-2' d='M 88.1,105.9 L 39.6,105.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-2 atom-2 atom-3' d='M 39.6,105.9 L 15.4,63.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-2 atom-2 atom-3' d='M 43.8,98.6 L 23.8,63.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-3 atom-3 atom-4' d='M 15.4,63.9 L 39.6,21.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-4 atom-4 atom-5' d='M 39.6,21.9 L 88.1,21.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-4 atom-4 atom-5' d='M 43.8,29.1 L 83.9,29.1' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-5 atom-5 atom-0' d='M 88.1,21.9 L 112.4,63.9' style='fill:none;fill-rule:evenodd;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path d='M 111.1,66.0 L 112.4,63.9 L 111.1,61.8' style='fill:none;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 89.3,103.8 L 88.1,105.9 L 85.7,105.9' style='fill:none;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 42.0,105.9 L 39.6,105.9 L 38.4,103.8' style='fill:none;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 16.6,66.0 L 15.4,63.9 L 16.6,61.8' style='fill:none;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 38.4,24.0 L 39.6,21.9 L 42.0,21.9' style='fill:none;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 85.7,21.9 L 88.1,21.9 L 89.3,24.0' style='fill:none;stroke:#E5E8ED;stroke-width:5.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+</svg>
