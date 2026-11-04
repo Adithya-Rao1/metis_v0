@@ -12,8 +12,10 @@ $$;
 -- ---------- users ----------
 CREATE TABLE app_user (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email_lower     text NOT NULL UNIQUE CHECK (email_lower = lower(email_lower) AND length(email_lower) BETWEEN 3 AND 254),
-  password_hash   text NOT NULL,
+  email_lower     text NOT NULL UNIQUE CHECK (email_lower = lower(email_lower) AND length(email_lower) BETWEEN 3 AND 254
+                  AND email_lower ~ '^[^@[:space:][:cntrl:]]+@[^@[:space:][:cntrl:]]+\.[^@[:space:][:cntrl:]]+$'
+                  AND email_lower !~ '[\u200b-\u200f\u202a-\u202e\ufeff]'),
+  password_hash   text NOT NULL CHECK (password_hash ~ '^\$2[aby]\$'),
   email_verified_at timestamptz,
   is_edu          boolean NOT NULL DEFAULT false,
   tier            text NOT NULL DEFAULT 'free' CHECK (tier IN ('free','edu','paid')),
@@ -70,63 +72,64 @@ CREATE POLICY consent_owner ON consent USING (owner_id = current_user_id()) WITH
 CREATE TABLE project (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id    uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
-  created_at  timestamptz NOT NULL DEFAULT now()
+  name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 200 AND btrim(name) <> '' AND name !~ '[[:cntrl:]]'),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, owner_id)
 );
 CREATE INDEX ON project (owner_id);
 
 CREATE TABLE compound (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id     uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  project_id   uuid NOT NULL REFERENCES project(id) ON DELETE CASCADE,
-  smiles       text NOT NULL CHECK (length(smiles) BETWEEN 1 AND 2000),
-  canonical_smiles text NOT NULL CHECK (length(canonical_smiles) BETWEEN 1 AND 2000),
-  label        text CHECK (length(label) <= 200),
-  created_at   timestamptz NOT NULL DEFAULT now()
+  project_id   uuid NOT NULL,
+  smiles       text NOT NULL CHECK (length(smiles) BETWEEN 1 AND 2000 AND smiles !~ '[[:space:][:cntrl:]]'),
+  canonical_smiles text NOT NULL CHECK (length(canonical_smiles) BETWEEN 1 AND 2000 AND canonical_smiles !~ '[[:space:][:cntrl:]]'),
+  label        text CHECK (length(label) <= 200 AND label !~ '[[:cntrl:]]'),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, owner_id),
+  -- composite FK: child owner must equal parent owner; FK checks ignore RLS, so this cannot fail open.
+  FOREIGN KEY (project_id, owner_id) REFERENCES project(id, owner_id) ON DELETE CASCADE
 );
 CREATE INDEX ON compound (owner_id);
 CREATE INDEX ON compound (project_id);
 
--- Cap: at most 10 compounds per project (v1 limit, spec 3).
-CREATE FUNCTION enforce_compound_cap() RETURNS trigger LANGUAGE plpgsql AS $$
+-- Cap: at most 10 compounds per project (v1 limit, spec 3). Fires on insert and on moving a compound.
+CREATE FUNCTION enforce_compound_cap() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.project_id = NEW.project_id THEN RETURN NEW; END IF;
   PERFORM pg_advisory_xact_lock(hashtext(NEW.project_id::text));
-  IF (SELECT count(*) FROM compound WHERE project_id = NEW.project_id) >= 10 THEN
+  IF (SELECT count(*) FROM public.compound c WHERE c.project_id = NEW.project_id AND c.id <> NEW.id) >= 10 THEN
     RAISE EXCEPTION 'compound cap (10) reached for project' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END $$;
-CREATE TRIGGER compound_cap BEFORE INSERT ON compound FOR EACH ROW EXECUTE FUNCTION enforce_compound_cap();
-
--- Child owner must equal parent owner (prevents cross-tenant attachment).
-CREATE FUNCTION enforce_compound_owner() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.owner_id <> (SELECT owner_id FROM project WHERE id = NEW.project_id) THEN
-    RAISE EXCEPTION 'owner mismatch with project' USING ERRCODE = '23514';
-  END IF;
-  RETURN NEW;
-END $$;
-CREATE TRIGGER compound_owner BEFORE INSERT OR UPDATE ON compound FOR EACH ROW EXECUTE FUNCTION enforce_compound_owner();
+CREATE TRIGGER compound_cap BEFORE INSERT OR UPDATE OF project_id ON compound FOR EACH ROW EXECUTE FUNCTION enforce_compound_cap();
 
 CREATE TABLE prediction (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id       uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  compound_id    uuid NOT NULL REFERENCES compound(id) ON DELETE CASCADE,
-  endpoint       text NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 64),
+  compound_id    uuid NOT NULL,
+  endpoint       text NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 64 AND btrim(endpoint) <> ''),
   model_version_id uuid NOT NULL,
   ensemble_n     integer NOT NULL CHECK (ensemble_n IN (3,5,10,20)),
   kind           text NOT NULL CHECK (kind IN ('regression','classification')),
-  value          double precision NOT NULL,
-  interval_low   double precision,
-  interval_high  double precision,
+  value          double precision NOT NULL CHECK (abs(value) < 'Infinity'::float8),
+  interval_low   double precision CHECK (abs(interval_low) < 'Infinity'::float8),
+  interval_high  double precision CHECK (abs(interval_high) < 'Infinity'::float8),
   probability    double precision CHECK (probability BETWEEN 0 AND 1),
   coverage       double precision NOT NULL CHECK (coverage > 0 AND coverage < 1),
   sample_size    integer NOT NULL CHECK (sample_size > 0),
-  method_note    text NOT NULL CHECK (length(method_note) > 0),
-  uncertainty_breakdown jsonb NOT NULL,
+  method_note    text NOT NULL CHECK (length(method_note) BETWEEN 1 AND 2000 AND btrim(method_note) <> ''),
+  uncertainty_breakdown jsonb NOT NULL CHECK (
+    jsonb_typeof(uncertainty_breakdown) = 'object' AND pg_column_size(uncertainty_breakdown) < 1024
+    AND uncertainty_breakdown ?& ARRAY['ensemble_disagreement','similarity_to_training','assay_noise']
+    AND abs((uncertainty_breakdown->>'ensemble_disagreement')::float8 + (uncertainty_breakdown->>'similarity_to_training')::float8
+            + (uncertainty_breakdown->>'assay_noise')::float8 - 1) < 0.001),
   created_at     timestamptz NOT NULL DEFAULT now(),
-  CHECK (kind <> 'regression' OR (interval_low IS NOT NULL AND interval_high IS NOT NULL AND interval_low <= interval_high)),
-  CHECK (kind <> 'classification' OR probability IS NOT NULL)
+  CHECK (kind <> 'regression' OR (interval_low IS NOT NULL AND interval_high IS NOT NULL AND interval_low <= interval_high AND value BETWEEN interval_low AND interval_high)),
+  CHECK (kind <> 'classification' OR probability IS NOT NULL),
+  FOREIGN KEY (compound_id, owner_id) REFERENCES compound(id, owner_id) ON DELETE CASCADE
 );
 CREATE INDEX ON prediction (owner_id);
 CREATE INDEX ON prediction (compound_id);
@@ -134,21 +137,23 @@ CREATE INDEX ON prediction (compound_id);
 CREATE TABLE measurement (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id    uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  compound_id uuid NOT NULL REFERENCES compound(id) ON DELETE CASCADE,
-  endpoint    text NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 64),
-  value       double precision NOT NULL,
+  compound_id uuid NOT NULL,
+  endpoint    text NOT NULL CHECK (length(endpoint) BETWEEN 1 AND 64 AND btrim(endpoint) <> ''),
+  value       double precision NOT NULL CHECK (abs(value) < 'Infinity'::float8),
   unit        text CHECK (length(unit) <= 32),
   assay       text CHECK (length(assay) <= 200),
-  created_at  timestamptz NOT NULL DEFAULT now()
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (compound_id, owner_id) REFERENCES compound(id, owner_id) ON DELETE CASCADE
 );
 CREATE INDEX ON measurement (owner_id);
 
 CREATE TABLE note (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id    uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  project_id  uuid NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+  project_id  uuid NOT NULL,
   body        text NOT NULL CHECK (length(body) <= 20000),
-  created_at  timestamptz NOT NULL DEFAULT now()
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (project_id, owner_id) REFERENCES project(id, owner_id) ON DELETE CASCADE
 );
 CREATE INDEX ON note (owner_id);
 
@@ -156,14 +161,20 @@ CREATE INDEX ON note (owner_id);
 CREATE TABLE grant_ (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id      uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
-  project_id    uuid NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+  project_id    uuid NOT NULL,
   grantee_id    uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
   permission    text NOT NULL CHECK (permission IN ('view','comment','edit')),
   created_at    timestamptz NOT NULL DEFAULT now(),
   revoked_at    timestamptz,
-  CHECK (grantee_id <> owner_id)
+  CHECK (grantee_id <> owner_id),
+  FOREIGN KEY (project_id, owner_id) REFERENCES project(id, owner_id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX grant_one_active ON grant_ (project_id, grantee_id) WHERE revoked_at IS NULL;
+
+CREATE FUNCTION datasets_ok(d jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT jsonb_typeof(d) = 'array' AND jsonb_array_length(d) > 0
+     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d) e WHERE jsonb_typeof(e) <> 'object' OR e = '{}'::jsonb)
+$$;
 
 -- ---------- models (global, not user-owned; publish gate) ----------
 CREATE TABLE model_version (
@@ -181,9 +192,13 @@ CREATE TABLE model_version (
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (endpoint, version),
   -- A model cannot be published without data links, cleared licenses, limitations, split, benchmark, coverage (spec 6.5).
-  CHECK (status <> 'published' OR (
-    jsonb_array_length(datasets) > 0 AND licenses_cleared AND limitations IS NOT NULL AND length(limitations) > 0
-    AND split_type IS NOT NULL AND benchmark IS NOT NULL AND coverage_by_n IS NOT NULL AND weights_sha256 IS NOT NULL))
+  CHECK (status <> 'published' OR COALESCE((
+    datasets_ok(datasets)
+    AND licenses_cleared AND limitations IS NOT NULL AND btrim(limitations) <> ''
+    AND split_type IN ('scaffold','butina','time','random')
+    AND jsonb_typeof(benchmark) = 'object' AND benchmark <> '{}'::jsonb
+    AND jsonb_typeof(coverage_by_n) = 'object' AND coverage_by_n <> '{}'::jsonb
+    AND weights_sha256 ~ '^[0-9a-f]{64}$'), false))
 );
 ALTER TABLE prediction ADD FOREIGN KEY (model_version_id) REFERENCES model_version(id);
 
@@ -205,7 +220,7 @@ CREATE TABLE audit_log (
   actor_id    uuid,
   action      text NOT NULL CHECK (length(action) BETWEEN 1 AND 64),
   resource    text,
-  detail      jsonb NOT NULL DEFAULT '{}'
+  detail      jsonb NOT NULL DEFAULT '{}' CHECK (pg_column_size(detail) < 8192)
 );
 
 -- ---------- RLS for tenant tables ----------
@@ -218,6 +233,18 @@ BEGIN
     EXECUTE format('CREATE POLICY %I ON %I USING (owner_id = current_user_id()) WITH CHECK (owner_id = current_user_id())', t||'_owner', t);
   END LOOP;
 END $$;
+-- deletion_request and audit_log: users only see/insert their own rows.
+ALTER TABLE deletion_request ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deletion_request FORCE ROW LEVEL SECURITY;
+CREATE POLICY deletion_owner ON deletion_request USING (owner_id = current_user_id()) WITH CHECK (owner_id = current_user_id());
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_log FORCE ROW LEVEL SECURITY;
+CREATE POLICY audit_ins ON audit_log FOR INSERT WITH CHECK (actor_id = current_user_id());
+CREATE POLICY audit_own ON audit_log FOR SELECT USING (actor_id = current_user_id());
+-- App role sees only published models.
+ALTER TABLE model_version ENABLE ROW LEVEL SECURITY;
+ALTER TABLE model_version FORCE ROW LEVEL SECURITY;
+CREATE POLICY model_published ON model_version FOR SELECT USING (status = 'published');
 -- Grantees may read shared projects and their children (view or higher), read-only at DB level.
 CREATE POLICY project_shared_read ON project FOR SELECT USING (EXISTS (
   SELECT 1 FROM grant_ g WHERE g.project_id = project.id AND g.grantee_id = current_user_id() AND g.revoked_at IS NULL));
@@ -228,6 +255,22 @@ CREATE POLICY grant_grantee_read ON grant_ FOR SELECT USING (grantee_id = curren
 -- ---------- append-only enforcement via triggers (defense beyond privileges) ----------
 CREATE FUNCTION forbid_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION '% is append-only', TG_TABLE_NAME USING ERRCODE = '42501'; END $$;
+CREATE FUNCTION model_published_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.status = 'published' AND NOT (NEW.status = 'retired' AND (NEW.endpoint, NEW.version, NEW.datasets, NEW.weights_sha256, NEW.benchmark, NEW.coverage_by_n)
+      IS NOT DISTINCT FROM (OLD.endpoint, OLD.version, OLD.datasets, OLD.weights_sha256, OLD.benchmark, OLD.coverage_by_n)) THEN
+    RAISE EXCEPTION 'published model versions are immutable (retire only)' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER model_immutable BEFORE UPDATE ON model_version FOR EACH ROW EXECUTE FUNCTION model_published_immutable();
+-- Consent revocation time is server-set.
+CREATE FUNCTION consent_server_time() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.revoked_at IS DISTINCT FROM OLD.revoked_at THEN NEW.revoked_at := now(); END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER consent_time BEFORE UPDATE ON consent FOR EACH ROW EXECUTE FUNCTION consent_server_time();
 CREATE TRIGGER audit_no_update BEFORE UPDATE OR DELETE ON audit_log FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
 CREATE TRIGGER terms_no_update BEFORE UPDATE ON terms_acceptance FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
 
@@ -240,32 +283,44 @@ END $$;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO metis_app, metis_readonly;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON auth_token, consent, project, compound, prediction, measurement, note, grant_, deletion_request TO metis_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON project, compound, prediction, measurement, note, grant_ TO metis_app;
 -- app_user: no direct INSERT (sign-up goes through auth_register); UPDATE only on password_hash;
 -- tier / is_edu / lockout / verification fields change only through definer functions.
 GRANT SELECT, DELETE ON app_user TO metis_app;
 GRANT UPDATE (password_hash) ON app_user TO metis_app;
-GRANT SELECT, INSERT ON terms_acceptance TO metis_app;
-GRANT SELECT, INSERT ON audit_log TO metis_app;
+-- Tokens are issued only via auth_issue_token; users cannot mint or reset them.
+GRANT SELECT ON auth_token TO metis_app;
+-- Timestamps are server-set: clients may not supply accepted_at / granted_at; consent cannot be deleted.
+GRANT SELECT ON terms_acceptance, consent TO metis_app;
+GRANT INSERT (owner_id, document, version) ON terms_acceptance TO metis_app;
+GRANT INSERT (owner_id, scope) ON consent TO metis_app;
+GRANT UPDATE (revoked_at) ON consent TO metis_app;
+GRANT SELECT, INSERT ON deletion_request TO metis_app;
+GRANT SELECT, INSERT (actor_id, action, resource, detail) ON audit_log TO metis_app;
 GRANT USAGE ON SEQUENCE audit_log_id_seq TO metis_app;
 GRANT SELECT ON model_version TO metis_app;
 -- Read-only role (backups/analytics): no structures, notes, or credentials.
 GRANT SELECT ON model_version, deletion_request TO metis_readonly;
+ALTER ROLE metis_app SET search_path = public;
+ALTER ROLE metis_app SET lock_timeout = '2s';
+ALTER ROLE metis_app SET statement_timeout = '30s';
+DO $$ BEGIN EXECUTE format('REVOKE TEMP ON DATABASE %I FROM PUBLIC', current_database()); END $$;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+REVOKE ALL ON FUNCTION enforce_compound_cap(), forbid_mutation(), model_published_immutable(), consent_server_time() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION current_user_id() TO metis_app, metis_readonly;
 
 -- ---------- pre-authentication functions (SECURITY DEFINER, minimal surface) ----------
 -- The app role cannot read app_user without a user id, so login/sign-up go through these.
 -- Each pins search_path and takes only what it needs.
-CREATE FUNCTION auth_register(p_email text, p_password_hash text, p_terms_version text, p_is_edu boolean)
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+CREATE FUNCTION auth_register(p_email text, p_password_hash text, p_terms_version text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE uid uuid;
 BEGIN
   IF p_terms_version IS NULL OR length(p_terms_version) = 0 THEN
     RAISE EXCEPTION 'terms acceptance required' USING ERRCODE = '23514';
   END IF;
-  INSERT INTO app_user (email_lower, password_hash, is_edu, tier)
-    VALUES (lower(p_email), p_password_hash, p_is_edu, CASE WHEN p_is_edu THEN 'edu' ELSE 'free' END)
-    RETURNING id INTO uid;
+  -- Tier is always 'free' at sign-up; edu/paid are set only by server-side verification (Wave 2).
+  INSERT INTO app_user (email_lower, password_hash) VALUES (lower(p_email), p_password_hash) RETURNING id INTO uid;
   INSERT INTO terms_acceptance (owner_id, document, version)
     SELECT uid, d, p_terms_version FROM unnest(ARRAY['terms','privacy','disclaimer']) AS d;
   INSERT INTO audit_log (actor_id, action, resource) VALUES (uid, 'register', 'app_user:' || uid);
@@ -274,27 +329,30 @@ END $$;
 
 CREATE FUNCTION auth_lookup(p_email text)
 RETURNS TABLE (id uuid, password_hash text, email_verified boolean, locked_until timestamptz)
-LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
   SELECT id, password_hash, email_verified_at IS NOT NULL, locked_until
   FROM app_user WHERE email_lower = lower(p_email) AND deleted_at IS NULL
 $$;
 
 CREATE FUNCTION auth_record_login(p_user uuid, p_success boolean)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
+  -- A success cannot clear an active lock; a failure while locked changes nothing.
   IF p_success THEN
-    UPDATE app_user SET failed_logins = 0, locked_until = NULL WHERE id = p_user;
+    UPDATE app_user SET failed_logins = 0, locked_until = NULL
+     WHERE id = p_user AND (locked_until IS NULL OR locked_until < now());
   ELSE
     UPDATE app_user SET failed_logins = failed_logins + 1,
       locked_until = CASE WHEN failed_logins + 1 >= 5 THEN now() + interval '15 minutes' ELSE locked_until END
-    WHERE id = p_user;
+     WHERE id = p_user AND (locked_until IS NULL OR locked_until < now());
   END IF;
+  IF NOT FOUND THEN RETURN; END IF;
   INSERT INTO audit_log (actor_id, action, resource) VALUES (p_user, CASE WHEN p_success THEN 'login_ok' ELSE 'login_fail' END, 'app_user:' || p_user);
 END $$;
 
 -- Single-use token consumption: returns the owner only if valid, unexpired, unused, right purpose.
 CREATE FUNCTION auth_consume_token(p_token_hash text, p_purpose text)
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE uid uuid;
 BEGIN
   UPDATE auth_token SET used_at = now()
@@ -306,8 +364,18 @@ BEGIN
   RETURN uid;
 END $$;
 
-REVOKE ALL ON FUNCTION auth_register(text,text,text,boolean), auth_lookup(text), auth_record_login(uuid,boolean), auth_consume_token(text,text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION auth_register(text,text,text,boolean), auth_lookup(text), auth_record_login(uuid,boolean), auth_consume_token(text,text) TO metis_app;
+REVOKE ALL ON FUNCTION auth_register(text,text,text), auth_lookup(text), auth_record_login(uuid,boolean), auth_consume_token(text,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION auth_register(text,text,text), auth_lookup(text), auth_record_login(uuid,boolean), auth_consume_token(text,text) TO metis_app;
+
+-- Token issuance (called by the API only; users cannot insert into auth_token). TTL capped at 24h.
+CREATE FUNCTION auth_issue_token(p_owner uuid, p_purpose text, p_token_hash text, p_ttl interval)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+BEGIN
+  IF p_ttl <= interval '0' OR p_ttl > interval '24 hours' THEN RAISE EXCEPTION 'ttl out of range' USING ERRCODE = '23514'; END IF;
+  INSERT INTO auth_token (owner_id, purpose, token_hash, expires_at) VALUES (p_owner, p_purpose, p_token_hash, now() + p_ttl);
+END $$;
+REVOKE ALL ON FUNCTION auth_issue_token(uuid,text,text,interval) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION auth_issue_token(uuid,text,text,interval) TO metis_app;
 
 -- Re-acceptance: current accepted version per document.
 CREATE VIEW terms_current WITH (security_invoker = true) AS
@@ -322,12 +390,15 @@ DO $$ BEGIN
 END $$;
 GRANT USAGE ON SCHEMA public TO metis_auth;
 GRANT SELECT, INSERT, UPDATE ON app_user TO metis_auth;
-GRANT SELECT, UPDATE ON auth_token TO metis_auth;
+GRANT SELECT, INSERT, UPDATE ON auth_token TO metis_auth;
 GRANT INSERT ON terms_acceptance TO metis_auth;
 GRANT INSERT ON audit_log TO metis_auth;
 GRANT USAGE ON SEQUENCE audit_log_id_seq TO metis_auth;
 GRANT EXECUTE ON FUNCTION current_user_id() TO metis_auth;
-ALTER FUNCTION auth_register(text,text,text,boolean) OWNER TO metis_auth;
+ALTER FUNCTION auth_register(text,text,text) OWNER TO metis_auth;
 ALTER FUNCTION auth_lookup(text) OWNER TO metis_auth;
 ALTER FUNCTION auth_record_login(uuid,boolean) OWNER TO metis_auth;
 ALTER FUNCTION auth_consume_token(text,text) OWNER TO metis_auth;
+ALTER FUNCTION auth_issue_token(uuid,text,text,interval) OWNER TO metis_auth;
+ALTER FUNCTION enforce_compound_cap() OWNER TO metis_auth;
+GRANT SELECT ON compound TO metis_auth;

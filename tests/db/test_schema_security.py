@@ -5,8 +5,8 @@ import pytest
 H = "a" * 64
 
 
-def register(c, email="a@x.edu", edu=False, terms="2026-01"):
-    return c.execute("SELECT auth_register(%s,%s,%s,%s)", (email, "hash", terms, edu)).fetchone()[0]
+def register(c, email="a@x.edu", terms="2026-01"):
+    return c.execute("SELECT auth_register(%s,%s,%s)", (email, "$2b$04$" + "x" * 53, terms)).fetchone()[0]
 
 
 def mkproj(c, uid, name="p"):
@@ -98,7 +98,7 @@ def test_cannot_insert_for_another_owner(app, su):
 def test_cannot_attach_compound_to_other_users_project(su):
     a, b = register(su, "a@x.com"), register(su, "b@x.com")
     pa = mkproj(su, a)
-    with pytest.raises(psycopg.errors.CheckViolation):
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
         mkcomp(su, b, pa)
 
 
@@ -145,7 +145,7 @@ def test_register_records_all_three_terms(app, su):
 def test_register_without_terms_fails_and_creates_no_user(su):
     for bad in ("", None):
         with pytest.raises(psycopg.errors.CheckViolation):
-            su.execute("SELECT auth_register('n@x.com','h',%s,false)", (bad,))
+            su.execute("SELECT auth_register('n@x.com','$2b$04$hash',%s)", (bad,))
     assert su.execute("SELECT count(*) FROM app_user").fetchone()[0] == 0
 
 
@@ -157,7 +157,7 @@ def test_email_unique_case_insensitive(su):
 
 def test_pre_auth_functions_work_for_app_role_without_user_context(app, su):
     c = app.as_user(None)
-    uid = c.execute("SELECT auth_register('new@x.com','h','v1',false)").fetchone()[0]
+    uid = c.execute("SELECT auth_register('new@x.com','$2b$04$hash','v1')").fetchone()[0]
     c.commit()
     row = c.execute("SELECT * FROM auth_lookup('NEW@x.com')").fetchone()
     assert row[0] == uid and row[2] is False
@@ -189,6 +189,10 @@ def test_lockout_after_five_failures_and_reset(app, su):
         c.execute("SELECT auth_record_login(%s,false)", (a,))
     c.commit()
     assert su.execute("SELECT locked_until > now() FROM app_user WHERE id=%s", (a,)).fetchone()[0]
+    c.execute("SELECT auth_record_login(%s,true)", (a,))  # success cannot clear an active lock
+    c.commit()
+    assert su.execute("SELECT locked_until > now() FROM app_user WHERE id=%s", (a,)).fetchone()[0]
+    su.execute("UPDATE app_user SET locked_until = now() - interval '1 minute' WHERE id=%s", (a,))
     c.execute("SELECT auth_record_login(%s,true)", (a,))
     c.commit()
     assert su.execute("SELECT locked_until, failed_logins FROM app_user WHERE id=%s", (a,)).fetchone() == (None, 0)
@@ -246,7 +250,7 @@ def test_prediction_requires_interval_and_valid_n(su):
     p = mkproj(su, a)
     c = mkcomp(su, a, p)
     mv = su.execute("INSERT INTO model_version(endpoint,version) VALUES ('sol','1') RETURNING id").fetchone()[0]
-    ins = "INSERT INTO prediction(owner_id,compound_id,endpoint,model_version_id,ensemble_n,kind,value,interval_low,interval_high,coverage,sample_size,method_note,uncertainty_breakdown) VALUES (%s,%s,'sol',%s,%s,'regression',1,%s,%s,0.9,100,'split conformal','{}')"
+    ins = "INSERT INTO prediction(owner_id,compound_id,endpoint,model_version_id,ensemble_n,kind,value,interval_low,interval_high,coverage,sample_size,method_note,uncertainty_breakdown) VALUES (%s,%s,'sol',%s,%s,'regression',1,%s,%s,0.9,100,'split conformal','{\"ensemble_disagreement\":0.5,\"similarity_to_training\":0.3,\"assay_noise\":0.2}')"
     su.execute(ins, (a, c, mv, 5, 0.5, 1.5))
     with pytest.raises(psycopg.errors.CheckViolation):
         su.execute(ins, (a, c, mv, 7, 0.5, 1.5))      # N=7 not offered
@@ -258,16 +262,17 @@ def test_prediction_requires_interval_and_valid_n(su):
 
 def test_model_publish_gate(su):
     ok = dict(d='[{"name":"x"}]', lic=True, lim="limits", split="scaffold", bench='{"a":1}', cov='{"5":0.9}', sha="s")
+    SHA = "ab" * 32
     q = "INSERT INTO model_version(endpoint,version,status,datasets,licenses_cleared,limitations,split_type,benchmark,coverage_by_n,weights_sha256) VALUES ('e',%s,'published',%s,%s,%s,%s,%s,%s,%s)"
-    su.execute(q, ("1", ok["d"], True, "l", "scaffold", ok["bench"], ok["cov"], "s"))
+    su.execute(q, ("1", ok["d"], True, "l", "scaffold", ok["bench"], ok["cov"], SHA))
     for i, args in enumerate([
-        ("[]", True, "l", "s", "{}", "{}", "s"),                  # no datasets
-        (ok["d"], False, "l", "s", "{}", "{}", "s"),              # license not cleared
-        (ok["d"], True, "", "s", "{}", "{}", "s"),                # empty limitations
-        (ok["d"], True, "l", None, "{}", "{}", "s"),              # no split
+        ("[]", True, "l", "s", "{}", "{}", SHA),                  # no datasets
+        (ok["d"], False, "l", "s", "{}", "{}", SHA),              # license not cleared
+        (ok["d"], True, "", "s", "{}", "{}", SHA),                # empty limitations
+        (ok["d"], True, "l", None, "{}", "{}", SHA),              # no split
         (ok["d"], True, "l", "s", None, "{}", "s"),               # no benchmark
         (ok["d"], True, "l", "s", "{}", None, "s"),               # no coverage
-        (ok["d"], True, "l", "s", "{}", "{}", None),              # no weights hash
+        (ok["d"], True, "l", "scaffold", "{\"a\":1}", "{\"5\":0.9}", None),              # no weights hash
     ]):
         with pytest.raises(psycopg.errors.CheckViolation):
             su.execute(q, (f"bad{i}",) + args)
@@ -330,6 +335,6 @@ def test_app_role_cannot_escalate_tier_or_forge_users(app, su):
             c.execute(sql)
         c.rollback()
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        c.execute("INSERT INTO app_user(email_lower,password_hash) VALUES ('x@y.com','h')")
+        c.execute("INSERT INTO app_user(email_lower,password_hash) VALUES ('x@y.com','$2b$04$h')")
     c.rollback()
-    assert c.execute("UPDATE app_user SET password_hash='new'").rowcount == 1  # own password change allowed
+    assert c.execute("UPDATE app_user SET password_hash='$2b$04$new'").rowcount == 1  # own password change allowed

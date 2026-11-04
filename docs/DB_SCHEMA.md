@@ -1,6 +1,6 @@
 # Database schema (Wave 0 baseline)
 
-Source of truth: `backend/db/migrations/0001_baseline.sql`. Tests: `tests/db/test_schema_security.py` (run against real Postgres via pgserver; 31 tests). Design must stay secure even though this document is public.
+Source of truth: `backend/db/migrations/0001_baseline.sql`. Tests: `tests/db/test_schema_security.py` (run against real Postgres via pgserver; 224 tests incl. QA red-team suite in tests/security). Design must stay secure even though this document is public.
 
 ## Principles
 1. **UUID primary keys** everywhere (audit_log uses a bigserial, never exposed).
@@ -8,7 +8,7 @@ Source of truth: `backend/db/migrations/0001_baseline.sql`. Tests: `tests/db/tes
 3. **RLS is the second layer.** The application also checks ownership/grants; either layer failing closed protects the data.
 4. **Constraints police the data**: NOT NULL, CHECKs (lengths, enums, ranges), partial unique indexes, FKs with explicit `ON DELETE CASCADE` for user data.
 5. **Least privilege roles**: `metis_app` (DML only, no DDL, no BYPASSRLS, no superuser), `metis_readonly` (sees only `model_version`, `deletion_request`: no structures, notes, credentials), `metis_auth` (NOLOGIN, owns the pre-auth functions, BYPASSRLS but only the privileges those functions need). Migrations run as a separate owner role in deploy.
-6. **Pre-auth surface is five functions**, SECURITY DEFINER with pinned `search_path`: `auth_register`, `auth_lookup`, `auth_record_login`, `auth_consume_token` (and `current_user_id`). The app role cannot read `app_user` directly without a user context.
+6. **Pre-auth surface is five SECURITY DEFINER functions with pinned `search_path`**: `auth_register` (always creates a free-tier user), `auth_lookup`, `auth_record_login`, `auth_consume_token`, `auth_issue_token` (24h TTL cap). Users cannot insert or update `auth_token`, `app_user` privileged columns, or timestamps on terms/consent. The app role cannot read `app_user` directly without a user context.
 
 ## Tables
 | Table | Owner column | Notes |
@@ -29,6 +29,9 @@ Source of truth: `backend/db/migrations/0001_baseline.sql`. Tests: `tests/db/tes
 
 ## Deletion
 Deleting a user cascades to every owned row. Deleting a project cascades to compounds, notes, grants and (through compounds) predictions and measurements. Object-storage files are removed by the purge job (Wave 2), recorded in `deletion_request`.
+
+## Integrity rules added after QA review
+Child rows carry `(parent_id, owner_id)` composite foreign keys, so a row can never point at another tenant's parent (checked by the FK machinery, which ignores RLS). `audit_log` and `deletion_request` have RLS (own rows only; app cannot UPDATE/DELETE deletion requests). TEMP tables are revoked. Published model versions are immutable except retiring. Identity is a session setting: the API must use `SET LOCAL`, `DISCARD ALL` on pool check-in, parameterized SQL only (see DEVLOG).
 
 ## Known gaps (tracked, not hidden)
 - Grantee access to predictions/measurements is intentionally absent until the collaboration UI is built (BACKLOG).

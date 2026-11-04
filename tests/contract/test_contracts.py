@@ -32,7 +32,7 @@ def test_regression_needs_ordered_interval_and_classification_needs_probability(
         Prediction(**{**BASE, "interval_low": None})
     with pytest.raises(ValidationError):
         Prediction(**{**BASE, "kind": "classification"})
-    Prediction(**{**BASE, "kind": "classification", "probability": 0.2})
+    Prediction(**{**BASE, "kind": "classification", "probability": 0.2, "interval_low": None, "interval_high": None})
 
 
 def test_ensemble_sizes():
@@ -48,9 +48,9 @@ def test_breakdown_sums_to_one():
 
 
 def test_ten_compound_cap():
-    CompoundSubmission(smiles=["C"] * 10, endpoints=["solubility"])
+    CompoundSubmission(smiles=[f"C{'C'*i}" for i in range(10)], endpoints=["solubility"])
     with pytest.raises(ValidationError):
-        CompoundSubmission(smiles=["C"] * 11, endpoints=["solubility"])
+        CompoundSubmission(smiles=[f"C{'C'*i}" for i in range(11)], endpoints=["solubility"])
     with pytest.raises(ValidationError):
         CompoundSubmission(smiles=[], endpoints=["solubility"])
     with pytest.raises(ValidationError):
