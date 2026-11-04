@@ -140,7 +140,7 @@ def test_signup_requires_unchecked_by_default_acceptance(make_page):
     pg.wait_for_function("() => document.getElementById('terms-version').textContent.includes('2026-01')")
     cb, btn = pg.locator("#accept"), pg.locator("#signup-submit")
     assert not cb.is_checked() and btn.is_disabled()
-    assert "DRAFT" in pg.inner_text("[data-testid=draft-note]")
+    assert pg.locator("[data-testid=draft-note]").count() == 0  # draft warning lives in BACKLOG, not on the page
     cb.check()
     assert btn.is_enabled()
     cb.uncheck()

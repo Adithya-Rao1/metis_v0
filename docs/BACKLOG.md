@@ -16,3 +16,6 @@ Open QA findings (strict xfail, details private):
 Backend gaps from the web wiring: /auth/me lacks email; no .edu upgrade route; no pre-start time estimate; no SMILES depiction route for docking-prep ligands; no project rename or compound/note/measurement delete routes; model card lacks higher_is_better.
 Operations: no real mailer (console only; launch blocker); METIS_REDIS_URL required but unused; metis_app_login provisioning unscripted; deletion_request purge bookkeeping manual; Docker never built; compose `maintenance` service; raise secret-key minimum to 64 bytes; blanket noqa in backend/dockprep.
 Licences: record Ketcher NOTICE (LGPL-2.1 listed) and dockprep tools (pdb2pqr BSD-3, propka LGPL-2.1, Open Babel GPL-2.0, Meeko LGPL-2.1, fpocket unverified) in docs/LICENSES.md; update TRACEABILITY.
+
+## Before launch: legal review
+The Terms of Service, Privacy Policy and Disclaimer linked from sign-up are drafts. They are not legal advice and need lawyer review before launch. (The warning box was removed from the sign-up page on the owner's instruction; the DRAFT notes on the three pages under web/legal/ remain.)
