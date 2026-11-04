@@ -369,6 +369,7 @@ def test_per_user_job_quota_429(client, app, loaded):
     client.post(f"/projects/{other}/compounds", json={"smiles": ["CCO"]}, headers=H("b"))
     code_b = client.post(f"/projects/{other}/predict", json={"endpoints": ["logd"]}, headers=H("b")).status_code
     ev.set()
+    q.shutdown()  # let every queued job finish before the fixture truncates the tables (else: deadlock)
     assert codes[:MAX_ACTIVE_PER_USER] == [202] * MAX_ACTIVE_PER_USER and codes[MAX_ACTIVE_PER_USER:] == [429] * 3
     assert code_b == 202  # quota is per user
 

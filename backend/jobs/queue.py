@@ -113,6 +113,10 @@ class InProcessJobQueue:
             rec = self._jobs.get(job_id)
         return rec if rec is not None and rec.owner_id == owner_id else None
 
+    def shutdown(self, wait: bool = True) -> None:
+        """Stop accepting work and (by default) let queued and running jobs finish."""
+        self._pool.shutdown(wait=wait)
+
     def wait(self, job_id: uuid.UUID, timeout: float = 60.0) -> None:
         fut = self._futures.get(job_id)
         if fut is not None:

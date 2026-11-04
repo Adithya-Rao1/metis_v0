@@ -621,6 +621,7 @@ class TestDomain:
         a.post(f"/projects/{pid}/compounds", {"smiles": ["CCO"]})
         codes = [a.post(f"/projects/{pid}/predict", {"endpoints": ["logd"]}).status_code for _ in range(40)]
         ev.set()
+        q.shutdown()  # drain queued jobs before the fixture truncates the tables (else: deadlock)
         assert any(c in (409, 429) for c in codes)
 
     def test_compound_sandbox_concurrency_cap(self, monkeypatch):
