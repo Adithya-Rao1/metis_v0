@@ -10,7 +10,7 @@ GOOD = {
     "METIS_REDIS_URL": "redis://:s3cr3tpw@redis:6379/0",
     "METIS_OBJECT_STORE_ENDPOINT": "http://minio:9000",
     "METIS_OBJECT_STORE_ACCESS_KEY": "ak8f3j2h",
-    "METIS_OBJECT_STORE_SECRET_KEY": "sk7d9s8a6f5g4h3j",
+    "METIS_OBJECT_STORE_SECRET_KEY": "objstore-test-pw",
 }
 
 

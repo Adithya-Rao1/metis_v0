@@ -217,9 +217,7 @@ def test_redaction_keeps_ordinary_text():
 # ---- F-05 / F-10 ---------------------------------------------------------------------------------------------
 def test_f05_production_error_does_not_echo_secrets():
     with pytest.raises(ValueError) as ei:
-        Settings(
-            env="production", redis_url="redis://:pwpwpw@r:6379/0", secret_key="abcabcabcabc"
-        )
+        Settings(env="production", redis_url="redis://:pwpwpw@r:6379/0", secret_key="abcabcabcabc")
     assert "pwpwpw" not in str(ei.value) and "abcabcabcabc" not in str(ei.value)
     assert "METIS_SECRET_KEY" in str(ei.value)
 

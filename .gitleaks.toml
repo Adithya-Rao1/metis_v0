@@ -4,8 +4,9 @@
 useDefault = true
 
 [allowlist]
-description = "fake fixtures in tests/foundation/test_wave1_fixes.py and tests/security/test_wave1_redteam.py"
+description = "fake fixtures in tests/foundation (test_wave1_fixes.py, test_settings.py) and tests/security/test_wave1_redteam.py"
 regexes = [
   '''Short-Secret-Key-Value''',
   '''RedisPw77''',
+  '''sk7d9s8a6f5g4h3j''',
 ]
