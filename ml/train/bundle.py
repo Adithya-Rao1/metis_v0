@@ -35,7 +35,7 @@ def weights_sha256(members_dir: Path) -> str:
 
 
 def code_commit() -> str:
-    """HEAD commit read from .git directly (no subprocess). 'unknown' if not in a git checkout."""
+    """HEAD commit read from .git directly. 'unknown' if not in a git checkout."""
     try:
         d = Path(__file__).resolve().parent
         while not (d / ".git").exists():
