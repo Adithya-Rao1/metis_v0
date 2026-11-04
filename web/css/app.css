@@ -82,10 +82,11 @@ tr.sel-row{cursor:pointer} tr.sel-row:hover td{background:var(--soft)} tr.sel-ro
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px} @media (max-width:560px){.pair{grid-template-columns:minmax(0,1fr)}}
 
 /* layout helpers */
-.row{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:0;align-items:start}
-@media (max-width:900px){.row{grid-template-columns:minmax(0,1fr)}}
-.drawer{border-left:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:14px;font-size:13px;min-width:0}
-@media (max-width:900px){.drawer{border-left:0;border-top:1px solid var(--line)}}
+.row{display:grid;grid-template-columns:minmax(0,1fr);gap:0;align-items:start}
+.drawer{border-top:1px solid var(--line);padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;font-size:13px;min-width:0;align-items:start}
+/* the ranking panel sits beside the table only when the table keeps room for every property column */
+@media (min-width:1700px){.row{grid-template-columns:minmax(0,1fr) 330px}.drawer{border-top:0;border-left:1px solid var(--line);display:flex;flex-direction:column}}
+main.wide{max-width:1680px}
 .drawer h2{font-size:12px;margin:0 0 4px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:center}
 .kv>:nth-child(odd){color:var(--muted)}
@@ -152,3 +153,18 @@ body.home .cta:focus-visible{outline:2px solid #e6e9ec;outline-offset:3px}
 fieldset{min-width:0}
 input[type=file]{max-width:100%}
 .checks label,.parsed div{min-width:0;overflow-wrap:anywhere}
+
+/* utilities (replace inline style attributes so a strict style-src CSP works) */
+.mt0{margin-top:0}.mt6{margin-top:6px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mb8{margin-bottom:8px}.mb10{margin-bottom:10px}.pt12{padding-top:12px}
+.minw0{min-width:0}.self-start{align-self:flex-start}.round-top{border-radius:6px 6px 0 0}
+.tabs.flush{padding:0;margin-top:12px}.toolbar.flush{padding:0;border:0}.viewer-dock.flush{padding:0}
+fieldset.bare{border:0;padding:0;margin:0}fieldset.bare.mt8{margin-top:8px}
+.loglist{margin:4px 0 0;padding-left:18px}
+.kv.kv-lim{grid-template-columns:1fr auto}
+.molcell.nowrap-row{flex-wrap:nowrap}
+.stackcol{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tablewrap:focus-visible{outline-offset:-2px}
+.pair>*{min-width:0}
+.rel-bar{display:block;height:8px;background:var(--soft);border:1px solid var(--line);border-radius:2px;min-width:80px}

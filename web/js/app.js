@@ -26,7 +26,7 @@ const lbox = document.getElementById("limits");
 config.limits.forEach((l) => {
   const side = l.max != null ? "max" : "min";
   const id = `lim-${l.endpoint}`;
-  lbox.append(el("div", { class: "kv", style: "grid-template-columns:1fr auto" },
+  lbox.append(el("div", { class: "kv kv-lim" },
     el("label", { for: id, text: `${project.endpoints[l.endpoint].label} ${side === "max" ? "<" : ">"}` }),
     el("input", { id, class: "num", type: "number", step: "any", value: l[side], "data-limit": l.endpoint,
       oninput: (e) => { l[side] = e.target.value === "" ? null : Number(e.target.value); refresh(); } })),
@@ -70,9 +70,9 @@ function refresh(rebuild = true) {
       onkeydown: (ev) => { if ((ev.key === "Enter" || ev.key === " ") && ev.target === tr) { ev.preventDefault(); showCompound(c.id, false); } } });
     tr.append(el("td", { class: "nowrap", "data-testid": "rank" }, `${r.blendedRank} (${r.propertyOnlyRank})`,
       r.passes ? null : el("span", { class: "limit-note", text: "fails a hard limit" })));
-    tr.append(el("td", {}, el("div", { class: "molcell", style: "flex-wrap:nowrap" },
+    tr.append(el("td", {}, el("div", { class: "molcell nowrap-row" },
       el("img", { class: "mol", src: c.svg, alt: `2D structure of ${c.name}` }),
-      el("div", { style: "display:flex;flex-direction:column;gap:4px;align-items:flex-start" },
+      el("div", { class: "stackcol" },
         el("span", { class: "chip", text: c.name }),
         el("button", { class: "btn small", type: "button", "aria-label": `Show 3D structure of ${c.name}`, onclick: () => showCompound(c.id, true), text: "3D" })))));
     eps.forEach((e) => {
@@ -102,7 +102,7 @@ function renderBreakdown(r) {
   const c = project.compounds.find((x) => x.id === r.id);
   document.getElementById("bd-title").textContent = `${c.name}: blended score R = ${r.R.toFixed(3)} (property-only S = ${r.S.toFixed(3)}, confidence C = ${r.C.toFixed(3)})`;
   const stack = document.getElementById("stack");
-  stack.replaceChildren(...r.parts.map((p, i) => el("i", { class: `seg-${i}`, style: `width:${(p.share * 100).toFixed(2)}%`, title: `${project.endpoints[p.endpoint].label}: ${p.share.toFixed(3)}` })));
+  stack.replaceChildren(...r.parts.map((p, i) => el("i", { class: `seg-${i}`, pct: (p.share * 100).toFixed(2), title: `${project.endpoints[p.endpoint].label}: ${p.share.toFixed(3)}` })));
   const tb = document.querySelector("#bd-table tbody");
   tb.replaceChildren(...r.parts.map((p, i) => el("tr", {},
     el("td", {}, el("span", { class: `swatch seg-${i}` }), project.endpoints[p.endpoint].label),

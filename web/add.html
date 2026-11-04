@@ -30,21 +30,21 @@ Cn1cnc2c1c(=O)n(C)c(=O)n2C caffeine</textarea>
         <p class="legend" id="file-note" role="status">Files are parsed on the server in a sandbox. This static build only reads the file name and size.</p>
       </section>
       <section id="p-draw" role="tabpanel" aria-labelledby="t-draw" hidden>
-        <div class="note-box" style="margin-bottom:8px">The free-hand structure editor is not part of this static build (handoff to wiring). Pick a fixture structure to see the live 2D and 3D preview that the editor will drive.</div>
+        <div class="note-box mb8">The free-hand structure editor is not part of this static build (handoff to wiring). Pick a fixture structure to see the live 2D and 3D preview that the editor will drive.</div>
         <label for="tpl">Fixture structure <select id="tpl"></select></label>
-        <div class="pair" style="margin-top:8px"><div><div id="draw2d"></div></div>
+        <div class="pair mt8"><div><div id="draw2d"></div></div>
           <div class="viewer-wrap"><div class="viewer" id="viewer" aria-label="3D preview"></div><p class="caption" id="viewer-cap"></p></div></div>
       </section>
     </div>
     <div>
       <div class="parsed" id="check" aria-live="polite"><b>Check (live)</b></div>
       <p class="legend">Format check only (brackets, ring closures, characters). Full parsing happens on the server and explains any problem; nothing is silently fixed.</p>
-      <div class="checks" style="margin-top:12px"><b>Properties to predict</b><div id="props" class="checks"></div></div>
-      <div class="checks" style="margin-top:12px"><b>Ensemble size N</b>
+      <div class="checks mt12"><b>Properties to predict</b><div id="props" class="checks"></div></div>
+      <div class="checks mt12"><b>Ensemble size N</b>
         <label for="ens">Members per estimate <select id="ens"></select></label>
         <label for="tier" class="legend">Preview as account type <select id="tier"><option value="free" selected>free (cap 10)</option><option value="edu">verified .edu (cap 20)</option><option value="paid">paid (cap 20)</option></select></label>
         <span class="legend" id="eta" data-testid="eta"></span></div>
-      <p style="margin-top:12px"><button class="btn primary" id="submit" type="button">Submit (fixture mode)</button></p>
+      <p class="mt12"><button class="btn primary" id="submit" type="button">Submit (fixture mode)</button></p>
       <pre class="formula" id="payload" hidden></pre>
     </div>
   </div>

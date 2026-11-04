@@ -1,9 +1,9 @@
-"""Writes small screenshots of every screen to web/screenshots/ (dark scheme) and checks they were produced."""
+"""Writes small screenshots of every screen to tests/web/screenshots/ (dark scheme) and checks they were produced."""
 from pathlib import Path
 
 import pytest
 
-OUT = Path(__file__).resolve().parents[2] / "web" / "screenshots"
+OUT = Path(__file__).resolve().parents[2] / "tests" / "web" / "screenshots"
 SHOTS = [
     ("00_home", "index.html", 1440, 900, "#mol3d canvas"),
     ("00_home_mobile", "index.html", 390, 844, "#mol3d canvas"),
@@ -14,13 +14,14 @@ SHOTS = [
     ("05_model_data", "model.html?e=herg", 1280, 1000, "#viewer canvas"),
     ("06_docking_prep", "docking.html", 1440, 900, "#viewer canvas"),
     ("07_account_consents", "account.html", 1100, 700, "[data-consent]"),
+    ("09_export_report", "report.html", 1280, 900, "#rp-foot"),
     ("08_project_table_mobile", "app.html", 390, 844, "tr.sel-row"),
 ]
 
 
 @pytest.mark.parametrize("name,url,w,h,ready", SHOTS)
 def test_screenshot(make_page, name, url, w, h, ready):
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     pg = make_page(w, h, color_scheme="dark")
     pg.goto(pg.base + "/" + url)
     pg.wait_for_selector(ready)

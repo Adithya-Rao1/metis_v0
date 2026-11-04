@@ -3,13 +3,39 @@ import { SharedViewer, CONFORMER_LABEL } from "./viewer.js";
 
 const data = await loadJSON("fixtures/models.json");
 const training = await loadJSON("fixtures/training.json");
-const id = data.models[qs("e", "herg")] ? qs("e", "herg") : "herg";
+const reqId = qs("e", "herg");
+const id = Object.hasOwn(data.models, reqId) ? reqId : "herg";
 const m = data.models[id];
 renderChrome({ current: "model.html", crumb: `Models / ${m.label}` });
 document.getElementById("h").textContent = `Model and data page (${m.label})`;
 document.title = `${m.label} model | Metis`;
 document.getElementById("picker").replaceChildren(...Object.values(data.models).map((x) =>
   el("a", { class: "chip", href: `model.html?e=${x.id}`, ...(x.id === id ? { "aria-current": "page" } : {}), text: x.label })));
+
+// G-01: calibration / coverage / noise-ceiling / significance blocks. FIXTURE layout content (zeros), not results.
+function calibrationBlocks(m) {
+  const reg = m.kind !== "classification";
+  const tbl = (cap, heads, rows) => el("div", { class: "tablewrap" }, el("table", {}, el("caption", { text: cap }),
+    el("thead", {}, el("tr", {}, heads.map((x) => el("th", { scope: "col", text: x })))),
+    el("tbody", {}, rows.map((r) => el("tr", {}, r.map((c) => el("td", { class: "mono", text: c })))))));
+  const bins = ["0.0 to 0.2", "0.2 to 0.4", "0.4 to 0.6", "0.6 to 0.8", "0.8 to 1.0"];
+  return [
+    el("h2", { id: "calibration", text: "Calibration (FIXTURE content, placeholders)" }),
+    el("p", { class: "legend", "data-testid": "fixture-calibration", text: "FIXTURE: every number below is a zero placeholder showing the layout. No calibration has been computed." }),
+    tbl(reg ? "Reliability diagram data: nominal vs. observed interval coverage, held-out scaffold split." : "Reliability diagram data: mean predicted probability vs. observed fraction positive per bin, held-out scaffold split.",
+      reg ? ["Nominal coverage", "Observed coverage", "n"] : ["Predicted probability bin", "Observed fraction", "n"],
+      reg ? ["50%", "80%", "90%", "95%"].map((x) => [x, "0.00 (placeholder)", "0"]) : bins.map((x) => [x, "0.00 (placeholder)", "0"])),
+    el("div", { class: "kv" }, el("span", { text: "Expected calibration error (ECE)" }), el("span", { class: "mono", "data-testid": "ece", text: "0.00 (placeholder)" })),
+    tbl("Interval coverage by similarity bin (similarity of the query to its nearest training compounds). Sample sizes are never hidden.",
+      ["Similarity bin (Tanimoto to nearest training compound)", "Interval coverage", "Compounds in bin (n)"],
+      [["0.0 to 0.3 (far from training data)", "0.0% (placeholder)", "0"], ["0.3 to 0.5", "0.0% (placeholder)", "0"], ["0.5 to 0.7", "0.0% (placeholder)", "0"], ["0.7 to 1.0 (near training data)", "0.0% (placeholder)", "0"]]),
+    reg ? el("div", { class: "kv" }, el("span", { text: "Noise ceiling (best achievable error given assay noise)" }), el("span", { class: "mono", "data-testid": "noise-ceiling", text: "R2 ceiling 0.00, RMSE floor 0.00 (placeholder)" }))
+        : el("div", { class: "kv" }, el("span", { text: "Noise ceiling" }), el("span", { class: "mono", "data-testid": "noise-ceiling", text: "Not defined for a classification label; label agreement between sources is reported instead (placeholder)" })),
+    tbl("Significance of the difference from the baseline: 5x2cv paired t-test over scaffold splits.",
+      ["Comparison", "t statistic", "p value", "Result"],
+      [["Metis ensemble vs. baseline (5x2cv paired t-test)", "0.00", "n/a", "placeholder: test not yet run"]]),
+  ];
+}
 
 const rep = document.getElementById("report");
 rep.append(
@@ -26,10 +52,11 @@ rep.append(
   el("div", { class: "tablewrap" }, el("table", {}, el("caption", { text: "Coverage and runtime at each ensemble size offered (placeholders)." }),
     el("thead", {}, el("tr", {}, ["Ensemble size N", "Interval coverage (held out)", "Time per compound"].map((x) => el("th", { scope: "col", text: x })))),
     el("tbody", {}, m.ensemble_table.map((r) => el("tr", {}, el("td", { text: String(r.n) }), el("td", { class: "mono", text: r.coverage }), el("td", { class: "mono", text: r.runtime })))))),
+  ...calibrationBlocks(m),
   el("div", { class: "note-box", id: "limitations" }, el("b", { text: "Known limitations of this dataset" }), " (written per dataset, linked to source): ", m.limitations, el("br"), m.attribution_check),
   el("p", { class: "legend", text: "Dataset licenses are shown as recorded. Where the status is pending, no claim about reuse is made." }),
   el("h2", { text: "Training examples" }),
-  el("div", { class: "viewer-dock", style: "padding:0" },
+  el("div", { class: "viewer-dock flush" },
     el("div", { class: "viewer-wrap" }, el("div", { class: "viewer", id: "viewer", "aria-label": "3D viewer" }), el("p", { class: "caption", id: "viewer-cap", text: "Press 3D on an example." })),
     el("div", { id: "examples", class: "checks" })));
 

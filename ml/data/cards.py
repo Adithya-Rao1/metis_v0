@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ml.data.manifest import get
+from ml.data.splits import SPLIT_METHODS
 
 CARD_DIR = Path(__file__).with_name("cards")
 
@@ -14,14 +15,14 @@ LIMITATIONS = {
 
 
 def render_card(dataset_id: str, n_compounds: int | None, split_method: str | None, split_sizes: tuple[int, int, int] | None = None) -> str:
+    if split_method is not None and split_method not in SPLIT_METHODS:
+        raise ValueError(f"unsupported split method {split_method!r}; allowed: {SPLIT_METHODS}")
     e = get(dataset_id)
     size = "not yet downloaded or cleaned" if n_compounds is None else f"{n_compounds} compounds after cleaning"
     if split_method is None:
         sp = "not yet split"
     else:
         sp = split_method + (f" split (train/cal/test = {split_sizes[0]}/{split_sizes[1]}/{split_sizes[2]})" if split_sizes else " split")
-        if split_method == "random":
-            raise ValueError("random splits are not allowed")
     gate = "NOT cleared for training (gate G1: written license confirmation required)." if e.license_status != "cleared" else f"Cleared. Checked {e.date_checked} by {e.confirmed_by}."
     if e.license_status == "excluded":
         gate = "EXCLUDED. Must not be loaded, trained on, or redistributed."

@@ -20,7 +20,7 @@ services:
   migrate:
     build: {context: .., dockerfile: deploy/Dockerfile}
     command: ["python", "-m", "backend.core.migrate"]
-    environment:
+    environment:  # owner credentials live only in this one-shot job
       METIS_MIGRATION_URL: ${METIS_MIGRATION_URL:?set METIS_MIGRATION_URL}
     depends_on: {postgres: {condition: service_healthy}}
     networks: [backend]
@@ -42,7 +42,17 @@ services:
 
   app:
     build: {context: .., dockerfile: deploy/Dockerfile}
-    env_file: [.env]
+    # Explicit allow-list: the app never receives POSTGRES_PASSWORD, METIS_MIGRATION_URL (schema owner),
+    # METIS_APP_DB_PASSWORD or REDIS_PASSWORD. Values are interpolated from deploy/.env by compose only.
+    environment:
+      METIS_ENV: ${METIS_ENV:-production}
+      METIS_DATABASE_URL: ${METIS_DATABASE_URL:?set METIS_DATABASE_URL (metis_app_login role)}
+      METIS_SECRET_KEY: ${METIS_SECRET_KEY:?set METIS_SECRET_KEY}
+      METIS_REDIS_URL: ${METIS_REDIS_URL:?set METIS_REDIS_URL}
+      METIS_OBJECT_STORE_ENDPOINT: ${METIS_OBJECT_STORE_ENDPOINT:?set METIS_OBJECT_STORE_ENDPOINT}
+      METIS_OBJECT_STORE_ACCESS_KEY: ${METIS_OBJECT_STORE_ACCESS_KEY:?set METIS_OBJECT_STORE_ACCESS_KEY}
+      METIS_OBJECT_STORE_SECRET_KEY: ${METIS_OBJECT_STORE_SECRET_KEY:?set METIS_OBJECT_STORE_SECRET_KEY}
+      METIS_OBJECT_STORE_BUCKET: ${METIS_OBJECT_STORE_BUCKET:-metis}
     ports: ["127.0.0.1:8000:8000"]
     read_only: true
     tmpfs: [/tmp]

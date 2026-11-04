@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Export and report | Metis</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<main>
+ <div class="screen-head"><h1>Export and report</h1>
+  <p class="muted">Static preview of what Export (CSV, SDF) and Report (PDF) will contain. Built from fixture data. Nothing is generated or downloaded in this build.</p>
+  <p class="legend"><a href="app.html">Back to project table</a></p></div>
+ <div class="frame">
+  <div class="report">
+    <p class="draft-note" role="note" data-testid="fixture-report-note"><strong>FIXTURE preview.</strong> Every value below is illustrative layout content from the fixture project, not a model result.</p>
+    <section aria-labelledby="x-h"><h2 id="x-h">Export</h2>
+      <div class="rgrid">
+        <div class="rcard" data-format="csv"><span class="t">CSV</span><span class="n">Table of predictions</span>
+          <span class="legend" id="csv-note"></span></div>
+        <div class="rcard" data-format="sdf"><span class="t">SDF</span><span class="n">Structures with properties</span>
+          <span class="legend" id="sdf-note"></span></div>
+      </div>
+      <p class="mt8"><button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Download CSV</button>
+        <button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Download SDF</button></p>
+      <div class="tablewrap"><table id="csv-prev"><caption>CSV preview: the first rows and columns that the file will contain.</caption><thead></thead><tbody></tbody></table></div>
+    </section>
+    <section aria-labelledby="r-h"><h2 id="r-h">Report (PDF)</h2>
+      <p>The PDF has one page per compound: 2D structure, 3D conformer image labeled as computed, every property with its interval or calibrated probability, N and sample size, the ranking breakdown, and the disclaimer on every page.</p>
+      <div class="note-box" id="report-page" data-testid="report-page">
+        <h3 class="mt0">Page preview (fixture)</h3>
+        <div class="molcell"><img class="mol" id="rp-img" alt="2D structure of the preview compound" src="fixtures/svg/c3.svg"><span id="rp-title" class="chip"></span></div>
+        <ul id="rp-list" class="loglist"></ul>
+        <p class="legend" id="rp-conf"></p>
+        <p class="legend" data-testid="report-disclaimer-foot" id="rp-foot"></p>
+      </div>
+      <p class="mt8"><button class="btn primary" type="button" disabled title="Needs the backend (not connected in fixture mode)">Generate PDF</button></p>
+    </section>
+  </div>
+ </div>
+</main>
+<script type="module" src="js/report.js"></script>
+</body>
+</html>

@@ -13,34 +13,34 @@
  <div class="frame">
   <div class="panel">
     <div>
-      <div class="pair" style="margin-bottom:10px">
+      <div class="pair mb10">
         <div class="viewer-wrap"><div class="viewer" id="viewer" aria-label="3D view: protein, ligand, search box, site residues"></div>
           <p class="caption">3D: protein, ligand, search box and site residues (PDB 1M17 chain A; experimental coordinates from the PDB entry).</p></div>
         <div><img class="mol big" id="lig2d" alt="2D depiction of the ligand erlotinib" src="fixtures/svg/c1.svg"><p class="legend">2D ligand (erlotinib, from the PDB entry).</p></div>
       </div>
       <div class="checks">
-        <fieldset style="border:0;padding:0;margin:0"><legend><b>1. Docking engine</b></legend>
+        <fieldset class="bare"><legend><b>1. Docking engine</b></legend>
           <label><input type="radio" name="eng" value="vina" checked> AutoDock Vina</label>
           <label><input type="radio" name="eng" value="gnina"> GNINA</label>
           <p class="legend" id="eng-note"></p></fieldset>
-        <fieldset style="border:0;padding:0;margin:8px 0 0"><legend><b>2. Protein</b></legend>
-          <label><input type="radio" name="src" value="pdb" checked> PDB ID <input id="pdbid" class="mono" size="6" value="1M17" aria-label="PDB ID"></label>
+        <fieldset class="bare mt8"><legend><b>2. Protein</b></legend>
+          <div class="inline"><label for="src-pdb"><input id="src-pdb" type="radio" name="src" value="pdb" checked> PDB ID</label> <label class="sr" for="pdbid">PDB ID</label><input id="pdbid" class="mono" size="6" value="1M17"></div>
           <div class="parsed" id="pdbinfo" aria-live="polite"></div>
-          <label><input type="radio" name="src" value="upload"> Upload file <input id="up" type="file" accept=".pdb,.cif" disabled></label>
+          <div class="inline"><label for="src-up"><input id="src-up" type="radio" name="src" value="upload"> Upload file</label> <label class="sr" for="up">Protein file (.pdb or .cif)</label><input id="up" type="file" accept=".pdb,.cif" disabled></div>
           <label><input type="checkbox" id="waters" checked> Remove waters</label>
           <label><input type="checkbox" id="alt" checked> Keep first alternate location only</label>
-          <label>Chains to keep <input id="chains" class="mono" size="4" value="A"></label>
-          <label><input type="checkbox" id="hyd" checked> Add hydrogens, assign protonation at pH <input id="ph" class="num mono" type="number" step="0.1" value="7.4"></label></fieldset>
+          <div class="inline"><label for="chains">Chains to keep</label> <input id="chains" class="mono" size="4" value="A"></div>
+          <div class="inline"><label for="hyd"><input type="checkbox" id="hyd" checked> Add hydrogens, assign protonation at pH</label> <label class="sr" for="ph">Protonation pH</label><input id="ph" class="num mono" type="number" step="0.1" value="7.4"></div></fieldset>
       </div>
     </div>
     <div>
       <b>3. Binding site</b>
       <div class="tablewrap"><table id="sites"><thead><tr><th scope="col">Use</th><th scope="col">Source</th><th scope="col">Site</th><th scope="col">Score</th></tr></thead><tbody></tbody></table></div>
-      <div class="kv" style="margin-top:8px"><span>Box center (A)</span><span class="mono" id="bc"></span><span>Box size (A)</span><span class="mono" id="bs"></span></div>
-      <div class="note-box" style="margin-top:8px"><b>Site confidence:</b> highlighted residues are shown beside the site. <span id="fixnote"></span> No site-confidence value has been computed.</div>
-      <div class="note-box" style="margin-top:8px"><b>Change log</b> (downloaded with the files): <ul id="log" style="margin:4px 0 0;padding-left:18px"></ul></div>
+      <div class="kv mt8"><span>Box center (A)</span><span class="mono" id="bc"></span><span>Box size (A)</span><span class="mono" id="bs"></span></div>
+      <div class="note-box mt8"><b>Site confidence:</b> highlighted residues are shown beside the site. <span id="fixnote"></span> No site-confidence value has been computed.</div>
+      <div class="note-box mt8"><b>Change log</b> (downloaded with the files): <ul id="log" class="loglist"></ul></div>
       <h3>Download</h3>
-      <div class="toolbar" style="padding:0;border:0">
+      <div class="toolbar flush">
         <button class="btn" type="button" id="dl-box">Box parameters</button>
         <button class="btn" type="button" id="dl-log">Change log</button>
         <button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Ligands (PDBQT or SDF)</button>

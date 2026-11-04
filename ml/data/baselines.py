@@ -30,7 +30,13 @@ def rf_baseline(train_smiles, y_train, kind: str, n_estimators: int = 200, seed:
 
 def rf_predict(model, smiles, kind: str) -> np.ndarray:
     X = morgan_matrix(list(smiles))
-    return model.predict(X) if kind == "regression" else model.predict_proba(X)[:, 1]
+    if kind == "regression":
+        return model.predict(X)
+    proba = model.predict_proba(X)
+    classes = list(model.classes_)
+    if 1 in classes:
+        return proba[:, classes.index(1)]
+    return np.zeros(len(X))  # single-class training set without a positive class
 
 
 def crippen_logp(smiles: str) -> float:

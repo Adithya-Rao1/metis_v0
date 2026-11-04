@@ -11,6 +11,7 @@ export function el(tag, attrs = {}, ...kids) {
   for (const [k, v] of Object.entries(attrs)) {
     if (v === false || v == null) continue;
     if (k === "text") e.textContent = v;
+    else if (k === "pct") e.style.width = `${Number(v)}%`; // CSSOM, allowed under a strict style-src
     else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
     else e.setAttribute(k, v === true ? "" : v);
   }

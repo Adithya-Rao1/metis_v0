@@ -3,15 +3,22 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from pathlib import Path
 
-from ml.data.manifest import assert_loadable, load_manifest
+from ml.data.manifest import ID_RE, assert_loadable, load_manifest
 
 DEFAULT_CACHE = Path("data")
 
 
 def cache_path(dataset_id: str, cache_dir: Path | str = DEFAULT_CACHE) -> Path:
+    if not isinstance(dataset_id, str) or not ID_RE.match(dataset_id):
+        raise ValueError("invalid dataset id: must match [A-Za-z0-9_]+")
+    base = Path(cache_dir).resolve()
+    p = (base / f"{dataset_id}.csv").resolve()
+    if base not in p.parents:
+        raise ValueError("cache path escapes the cache directory")
     return Path(cache_dir) / f"{dataset_id}.csv"
 
 
@@ -22,7 +29,13 @@ def load_local(dataset_id: str, cache_dir: Path | str = DEFAULT_CACHE, smiles_co
     if not p.exists():
         raise FileNotFoundError(f"{p} not found; run with --download (after license review) to fetch")
     with open(p, newline="") as f:
-        return [(r[smiles_col], float(r[label_col])) for r in csv.DictReader(f)]
+        rows = []
+        for n, r in enumerate(csv.DictReader(f), start=1):
+            y = float(r[label_col])
+            if not math.isfinite(y):
+                raise ValueError(f"{dataset_id}: non-finite label in data row {n}")
+            rows.append((r[smiles_col], y))
+        return rows
 
 
 def download(dataset_id: str, cache_dir: Path | str = DEFAULT_CACHE) -> Path:

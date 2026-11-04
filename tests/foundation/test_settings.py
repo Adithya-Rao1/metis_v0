@@ -6,7 +6,7 @@ from backend.core.settings import Settings
 GOOD = {
     "METIS_ENV": "production",
     "METIS_DATABASE_URL": "postgresql+psycopg://metis_app_login:pw9f3k2@db:5432/metis",
-    "METIS_SECRET_KEY": "k" * 40,
+    "METIS_SECRET_KEY": "k" * 20 + "Q9zT4w" * 4,
     "METIS_REDIS_URL": "redis://:s3cr3tpw@redis:6379/0",
     "METIS_OBJECT_STORE_ENDPOINT": "http://minio:9000",
     "METIS_OBJECT_STORE_ACCESS_KEY": "ak8f3j2h",

@@ -1,0 +1,9 @@
+# Security headers for static hosts that read a _headers file (Netlify, Cloudflare Pages).
+# Other hosts: set the same headers in the server config. Inline styles were removed (F-37), so style-src has no 'unsafe-inline'.
+# 3Dmol.js (vendor/) contains one eval( call site and creates blob workers; see README.md before tightening script-src further.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin

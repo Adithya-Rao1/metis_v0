@@ -6,8 +6,9 @@ const cid = Number(qs("c", 3)), ep = qs("e", "herg");
 const project = await loadJSON("fixtures/project.json");
 const training = await loadJSON("fixtures/training.json");
 const c = project.compounds.find((x) => x.id === cid) || project.compounds[0];
-const info = project.endpoints[ep] || project.endpoints.herg;
-const key = project.endpoints[ep] ? ep : "herg";
+const known = Object.hasOwn(project.endpoints, ep);
+const key = known ? ep : "herg";
+const info = project.endpoints[key];
 const p = c.predictions[key];
 renderChrome({ current: "app.html", crumb: `Project / ${c.name} / ${info.label}` });
 document.title = `${c.name}, ${info.label} | Metis`;
@@ -33,7 +34,7 @@ const rowsB = [["Model disagreement", b.ensemble_disagreement, r[0]], ["Distance
 document.getElementById("shares").replaceChildren(...rowsB.map(([label, v, rg], i) => el("div", { "data-share": i },
   `${label} `, el("span", { class: "mono", text: `${Math.round(v * 100)}%` }), " ",
   el("span", { class: "legend", text: `range ${Math.round(rg[0] * 100)} to ${Math.round(rg[1] * 100)} over resamples` }),
-  el("div", { class: "bar" }, el("i", { style: `width:${v * 100}%` })))));
+  el("div", { class: "bar" }, el("i", { pct: v * 100 })))));
 
 // 2D + 3D with same fragment highlighted (atom-index map shared by RDKit depiction and conformer)
 const f = c.fragment;
@@ -59,7 +60,7 @@ c.nearest.forEach((n, i) => {
     el("button", { class: "btn small", type: "button", "aria-label": `Show 3D structure of nearest training compound ${i + 1}`, text: "3D",
       onclick: () => { viewer.showMolblock(t.conformer_molblock); cap.textContent = `Training compound ${t.id} (stand-in). ${CONFORMER_LABEL}.`; } })));
 });
-nb.append(el("button", { class: "btn small", style: "align-self:flex-start", type: "button", text: "Back to this compound", onclick: showMain }));
+nb.append(el("button", { class: "btn small self-start", type: "button", text: "Back to this compound", onclick: showMain }));
 
 document.getElementById("ens2").value = String(p.ensemble_n);
 document.getElementById("rerun").addEventListener("click", () => {

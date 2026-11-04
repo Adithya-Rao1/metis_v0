@@ -1,7 +1,9 @@
 """License-gated dataset manifest. Training requires license_status == cleared."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -10,10 +12,16 @@ MANIFEST_PATH = Path(__file__).with_name("datasets.yaml")
 STATUSES = {"cleared", "pending", "excluded"}
 KINDS = {"regression", "classification"}
 ALWAYS_REFUSED = {"FreeSolv"}
+ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
+# A cleared entry may never look like FreeSolv (any id) or carry non-commercial / no-derivatives terms.
+_EXCLUDED_SOURCE_RE = re.compile(r"free[\W_]*solv|mobleylab", re.I)
+_NONCOMMERCIAL_RE = re.compile(r"non[\s_-]*commercial|(?<![a-z])nc(?![a-z])|(?<![a-z])nd(?![a-z])|by-?nc|research[\s-]*only|academic[\s-]*only", re.I)
+_PERMISSIVE_RE = re.compile(r"cc0|cc[\s-]*by(?![\s-]*n)|mit\b|apache|bsd|public[\s-]*domain|odc-?by|pddl|unlicense", re.I)
+_JUNK_CONFIRMERS = {"", "false", "true", "none", "null", "nan", "n/a", "na", "unknown", "x", "tbd", "todo"}
 
 
-class LicenseError(Exception):
-    pass
+class LicenseError(ValueError):
+    """Licence-gate violation. Subclasses ValueError so malformed-manifest handling stays uniform."""
 
 
 @dataclass(frozen=True)
@@ -40,12 +48,33 @@ def load_manifest(path: Path | str = MANIFEST_PATH) -> dict[str, DatasetEntry]:
             raise ValueError(f"{e.id}: bad license_status {e.license_status}")
         if e.kind not in KINDS:
             raise ValueError(f"{e.id}: bad kind {e.kind}")
-        if e.license_status == "cleared" and not (e.date_checked and e.confirmed_by):
-            raise ValueError(f"{e.id}: cleared requires date_checked and confirmed_by")
+        if not ID_RE.match(e.id):
+            raise ValueError(f"bad dataset id {e.id!r}: must match [A-Za-z0-9_]+")
+        if e.license_status == "cleared":
+            _validate_cleared(e)
         if e.id in out:
             raise ValueError(f"duplicate id {e.id}")
         out[e.id] = e
     return out
+
+
+def _validate_cleared(e: DatasetEntry) -> None:
+    if e.id in ALWAYS_REFUSED or any(_EXCLUDED_SOURCE_RE.search(x or "") for x in (e.id, e.name, e.source_url)):
+        raise LicenseError(f"{e.id}: FreeSolv (or an alias/source of it) can never be cleared")
+    lic = e.license_as_stated or ""
+    if _NONCOMMERCIAL_RE.search(lic):
+        raise LicenseError(f"{e.id}: non-commercial / no-derivatives licence {lic!r} cannot be cleared")
+    if not _PERMISSIVE_RE.search(lic):
+        raise LicenseError(f"{e.id}: licence {lic!r} is not recognised as permissive; cannot be cleared")
+    try:
+        d = date.fromisoformat((e.date_checked or "").strip())
+    except ValueError:
+        raise ValueError(f"{e.id}: cleared requires date_checked as an ISO date (YYYY-MM-DD)") from None
+    if d > date.today():
+        raise ValueError(f"{e.id}: date_checked is in the future")
+    who = (e.confirmed_by or "").strip()
+    if who.lower() in _JUNK_CONFIRMERS or not re.search(r"[A-Za-z]", who):
+        raise ValueError(f"{e.id}: cleared requires a real confirmed_by")
 
 
 def get(dataset_id: str, path: Path | str = MANIFEST_PATH) -> DatasetEntry:

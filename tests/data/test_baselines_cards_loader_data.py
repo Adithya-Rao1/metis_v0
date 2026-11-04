@@ -52,3 +52,36 @@ def test_cli_does_not_download_without_flag(capsys):
     assert main(["--list"]) == 0
     with pytest.raises(LicenseError):
         main(["FreeSolv", "--download"])
+
+
+from ml.data.loader import cache_path
+
+
+@pytest.mark.parametrize("m", ["Random", "RANDOM", "random ", "random", "stratified_random", "kfold"])
+def test_f28_card_rejects_non_allowed_splits(m):
+    with pytest.raises(ValueError):
+        render_card("hERG", 10, m)
+
+
+@pytest.mark.parametrize("bad", ["../../evil", "a/b", "x.csv", "", "a b"])
+def test_f27_cache_path_rejects_bad_ids(tmp_path, bad):
+    with pytest.raises(ValueError):
+        cache_path(bad, tmp_path)
+
+
+def test_f27_cache_path_ok(tmp_path):
+    assert cache_path("hERG", tmp_path) == tmp_path / "hERG.csv"
+
+
+@pytest.mark.parametrize("cell", ["nan", "inf", "-inf"])
+def test_f29b_load_local_rejects_non_finite(tmp_path, cell):
+    (tmp_path / "hERG.csv").write_text(f"Drug,Y\nCCO,1\nCCN,{cell}\n")
+    with pytest.raises(ValueError, match="row 2"):
+        load_local("hERG", tmp_path)
+
+
+def test_f36_single_class_classifier_predicts():
+    m = rf_baseline(["CCO", "CCN", "CCC"], np.array([0, 0, 0]), "classification", n_estimators=5)
+    assert rf_predict(m, ["CCO"], "classification").tolist() == [0.0]
+    m = rf_baseline(["CCO", "CCN", "CCC"], np.array([1, 1, 1]), "classification", n_estimators=5)
+    assert rf_predict(m, ["CCO"], "classification").tolist() == [1.0]

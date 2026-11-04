@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import sys
+import unicodedata
 from typing import Any
 
 REDACTED = "[REDACTED]"
@@ -41,47 +42,95 @@ SENSITIVE_KEYS = frozenset(
     }
 )
 
+# Key names are matched by substring (token, secret, X-Api-Key, session_id, csrftoken, ...), not just exactly.
+_SENSITIVE_SUBSTRINGS = (
+    "token",
+    "secret",
+    "passw",
+    "api_key",
+    "apikey",
+    "session",
+    "csrf",
+    "cookie",
+    "auth",
+    "jwt",
+    "credential",
+    "private_key",
+    "smiles",
+    "molblock",
+    "molfile",
+    "inchi",
+    "email",
+    "dsn",
+)
+
+
+def _is_sensitive_key(key: str) -> bool:
+    k = key.lower().replace("-", "_")
+    return k in SENSITIVE_KEYS or any(sub in k for sub in _SENSITIVE_SUBSTRINGS)
+
+
 _EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")
 _MOLBLOCK = re.compile(r"(M {2}END|V[23]000|\${4}|^\s*\d+\s+\d+\s+\d+\s+\d+.*$)", re.M)
 _INCHI = re.compile(r"InChI=\S+")
-_KV = re.compile(
-    r"(?i)\b("
-    + "|".join(sorted(SENSITIVE_KEYS, key=len, reverse=True))
-    + r")\b(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)"
-)
+_KV = re.compile(r"(?<![\w\-])([\w\-]+)([\"']?\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)")
 _BEARER = re.compile(r"(?i)\bbearer\s+\S+")
+_DSN = re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s/@]*@")
+_JWT = re.compile(r"\beyJ[\w\-]{5,}\.[\w\-]{5,}\.[\w\-]*")
+_ZERO_WIDTH = re.compile(r"[\u200b-\u200f\u2060-\u2064\ufeff\u00ad]")
+_BRACKET_ATOM = re.compile(r"\[[A-Za-z][A-Za-z0-9@+\-:]*\]")
 _SMILES_CHARS = re.compile(r"^[BCNOPSFIHcnopsrl\[\]\(\)=#@+\-\\/%.0-9]+$")
+_SMILES_RUN = re.compile(r"(?:\[[A-Za-z][A-Za-z0-9@+\-:]*\]|[BCNOPSFIHcnopsrl\[\]()=#@+\-\\/%.0-9])+")
 _SMILES_STRUCT = re.compile(r"[\[\]\(\)=#@/\\%]|\d")
 _TOKEN = re.compile(r"[^\s'\",:;{}]+")
 _ATOM_RUN = re.compile(r"^[CNOPSFBIcnops]{6,}$")
+
+
+def _smiles_like(core: str) -> bool:
+    if len(core) < 5:
+        return False
+    structure = _BRACKET_ATOM.sub("C", core)  # bracket atoms ([Na+], [Se], [C@@H]) count as one atom
+    if not _SMILES_CHARS.match(structure):
+        return False
+    atoms = sum(1 for ch in structure if ch in "BCNOPSFIcnops")
+    # require real structure: atoms plus a bond/branch/ring/bracket char; plain numbers/versions excluded
+    return atoms >= 2 and bool(_SMILES_STRUCT.search(core)) and not core.replace(".", "").isdigit()
 
 
 def _looks_like_smiles(tok: str) -> bool:
     core = tok.strip(".,;:\"'")
     if len(core) < 5:
         return False
-    if _ATOM_RUN.match(core):
-        return True
-    if not _SMILES_CHARS.match(core):
-        return False
-    atoms = sum(1 for ch in core if ch in "BCNOPSFIcnops")
-    # require real structure: atoms plus a bond/branch/ring/bracket char; plain numbers/versions excluded
-    return atoms >= 2 and bool(_SMILES_STRUCT.search(core)) and not core.replace(".", "").isdigit()
+    return bool(_ATOM_RUN.match(core)) or _smiles_like(core)
+
+
+def _scrub_token(tok: str) -> str:
+    if _looks_like_smiles(tok):
+        return REDACTED
+    # SMILES glued to a non-SMILES prefix (mol_<smiles>, q=<smiles>): scan SMILES runs.
+    return _SMILES_RUN.sub(lambda m: REDACTED if _smiles_like(m.group(0).strip(".,;:")) else m.group(0), tok)
+
+
+def _scrub_kv(m: re.Match[str]) -> str:
+    return f"{m.group(1)}{m.group(2)}{REDACTED}" if _is_sensitive_key(m.group(1)) else m.group(0)
 
 
 def scrub_text(text: str) -> str:
-    """Remove emails, molblocks, InChI, SMILES-like tokens and key=value secrets from free text."""
+    """Remove emails, molblocks, InChI, SMILES-like tokens, DSN passwords and credentials from free text."""
+    text = _ZERO_WIDTH.sub("", unicodedata.normalize("NFKC", text))
     if _MOLBLOCK.search(text):
         return REDACTED
-    text = _KV.sub(lambda m: f"{m.group(1)}{m.group(2)}{REDACTED}", text)
+    text = _DSN.sub(lambda m: f"{m.group(1)}{REDACTED}@", text)
+    text = _JWT.sub(REDACTED, text)
     text = _BEARER.sub(f"Bearer {REDACTED}", text)
+    text = _KV.sub(_scrub_kv, text)
     text = _EMAIL.sub(REDACTED, text)
     text = _INCHI.sub(REDACTED, text)
-    return _TOKEN.sub(lambda m: REDACTED if _looks_like_smiles(m.group(0)) else m.group(0), text)
+    return _TOKEN.sub(lambda m: _scrub_token(m.group(0)), text)
 
 
 def scrub_value(value: Any, key: str | None = None) -> Any:
-    if key is not None and key.lower() in SENSITIVE_KEYS:
+    if key is not None and _is_sensitive_key(key):
         return REDACTED
     if isinstance(value, str):
         return scrub_text(value)
@@ -133,7 +182,7 @@ class JsonFormatter(logging.Formatter):
             payload["exc"] = record.exc_text
         line = json.dumps(payload, default=str)
         # Defence in depth: scrub the serialized line too (handlers without the filter).
-        return scrub_text(line) if _MOLBLOCK.search(line) or _EMAIL.search(line) else line
+        return scrub_text(line) if _MOLBLOCK.search(line) or _EMAIL.search(line) or "://" in line else line
 
 
 def configure_logging(level: str = "INFO", stream: Any = None) -> logging.Logger:
@@ -148,4 +197,9 @@ def configure_logging(level: str = "INFO", stream: Any = None) -> logging.Logger
     handler.addFilter(RedactionFilter())
     root.addHandler(handler)
     root.setLevel(level.upper())
+    # uvicorn installs non-redacting handlers (propagate=False); route them via the redacting root handler.
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        lg = logging.getLogger(name)
+        lg.handlers = []
+        lg.propagate = True
     return root

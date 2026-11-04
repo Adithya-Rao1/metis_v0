@@ -22,31 +22,40 @@ jobs:
       # the embedded pgserver fixture (integrator-owned); switch them to this env var when convenient.
       METIS_TEST_PG_URI: postgresql://postgres:ci-only-not-a-secret@localhost:5432/metis_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r requirements-dev.txt -r ml/requirements.txt
       - run: ruff check backend/core tests/foundation
       - run: ruff format --check backend/core tests/foundation
       - run: mypy
-      - run: bandit -c pyproject.toml -r backend
-      - run: pip-audit -r requirements.txt
+      - run: bandit -c pyproject.toml -r backend ml
+      - run: pip-audit -r requirements.txt -r ml/requirements.txt
       - name: Baseline migration against Postgres (idempotent re-run)
         run: |
           METIS_MIGRATION_URL="$METIS_TEST_PG_URI" python -m backend.core.migrate
           METIS_MIGRATION_URL="$METIS_TEST_PG_URI" python -m backend.core.migrate
-      - run: python -m pytest -q
+      - run: python -m pytest -q --ignore=tests/web --ignore=tests/security/web
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -r requirements-dev.txt -r ml/requirements.txt playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest -q tests/web tests/security/web --deselect tests/web/test_screenshots.py
   secrets-and-scan:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: {fetch-depth: 0}
       - name: gitleaks
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz gitleaks
           ./gitleaks detect --source . --redact --no-banner
       - name: trivy fs scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         with:
           scan-type: fs
           scan-ref: .
