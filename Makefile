@@ -1,6 +1,6 @@
 PY ?= python
 # Commands and scopes are identical to .github/workflows/ci.yml (tests/foundation enforces this).
-.PHONY: install test lint type sec migrate
+.PHONY: install test lint type sec migrate demo
 install:
 	$(PY) -m pip install -r requirements-dev.txt -r ml/requirements.txt
 test:
@@ -13,3 +13,5 @@ sec:
 	bandit -c pyproject.toml -r backend ml && pip-audit -r requirements.txt -r ml/requirements.txt
 migrate:
 	$(PY) -m backend.core.migrate
+demo:  # local demo on http://127.0.0.1:8080 with SYNTHETIC sample models (see scripts/demo.py)
+	$(PY) scripts/demo.py
