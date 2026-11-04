@@ -11,4 +11,4 @@
 | Biogen kinetic solubility | unchecked, not in TDC | pending | source not yet identified |
 | PyTDC (only if --download used) | check before use | pending | lazy optional dependency, not in requirements |
 | scikit-learn, NumPy, SciPy, PyYAML, pytest | BSD-3 / BSD / MIT per upstream | pending verification | confirm against pinned versions |
-| Ketcher (ketcher-core/react/standalone 3.18.0) | Apache-2.0 per npm registry | pending verification | owner chose Ketcher 2026-11-04; read package LICENSE/NOTICE and bundled third-party notices before vendoring |
+| Ketcher (ketcher-core/react/standalone 3.18.0) | Apache-2.0 per npm registry | vendored; NOTICE lists LGPL-2.1, to be reviewed | owner chose Ketcher 2026-11-04; read package LICENSE/NOTICE and bundled third-party notices before vendoring |

@@ -26,3 +26,9 @@
 - Need migration 0004 (integrator): GRANT SELECT(window_start) on rate_limit_bucket (purge fails silently without it); purge session_revocation; SQL-side lock reset in auth_record_login (F-60 now leaves a spurious login_ok audit row); unverified-account expiry and password replacement for stale unverified rows (F-61 residual); a way for reset to clear a lock.
 - Not done: Docker image never built (no Docker locally); jobs still in memory (job table unwired); lint uses per-file ignores in pyproject (ruff format only on backend/core).
 - Suite: 914 passed, 2 skipped, 20 xfailed before the last two marker removals; ML/red-team rerun 169 passed.
+
+## 2026-11-04 Wave 3
+- Built: backend maintenance runner, durable jobs, account endpoints, OPERATIONS.md; migration 0004 (metis_janitor role); web on the real API with vendored Ketcher 3.18.0 and per-path CSP; e2e journey tests; `make demo` launcher (synthetic models, local only).
+- NOTE: demo launcher exposed a sandbox bug (503 when all slots busy); SLOT_WAIT_S = 5 s added.
+- QA: 0 critical/high, 3 medium, 11 low open (see BACKLOG). Python 1153 passed, 2 skipped, 33 xfailed; browser 175 passed, 4 xfailed; ruff, format, mypy clean.
+- Owner approved Wave 3. Wave 4 deliberately on hold until the demo video is filmed.
