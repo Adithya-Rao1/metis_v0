@@ -41,3 +41,6 @@ Child rows carry `(parent_id, owner_id)` composite foreign keys, so a row can ne
 
 ## 0002 accounts support (Wave 2)
 `rate_limit_bucket` (global, hashed keys only, written only through `rate_limit_hit`), `session_revocation` (RLS by owner; `session_is_revoked(jti)` callable pre-auth), `auth_upgrade_edu(user)` (verified email + `.edu` suffix checked inside SQL). Tests in tests/db.
+
+## 0003 domain storage (Wave 2)
+`project.ranking_config` (jsonb, size-bounded), `compound.conformer_molblock/conformer_method` (must be set together; always labelled computed), `compound.seq` (stable ordering), `job` table (owner-scoped RLS, composite FK to the owner's project, state/progress updatable by the app, owner and ids not), `prediction.job_id`. Tests in tests/db.

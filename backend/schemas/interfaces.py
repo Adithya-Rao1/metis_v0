@@ -38,6 +38,7 @@ class ModelCard(BaseModel):
     coverage_by_n: dict[str, float]                  # "3","5","10","20" -> empirical coverage
     runtime_by_n_seconds: dict[str, float]
     default_range: tuple[float, float]               # training-data min/max for desirability (decision 0002)
+    median_calibration_width_by_n: dict[str, float] = {}  # regression only; ranking confidence uses it (spec 7)
     weights_sha256: str
 
 

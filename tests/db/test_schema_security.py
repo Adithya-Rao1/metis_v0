@@ -376,3 +376,36 @@ def test_session_revocation_is_per_user_and_checkable_pre_auth(app, su):
     assert app.as_user(None).execute("SELECT session_is_revoked(%s)", (j,)).fetchone()[0] is True
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         app.as_user(b).execute("INSERT INTO session_revocation(jti,owner_id,expires_at) VALUES (%s,%s,now())", (uuid.uuid4(), a))
+
+
+# ---- 0003: domain storage ----
+def test_job_table_isolated_and_user_cannot_forge_states_or_owner(app, su):
+    a, b = register(su, "a@x.com"), register(su, "b@x.com")
+    pa = mkproj(su, a)
+    ca = app.as_user(a)
+    jid = ca.execute("INSERT INTO job(owner_id,project_id,kind,ensemble_n) VALUES (%s,%s,'predict',5) RETURNING id", (a, pa)).fetchone()[0]
+    ca.commit()
+    assert ca.execute("UPDATE job SET state='running', progress=0.5 WHERE id=%s", (jid,)).rowcount == 1
+    ca.commit()
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        ca.execute("UPDATE job SET owner_id=%s WHERE id=%s", (b, jid))
+    ca.rollback()
+    cb = app.as_user(b)
+    assert cb.execute("SELECT count(*) FROM job").fetchone()[0] == 0
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        cb.execute("INSERT INTO job(owner_id,project_id,kind) VALUES (%s,%s,'predict')", (b, pa))  # another tenant's project
+    cb.rollback()
+    with pytest.raises(psycopg.errors.CheckViolation):
+        app.as_user(a).execute("INSERT INTO job(owner_id,project_id,kind,ensemble_n) VALUES (%s,%s,'predict',7)", (a, pa))
+
+
+def test_conformer_needs_method_and_ranking_config_bounded(su):
+    a = register(su)
+    p = mkproj(su, a)
+    c = mkcomp(su, a, p)
+    with pytest.raises(psycopg.errors.CheckViolation):
+        su.execute("UPDATE compound SET conformer_molblock='x' WHERE id=%s", (c,))
+    su.execute("UPDATE compound SET conformer_molblock='x', conformer_method='ETKDGv3+MMFF94s' WHERE id=%s", (c,))
+    with pytest.raises(psycopg.errors.CheckViolation):
+        su.execute("UPDATE project SET ranking_config=%s::jsonb WHERE id=%s", ('"a string"', p))
+    su.execute("UPDATE project SET ranking_config='{\"lam\":0.25}'::jsonb WHERE id=%s", (p,))
