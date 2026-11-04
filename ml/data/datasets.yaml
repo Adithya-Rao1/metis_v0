@@ -1,0 +1,157 @@
+# Dataset license manifest. Gate G1: every TDC entry stays 'pending' until written confirmation is recorded
+# (date_checked + confirmed_by). Do not edit status to 'cleared' without that record.
+datasets:
+  - id: hERG
+    name: hERG (Wang et al.)
+    source_url: https://tdcommons.ai/single_pred_tasks/tox/#herg-blockers
+    endpoint: hERG channel blockade
+    kind: classification
+    units: "binary (1=blocker)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Wang et al. 2016, ADMET evaluation in drug discovery. 16. Predicting hERG blockers by combining multiple pharmacophores and machine learning approaches, Mol Pharm. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: hERG_Karim
+    name: hERG_Karim
+    source_url: https://tdcommons.ai/single_pred_tasks/tox/#herg-karim-et-al
+    endpoint: hERG channel blockade (balanced)
+    kind: classification
+    units: "binary (1=blocker)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Karim et al. 2021, CardioTox net, J Cheminform. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: AMES
+    name: AMES mutagenicity
+    source_url: https://tdcommons.ai/single_pred_tasks/tox/#ames-mutagenicity
+    endpoint: Ames mutagenicity
+    kind: classification
+    units: "binary (1=mutagenic)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Xu et al. 2012, In silico prediction of chemical Ames mutagenicity, J Chem Inf Model. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: LD50_Zhu
+    name: LD50_Zhu (rat oral acute toxicity)
+    source_url: https://tdcommons.ai/single_pred_tasks/tox/#acute-toxicity
+    endpoint: Rodent acute oral toxicity
+    kind: regression
+    units: "-log(mol/kg)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Zhu et al. 2009, Quantitative structure-activity relationship modeling of rat acute toxicity by oral exposure, Chem Res Toxicol. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: DILI
+    name: DILI
+    source_url: https://tdcommons.ai/single_pred_tasks/tox/#dili-drug-induced-liver-injury
+    endpoint: Drug-induced liver injury
+    kind: classification
+    units: "binary (1=DILI)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Xu et al. 2015, Deep learning induced DILI prediction, J Chem Inf Model. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: Solubility_AqSolDB
+    name: Solubility_AqSolDB
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#solubility-aqsoldb
+    endpoint: Thermodynamic aqueous solubility
+    kind: regression
+    units: "log(mol/L)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Sorkun et al. 2019, AqSolDB, Sci Data. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: Caco2_Wang
+    name: Caco2_Wang
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#caco-2-cell-effective-permeability-wang-et-al
+    endpoint: Caco-2 permeability
+    kind: regression
+    units: "log(cm/s)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Wang et al. 2016, ADMET evaluation in drug discovery. 16, J Chem Inf Model. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: PAMPA_NCATS
+    name: PAMPA_NCATS
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#pampa-permeability-ncats
+    endpoint: PAMPA permeability
+    kind: classification
+    units: "binary (1=high permeability)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Siramshetty et al. 2021, NCATS ADME PAMPA dataset. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: Half_Life_Obach
+    name: Half_Life_Obach
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#half-life-obach-et-al
+    endpoint: Human half-life
+    kind: regression
+    units: "hours"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Obach et al. 2008, Trend analysis of a database of intravenous pharmacokinetic parameters in humans, Drug Metab Dispos. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: Clearance_Microsome_AZ
+    name: Clearance_Microsome_AZ
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#clearance-astrazeneca
+    endpoint: Microsomal clearance
+    kind: regression
+    units: "mL/min/g"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "AstraZeneca deposition to ChEMBL (Wenlock and Tomkinson). Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: Clearance_Hepatocyte_AZ
+    name: Clearance_Hepatocyte_AZ
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#clearance-astrazeneca
+    endpoint: Hepatocyte clearance
+    kind: regression
+    units: "uL/min/10^6 cells"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "AstraZeneca deposition to ChEMBL (Wenlock and Tomkinson). Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: Lipophilicity_AstraZeneca
+    name: Lipophilicity_AstraZeneca
+    source_url: https://tdcommons.ai/single_pred_tasks/adme/#lipophilicity-astrazeneca
+    endpoint: logD at pH 7.4 (label as logD, not logP)
+    kind: regression
+    units: "logD (pH 7.4)"
+    license_as_stated: "Not Specified / CC BY 4.0 link on TDC page (unverified)"
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "AstraZeneca deposition to ChEMBL; label this endpoint logD. Accessed via TDC (Huang et al. 2021, NeurIPS Datasets and Benchmarks); credit TDC and original authors."
+  - id: FreeSolv
+    name: FreeSolv
+    source_url: https://github.com/MobleyLab/FreeSolv
+    endpoint: Hydration free energy
+    kind: regression
+    units: kcal/mol
+    license_as_stated: CC BY-NC-SA
+    license_status: excluded
+    date_checked: null
+    confirmed_by: null
+    notes: "Non-commercial license. Never load, train on, or redistribute."
+  - id: Biogen_KineticSolubility
+    name: Biogen kinetic solubility
+    source_url: https://doi.org/10.1021/acs.jcim.3c00200
+    endpoint: Kinetic aqueous solubility
+    kind: regression
+    units: unknown
+    license_as_stated: unchecked
+    license_status: pending
+    date_checked: null
+    confirmed_by: null
+    notes: "Not in TDC. License unchecked; kinetic solubility endpoint pending data."

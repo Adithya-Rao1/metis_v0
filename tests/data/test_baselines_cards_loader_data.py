@@ -1,0 +1,54 @@
+import numpy as np
+import pytest
+from ml.data.baselines import rf_baseline, rf_predict, gse_logs, crippen_logp, GSE_NOTE
+from ml.data.cards import render_card, write_card
+from ml.data.loader import load_local, main
+from ml.data.manifest import LicenseError
+
+S = ["CCO", "CCCO", "CCCCO", "c1ccccc1", "Cc1ccccc1", "CCc1ccccc1", "CCN", "CCCN", "CCCCN", "c1ccncc1"]
+
+
+def test_rf_regression_and_classification():
+    y = np.array([crippen_logp(s) for s in S])
+    m = rf_baseline(S, y, "regression", n_estimators=20)
+    assert rf_predict(m, S, "regression").shape == (10,)
+    c = rf_baseline(S, [int("c1" in s) for s in S], "classification", n_estimators=20)
+    p = rf_predict(c, S, "classification")
+    assert ((0 <= p) & (p <= 1)).all()
+
+
+def test_gse_and_crippen():
+    v, used = gse_logs("CCCCCC")
+    assert not used and abs(v - (0.5 - crippen_logp("CCCCCC"))) < 1e-9
+    v2, used2 = gse_logs("CCCCCC", 125.0)
+    assert used2 and abs(v2 - (v - 1.0)) < 1e-9
+    assert "missing" in GSE_NOTE
+
+
+def test_card_content():
+    t = render_card("AMES", 100, "scaffold", (80, 10, 10))
+    for w in ["Size", "Units", "scaffold", "pending", "NOT cleared", "Limitations", "TDC", "Xu et al."]:
+        assert w in t
+    assert "EXCLUDED" in render_card("FreeSolv", None, None)
+    with pytest.raises(ValueError):
+        render_card("AMES", 10, "random")
+
+
+def test_write_card(tmp_path):
+    assert write_card("hERG", out_dir=tmp_path).read_text().startswith("# Data card")
+
+
+def test_loader_cache_and_gates(tmp_path):
+    (tmp_path / "AMES.csv").write_text("Drug_ID,Drug,Y\na,CCO,1\nb,CCN,0\n")
+    assert load_local("AMES", tmp_path) == [("CCO", 1.0), ("CCN", 0.0)]
+    with pytest.raises(FileNotFoundError):
+        load_local("hERG", tmp_path)
+    with pytest.raises(LicenseError):
+        load_local("FreeSolv", tmp_path)
+
+
+def test_cli_does_not_download_without_flag(capsys):
+    assert main(["AMES"]) == 1
+    assert main(["--list"]) == 0
+    with pytest.raises(LicenseError):
+        main(["FreeSolv", "--download"])
