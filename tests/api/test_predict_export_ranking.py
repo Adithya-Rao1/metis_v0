@@ -5,7 +5,7 @@ import pytest
 from backend.exports.formats import disclaimer
 from backend.schemas.contracts import Prediction
 from backend.schemas.interfaces import PredictionDetail
-from tests.api.conftest import H
+from api_support import H
 
 
 def run_job(client, queue, pid, who="a", **body):
@@ -119,7 +119,7 @@ def test_uncertainty_detail(client, queue, loaded):
 
 def test_uncertainty_409_when_model_version_changed(client, queue, app, loaded):
     from backend.jobs import deps
-    from tests.api.conftest import FakeRegistry
+    from api_support import FakeRegistry
 
     pid, _ = loaded
     _, job = run_job(client, queue, pid)
@@ -140,11 +140,22 @@ def test_models_public(client):
     assert client.get("/models/BAD NAME").status_code == 404
 
 
-def test_registry_unavailable_503(app, client):
+def test_registry_unavailable_503(app, client, monkeypatch):
+    import sys
+
     from backend.jobs import deps
 
     del app.dependency_overrides[deps.get_registry]
+    monkeypatch.setitem(sys.modules, "ml.registry", None)  # simulate the ml package being absent
     assert client.get("/models").status_code == 503
+
+
+def test_real_untrained_registry_lists_no_models(app, client):
+    from backend.jobs import deps
+
+    del app.dependency_overrides[deps.get_registry]
+    r = client.get("/models")
+    assert r.status_code == 200 and r.json() == {"models": []}  # nothing is trained or published yet
 
 
 # ---------- exports ----------
@@ -243,7 +254,7 @@ def test_ranking_endpoint(client, queue, loaded):
 
 def test_ranking_needs_median_width(client, queue, app, loaded):
     from backend.jobs import deps
-    from tests.api.conftest import FakeRegistry
+    from api_support import FakeRegistry
 
     pid, _ = loaded
     run_job(client, queue, pid, endpoints=["logd"])

@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 
-from tests.api.conftest import H
+from api_support import H
 
 
 def test_project_crud_and_isolation(client):

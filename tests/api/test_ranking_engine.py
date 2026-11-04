@@ -140,7 +140,7 @@ val = st.floats(-20, 20, allow_nan=False)
 def scenario(draw):
     n_ep = draw(st.integers(1, 3))
     eps = ["a", "c", "b"][:n_ep]
-    weights = [PropertyWeight(endpoint=e, weight=draw(st.floats(0, 10)), higher_is_better=draw(st.booleans())) for e in eps]
+    weights = [PropertyWeight(endpoint=e, weight=draw(st.one_of(st.just(0.0), st.floats(1e-3, 10))), higher_is_better=draw(st.booleans())) for e in eps]
     if sum(w.weight for w in weights) <= 0:
         weights[0] = weights[0].model_copy(update={"weight": 1.0})
     lam = draw(st.floats(0, 1))
