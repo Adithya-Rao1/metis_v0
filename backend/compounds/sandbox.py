@@ -13,7 +13,7 @@ WORKER = pathlib.Path(__file__).with_name("worker.py")
 TIMEOUT_S = 30
 MAX_OUT_BYTES = 5_000_000
 MAX_CONCURRENT = 4  # each worker may use ~3 GB address space; bounded like docking prep
-SLOT_WAIT_S = 5.0  # a request waits this long for a free slot before 503 (a 10-row table asks for 10 pictures at once)
+SLOT_WAIT_S = 5.0  # wait this long for a free slot before 503 (a 10-row table asks for 10 pictures at once)
 _slots = threading.BoundedSemaphore(MAX_CONCURRENT)
 
 

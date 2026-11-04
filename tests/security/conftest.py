@@ -1,5 +1,7 @@
 """Fixtures for the red-team suite (independent of tests/db/conftest.py so it can run alone)."""
 import pathlib
+import sys
+
 import pytest
 import pgserver
 import psycopg
@@ -64,3 +66,18 @@ def login_role(pg, su):
     for c in conns:
         c.close()
     su.execute("DROP ROLE IF EXISTS rt_login")
+
+
+@pytest.fixture(scope="session")
+def synth_registry(tmp_path_factory):
+    """(FileModelRegistry, root): the SYNTHETIC published registry from tests/e2e (endpoints synreg/syncls). Test data only."""
+    root_dir = pathlib.Path(__file__).resolve().parents[2]
+    for p in (root_dir, root_dir / "tests" / "e2e"):
+        if str(p) not in sys.path:
+            sys.path.insert(0, str(p))
+    from synth_registry import build_registry
+
+    from ml.registry.registry import FileModelRegistry
+
+    root = build_registry(tmp_path_factory.mktemp("sec_synth_registry"))
+    return FileModelRegistry(root), root

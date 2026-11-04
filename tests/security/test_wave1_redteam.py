@@ -849,12 +849,24 @@ def test_data_card_flags_pending_and_excluded_status():
     assert "random" not in render_card("hERG", 5, "scaffold", (4, 0, 1)).lower().split("split:")[1].split("\n")[0]
 
 
-def test_info_manifest_units_agree_with_web_fixture_units():
-    """LOW conformance note: LD50 unit string differs between datasets.yaml and the web fixture/wireframe."""
+def test_info_manifest_units_agree_with_web_fixture_units(synth_registry):
+    """Wave 1 note F-47 (LD50 unit string differed between datasets.yaml and the web fixture). The invariant now lives on the
+    server: the unit string a user sees is the model card's, and it must be the manifest's string, with no second copy in web/."""
+    import yaml
+
     from ml.data import manifest
 
-    web = json.loads((ROOT / "web/fixtures/project.json").read_text())["endpoints"]["ld50"]["unit"]
-    assert manifest.get("LD50_Zhu").units and web  # presence only; the mismatch is reported in qa_wave1.md (F-47)
+    assert manifest.get("LD50_Zhu").units, "real manifest entry for LD50 must carry units"
+    reg, root = synth_registry
+    entries = yaml.safe_load((root / "datasets.yaml").read_text())["datasets"]
+    by_ep = {"synreg": "SynthReg", "syncls": "SynthCls"}
+    for ep, ds in by_ep.items():
+        want = next(e for e in entries if e["id"] == ds)["units"]
+        assert reg.model_card(ep).units == want, ep
+    # no unit string for a real endpoint is hard-coded in the pages (a second copy could drift from the manifest again)
+    units = {e.units for e in manifest.load_manifest().values() if e.units and re.search(r"[/%0-9^]", e.units)}
+    js = "".join(f.read_text() for f in sorted((ROOT / "web/js").glob("*.js")) if f.name != "legal_text.js")
+    assert not [u for u in units if u in js], [u for u in units if u in js]
 
 
 # =====================================================================================================
@@ -917,14 +929,41 @@ def test_no_verdict_or_traffic_light_language_on_built_screens():
     assert not hits, hits
 
 
-def test_fixture_fragment_atom_indices_match_smarts_in_the_conformer():
-    """Spec 4.2: the 2D and 3D highlight come from one atom-index map. Verify against RDKit for all fixtures."""
+def test_fixture_fragment_atom_indices_match_smarts_in_the_conformer(synth_registry):
+    """Spec 4.2: the 2D and 3D highlight come from one atom-index map. Now checked on the real path: the fragment indices the
+    uncertainty route returns (registry.predict) must address the same atoms in the SMILES mol, the 2D depiction and the
+    3D conformer molblock the conformer route returns (both are built from the stored canonical SMILES)."""
     from rdkit import Chem
 
-    for c in json.loads((WEB / "fixtures/project.json").read_text())["compounds"]:
-        m = Chem.MolFromMolBlock(c["conformer"]["molblock"], removeHs=False)
-        q = Chem.MolFromSmarts(c["fragment"]["smarts"])
-        assert set(c["fragment"]["atom_indices"]) in [set(x) for x in m.GetSubstructMatches(q)], c["id"]
+    from backend.compounds.standardize import depict, embed_3d
+
+    reg, _ = synth_registry
+    smis = ["CCOc1ccccc1C(=O)N", "c1ccc2c(c1)CCN2C(=O)C", "CC(C)Cc1ccc(cc1)C(C)C(=O)O", "OC(=O)c1ccccc1O"]
+    seen = 0
+    for smi in smis:
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+        mol = Chem.MolFromSmiles(can)
+        conf = embed_3d(can)
+        assert conf["ok"]
+        cmol = Chem.MolFromMolBlock(conf["molblock"], removeHs=False)
+        assert cmol.GetNumAtoms() == mol.GetNumAtoms()
+        assert [a.GetAtomicNum() for a in cmol.GetAtoms()] == [a.GetAtomicNum() for a in mol.GetAtoms()]
+        edges = lambda m: {tuple(sorted((b.GetBeginAtomIdx(), b.GetEndAtomIdx()))) for b in m.GetBonds()}  # noqa: E731
+        assert edges(cmol) == edges(mol)
+        atoms2d = depict(can, [0])["atoms"]
+        assert [a["symbol"] for a in atoms2d] == [a.GetSymbol() for a in mol.GetAtoms()]
+        for ep in ("synreg", "syncls"):
+            for f in reg.predict(ep, can, 5).fragments:
+                idx = list(f.atom_indices)
+                assert idx and len(set(idx)) == len(idx) and all(0 <= i < mol.GetNumAtoms() for i in idx), (smi, idx)
+                sub = Chem.PathToSubmol  # noqa: F841 - connectivity: the fragment must be one connected piece of the molecule
+                frag = Chem.RWMol(mol)
+                keep = set(idx)
+                for a in sorted((i for i in range(mol.GetNumAtoms()) if i not in keep), reverse=True):
+                    frag.RemoveAtom(a)
+                assert len(Chem.GetMolFrags(frag)) == 1, (smi, idx)
+                seen += 1
+    assert seen >= 4
 
 
 def test_web_is_compatible_with_strict_style_csp():
@@ -946,9 +985,19 @@ def test_report_export_screen_exists():
     assert (WEB / "report.html").exists() or (WEB / "export.html").exists()
 
 
-def test_uncertainty_panel_offers_all_ensemble_sizes():
-    sel = re.search(r'<select id="ens2">(.*?)</select>', (WEB / "compound.html").read_text(), re.S).group(1)
-    assert set(re.findall(r"<option[^>]*>(\d+)</option>", sel)) == {"3", "5", "10", "20"}
+def test_uncertainty_panel_offers_all_ensemble_sizes(synth_registry):
+    """The panel's re-run selector lists 3/5/10/20 (options are disabled, never hidden, when the tier cap or a missing
+    calibration forbids them). Browser check: tests/security/web/test_wave1_web.py::test_uncertainty_rerun_selector_*.
+    Here: the sizes the page can offer come from one frozen list that matches the contract, and every published card is
+    calibrated at exactly those sizes."""
+    from backend.schemas.contracts import ENSEMBLE_SIZES
+
+    js = (WEB / "js/compound.js").read_text()
+    assert [int(x) for x in re.search(r"ENSEMBLE_SIZES = \[([\d, ]+)\]", js).group(1).split(",")] == [3, 5, 10, 20]
+    assert tuple(ENSEMBLE_SIZES) == (3, 5, 10, 20)
+    reg, _ = synth_registry
+    for card in reg.list_models():
+        assert set(card.coverage_by_n) == {"3", "5", "10", "20"}, card.endpoint
 
 
 @defect("G-06", "LOW", "add-compounds page states no maximum file size/type limit for CSV/SDF upload (spec 10: size and type limits)")
