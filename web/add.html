@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Add compounds | Metis</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<main>
+ <div class="screen-head"><h1>Add compounds</h1>
+  <p class="muted" data-testid="cap-note">Up to 10 compounds per submission. All input paths are available.</p></div>
+ <div class="frame">
+  <div class="tabs" role="tablist" aria-label="Input method">
+    <button class="tab" role="tab" id="t-paste" aria-controls="p-paste" aria-selected="true" type="button">Paste SMILES</button>
+    <button class="tab" role="tab" id="t-upload" aria-controls="p-upload" aria-selected="false" tabindex="-1" type="button">Upload CSV or SDF</button>
+    <button class="tab" role="tab" id="t-draw" aria-controls="p-draw" aria-selected="false" tabindex="-1" type="button">Draw structure</button>
+  </div>
+  <div class="panel">
+    <div>
+      <section id="p-paste" role="tabpanel" aria-labelledby="t-paste">
+        <label for="smi" class="muted">One SMILES per line, optional name after a space</label>
+        <textarea id="smi" spellcheck="false" placeholder="CC(=O)Oc1ccccc1C(=O)O aspirin">CC(=O)Oc1ccccc1C(=O)O aspirin
+CC(C)Cc1ccc(cc1)C(C)C(=O)O ibuprofen
+Cn1cnc2c1c(=O)n(C)c(=O)n2C caffeine</textarea>
+      </section>
+      <section id="p-upload" role="tabpanel" aria-labelledby="t-upload" hidden>
+        <label for="file" class="muted">CSV with a SMILES column, or an SDF file (at most 10 structures are used)</label><br>
+        <input id="file" type="file" accept=".csv,.sdf">
+        <p class="legend" id="file-note" role="status">Files are parsed on the server in a sandbox. This static build only reads the file name and size.</p>
+      </section>
+      <section id="p-draw" role="tabpanel" aria-labelledby="t-draw" hidden>
+        <div class="note-box" style="margin-bottom:8px">The free-hand structure editor is not part of this static build (handoff to wiring). Pick a fixture structure to see the live 2D and 3D preview that the editor will drive.</div>
+        <label for="tpl">Fixture structure <select id="tpl"></select></label>
+        <div class="pair" style="margin-top:8px"><div><div id="draw2d"></div></div>
+          <div class="viewer-wrap"><div class="viewer" id="viewer" aria-label="3D preview"></div><p class="caption" id="viewer-cap"></p></div></div>
+      </section>
+    </div>
+    <div>
+      <div class="parsed" id="check" aria-live="polite"><b>Check (live)</b></div>
+      <p class="legend">Format check only (brackets, ring closures, characters). Full parsing happens on the server and explains any problem; nothing is silently fixed.</p>
+      <div class="checks" style="margin-top:12px"><b>Properties to predict</b><div id="props" class="checks"></div></div>
+      <div class="checks" style="margin-top:12px"><b>Ensemble size N</b>
+        <label for="ens">Members per estimate <select id="ens"></select></label>
+        <label for="tier" class="legend">Preview as account type <select id="tier"><option value="free" selected>free (cap 10)</option><option value="edu">verified .edu (cap 20)</option><option value="paid">paid (cap 20)</option></select></label>
+        <span class="legend" id="eta" data-testid="eta"></span></div>
+      <p style="margin-top:12px"><button class="btn primary" id="submit" type="button">Submit (fixture mode)</button></p>
+      <pre class="formula" id="payload" hidden></pre>
+    </div>
+  </div>
+  <div class="foot"><span data-testid="consent-line">Your structures are private by default. Nothing is shared or used to train any model unless you opt in under <a href="account.html">Account</a>.</span></div>
+ </div>
+</main>
+<script src="vendor/3Dmol-min.js"></script>
+<script type="module" src="js/add.js"></script>
+</body>
+</html>

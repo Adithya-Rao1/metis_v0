@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign up / Log in | Metis</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<main>
+ <div class="authbox">
+  <h1>Sign up / Log in</h1>
+  <p class="draft-note" role="note" data-testid="draft-note"><strong>DRAFT.</strong> The Terms of Service, Privacy Policy and Disclaimer linked below are drafts. They are not legal advice and need lawyer review before launch.</p>
+  <div class="tabs" role="tablist" aria-label="Account action" style="padding:0;margin-top:12px">
+    <button class="tab" role="tab" id="tab-signup" aria-controls="p-signup" aria-selected="true" type="button">Sign up</button>
+    <button class="tab" role="tab" id="tab-login" aria-controls="p-login" aria-selected="false" tabindex="-1" type="button">Log in</button>
+  </div>
+  <section id="p-signup" role="tabpanel" aria-labelledby="tab-signup" style="padding-top:12px">
+    <form id="signup" novalidate>
+      <div class="field"><label for="su-email">Email</label><input id="su-email" name="email" type="email" autocomplete="email" required>
+        <span class="legend">A verification email is required before any data is stored. A .edu address unlocks the larger ensemble sizes after verification.</span></div>
+      <div class="field"><label for="su-pass">Password</label><input id="su-pass" name="password" type="password" autocomplete="new-password" minlength="12" required>
+        <span class="legend">At least 12 characters.</span></div>
+      <div class="consent-row">
+        <input id="accept" name="accept" type="checkbox" aria-describedby="accept-links">
+        <label for="accept" id="accept-label">I accept the Terms of Service, Privacy Policy and Disclaimer.</label>
+      </div>
+      <p id="accept-links" class="legend">Read the drafts:
+        <a href="legal/terms.html" target="_blank" rel="noopener">Terms of Service (draft)</a>,
+        <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy (draft)</a>,
+        <a href="legal/disclaimer.html" target="_blank" rel="noopener">Disclaimer (draft)</a>.</p>
+      <button class="btn primary" id="signup-submit" type="submit" disabled>Create account</button>
+      <p id="signup-msg" class="legend" role="status" aria-live="polite" style="margin-top:8px"></p>
+    </form>
+  </section>
+  <section id="p-login" role="tabpanel" aria-labelledby="tab-login" hidden style="padding-top:12px">
+    <form id="login" novalidate>
+      <div class="field"><label for="li-email">Email</label><input id="li-email" name="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="li-pass">Password</label><input id="li-pass" name="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn primary" id="login-submit" type="submit">Log in</button>
+      <p id="login-msg" class="legend" role="status" aria-live="polite" style="margin-top:8px"></p>
+    </form>
+  </section>
+  <p class="legend" style="margin-top:16px">Fixture mode: these forms are not connected to a backend. Nothing is sent or stored. <a href="app.html">Open the fixture project</a>.</p>
+ </div>
+</main>
+<script type="module" src="js/auth.js"></script>
+</body>
+</html>

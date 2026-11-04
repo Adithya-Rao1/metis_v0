@@ -1,0 +1,15 @@
+Vendored third-party files (nothing is loaded from a CDN at runtime).
+
+3Dmol.js 2.5.3 (minified build)
+  file: vendor/3Dmol-min.js
+  source: https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.5.3/3Dmol-min.js (downloaded 2026-11-03)
+  sha256: bcf422137a34b4e206413a8a83a67c24a1ace84e282bf3b164f6bda6aeb42a20
+  license: BSD-3-Clause (see vendor/LICENSE-3Dmol.txt). 3Dmol.js incorporates code from GLmol, Three.js and jQuery.
+
+IBM Plex Sans, latin subset, weights 400/500/600 (woff2)
+  files: fonts/plex-sans-400.woff2, plex-sans-500.woff2, plex-sans-600.woff2
+  source: https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans@5.1.0/files/ibm-plex-sans-latin-{400,500,600}-normal.woff2
+  sha256 plex-sans-400.woff2: db71f8a28ad8501544fb4e7668e3c6d0b731760b6f20de3525ebaeba597f1922
+  sha256 plex-sans-500.woff2: 5ef914e59b0047a261844d96acabb60c34d3acab6b85ea24198726ce4781fd37
+  sha256 plex-sans-600.woff2: 31535a91ce3f6b8ed3ddedadab1e49957e2220263a640df1a3f14f6fdfe15eb6
+  license: SIL Open Font License 1.1, Copyright 2017 IBM Corp. with Reserved Font Name "Plex" (fonts/OFL.txt).

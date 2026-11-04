@@ -1,0 +1,684 @@
+{
+ "fixture": true,
+ "note": "FIXTURE data: all numbers are placeholders (zeros), not benchmark results.",
+ "models": {
+  "herg": {
+   "id": "herg",
+   "label": "hERG blockade",
+   "unit": "P(blocker)",
+   "kind": "classification",
+   "datasets": [
+    {
+     "name": "hERG_Karim",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "AUROC",
+    "MCC",
+    "AUPRC"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Mixed assay conditions across sources, class balance, and which scaffolds are missing from the data.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "ames": {
+   "id": "ames",
+   "label": "AMES mutagenicity",
+   "unit": "P(mutagenic)",
+   "kind": "classification",
+   "datasets": [
+    {
+     "name": "AMES",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "AUROC",
+    "MCC",
+    "AUPRC"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Bacterial assay only; strain and metabolic-activation differences between sources are not modelled.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "dili": {
+   "id": "dili",
+   "label": "Drug-induced liver injury",
+   "unit": "P(injury)",
+   "kind": "classification",
+   "datasets": [
+    {
+     "name": "DILI",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "AUROC",
+    "MCC",
+    "AUPRC"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Small dataset; labels come from heterogeneous clinical and literature sources.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "ld50": {
+   "id": "ld50",
+   "label": "Acute toxicity LD50 (rodent)",
+   "unit": "log mmol/kg",
+   "kind": "regression",
+   "datasets": [
+    {
+     "name": "LD50_Zhu",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "RMSE",
+    "MAE",
+    "R2"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Species, route and strain differ between records; wide noise ceiling.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "solubility": {
+   "id": "solubility",
+   "label": "Solubility (thermodynamic)",
+   "unit": "logS",
+   "kind": "regression",
+   "datasets": [
+    {
+     "name": "Solubility_AqSolDB",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "RMSE",
+    "MAE",
+    "R2"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "GSE equation (baseline for solubility)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Thermodynamic solubility only; kinetic solubility is pending suitable data. Temperature and pH conditions vary by source.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "permeability": {
+   "id": "permeability",
+   "label": "Permeability (Caco-2)",
+   "unit": "log cm/s",
+   "kind": "regression",
+   "datasets": [
+    {
+     "name": "Caco2_Wang",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    },
+    {
+     "name": "PAMPA_NCATS",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "RMSE",
+    "MAE",
+    "R2"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Cell-based and artificial-membrane assays are different measurements and are not pooled.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "logd": {
+   "id": "logd",
+   "label": "logD at pH 7.4",
+   "unit": "logD",
+   "kind": "regression",
+   "datasets": [
+    {
+     "name": "Lipophilicity_AstraZeneca",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "RMSE",
+    "MAE",
+    "R2"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Crippen logP (baseline for logP)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "The TDC Lipophilicity set is logD at pH 7.4, not logP; it is labelled as logD everywhere.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "half_life": {
+   "id": "half_life",
+   "label": "Half-life (human)",
+   "unit": "log h",
+   "kind": "regression",
+   "datasets": [
+    {
+     "name": "Half_Life_Obach",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "RMSE",
+    "MAE",
+    "R2"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Small dataset; in vivo values depend on dose and population.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  },
+  "clearance": {
+   "id": "clearance",
+   "label": "Clearance (microsomal, hepatocyte)",
+   "unit": "log mL/min/g",
+   "kind": "regression",
+   "datasets": [
+    {
+     "name": "Clearance_Microsome_AZ",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    },
+    {
+     "name": "Clearance_Hepatocyte_AZ",
+     "source": "Therapeutics Data Commons (credit TDC and the original authors)",
+     "n": "n = (placeholder)",
+     "license": "status pending: written answer on TDC licensing required (gate G1)"
+    }
+   ],
+   "split": "Scaffold (time split where dates exist). Never random-only.",
+   "calibration_n": "(placeholder)",
+   "target_coverage": 0.9,
+   "heldout_coverage": "(placeholder)",
+   "metrics": [
+    "RMSE",
+    "MAE",
+    "R2"
+   ],
+   "benchmark": [
+    {
+     "model": "Random forest, Morgan fingerprints (baseline)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "reference"
+    },
+    {
+     "model": "Metis ensemble (N = 10)",
+     "values": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "note": "placeholder: comparison not yet computed"
+    }
+   ],
+   "ensemble_table": [
+    {
+     "n": 3,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 5,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 10,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    },
+    {
+     "n": 20,
+     "coverage": "0.0%",
+     "runtime": "0 s"
+    }
+   ],
+   "limitations": "Two in vitro systems with different scales; not interchangeable.",
+   "attribution_check": "Attribution check: error for compounds containing a flagged fragment vs. without it (result goes here).",
+   "examples": [
+    "train_01",
+    "train_05",
+    "train_10"
+   ]
+  }
+ }
+}

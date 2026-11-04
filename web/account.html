@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Account and data | Metis</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<main>
+ <div class="screen-head"><h1>Account, data and consents</h1>
+  <p class="muted">Nothing is shared or used to train any model unless you turn it on here. Every consent starts off and can be revoked at any time.</p></div>
+ <div class="frame">
+  <div class="report">
+    <section aria-labelledby="a-acct"><h2 id="a-acct">Account</h2>
+      <div class="kv"><span>Email</span><span class="mono">researcher@example.edu (fixture)</span>
+        <span>Verification</span><span>email verified (fixture); .edu status: verified (fixture). Larger ensemble sizes need a verified .edu address.</span>
+        <span>Account type</span><span>free (fixture)</span></div></section>
+    <section aria-labelledby="a-cons"><h2 id="a-cons">Consents</h2>
+      <fieldset style="border:0;padding:0;margin:0" class="checks" id="consents"><legend class="legend">All consents are off by default.</legend></fieldset>
+      <p class="legend" id="cons-msg" role="status" aria-live="polite"></p></section>
+    <section aria-labelledby="a-ret"><h2 id="a-ret">Retention and deletion</h2>
+      <p>Deleting a project or your account removes your data immediately. Backups are purged within 30 days (proposed). See the <a href="legal/privacy.html">Privacy Policy (draft)</a>.</p>
+      <p><button class="btn" type="button" id="del-project">Delete a project</button> <button class="btn" type="button" id="del-all">Delete all my data</button></p>
+      <p class="legend" id="del-msg" role="status" aria-live="polite"></p></section>
+  </div>
+ </div>
+ <dialog id="confirm" aria-labelledby="c-h">
+  <form method="dialog"><h2 id="c-h">Delete all my data</h2>
+   <p>This permanently removes your projects, compounds, measurements and notes. Type DELETE to confirm.</p>
+   <div class="field"><label for="c-in">Confirmation</label><input id="c-in" autocomplete="off"></div>
+   <button class="btn" value="cancel">Cancel</button> <button class="btn primary" id="c-ok" value="ok" disabled>Delete everything</button></form>
+ </dialog>
+</main>
+<script type="module" src="js/account.js"></script>
+</body>
+</html>

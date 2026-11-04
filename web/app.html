@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project table | Metis</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<main>
+ <div class="screen-head"><h1>Project: <span id="pname"></span></h1>
+  <p class="muted">One row per compound. Every prediction shows its interval or calibrated probability, ensemble size N and sample size. There is no verdict column.</p></div>
+ <div class="frame">
+  <div class="appbar" style="border-radius:6px 6px 0 0"><span class="brand">Project</span><span class="sp"></span>
+    <a class="btn" href="add.html">Add compounds</a>
+    <button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Export</button>
+    <button class="btn primary" type="button" disabled title="Needs the backend (not connected in fixture mode)">Report (PDF)</button></div>
+  <div class="toolbar" id="chips" aria-live="polite"></div>
+  <div class="row">
+    <div style="min-width:0">
+      <div class="tablewrap">
+        <table id="ptable">
+          <caption>Value (interval at stated coverage). Click a value to open its uncertainty panel. Click a column name for its model and data page.</caption>
+          <thead id="thead"></thead><tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <section class="viewer-dock" aria-labelledby="dock-h">
+        <div class="viewer-wrap"><h2 id="dock-h" style="margin-top:0">3D view (one shared viewer)</h2>
+          <div class="viewer" id="viewer" aria-label="3D conformer viewer"></div>
+          <p class="caption" id="viewer-cap">Press a 3D button in the table to load that compound.</p></div>
+        <div><h2 style="margin-top:0">2D view</h2><div id="dock2d"></div></div>
+      </section>
+    </div>
+    <aside class="drawer" aria-label="Ranking settings" id="rankpanel">
+      <div><h2>Ranking</h2>
+        <div class="slider"><label for="lam">Uncertainty weight (lambda): <span class="mono" id="lamv">0.25</span></label>
+          <input id="lam" type="range" min="0" max="100" step="1" value="25">
+          <div class="ends"><span>Best properties first</span><span>Least uncertain first</span></div></div>
+        <div class="kv" style="margin-top:6px"><span>Hard limits use</span><span>point estimate (or unfavorable bound, per limit)</span></div></div>
+      <div><h2>Weights (0 to 10)</h2><div class="kv" id="weights"></div></div>
+      <div><h2>Hard limits</h2><div id="limits" class="checks"></div>
+        <p class="legend">Compounds that fail a limit stay in the table, are marked, and rank below compounds that satisfy every limit.</p></div>
+      <div><h2>Score breakdown</h2><p class="legend" id="bd-title"></p>
+        <div class="stack" id="stack" role="img" aria-label="Stacked score breakdown by property"></div>
+        <table id="bd-table" style="margin-top:6px"><thead><tr><th scope="col">Property</th><th scope="col">d</th><th scope="col">c</th><th scope="col">Share of R</th></tr></thead><tbody></tbody></table>
+        <p class="formula" id="formula-text"></p>
+        <p class="formula" id="formula-num"></p></div>
+      <div class="note-box">Both ranks are shown: blended (property-only). The breakdown for the selected row is a per-property stack that sums to its blended score R. d = desirability from the point estimate (scaled over the reference range on each model page); c = confidence.</div>
+    </aside>
+  </div>
+  <div class="foot"><span>Predictions are model estimates, not measurements.</span><span>Coverage and sample size are shown beside every value.</span></div>
+ </div>
+</main>
+<script src="vendor/3Dmol-min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

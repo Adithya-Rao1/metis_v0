@@ -1,0 +1,2039 @@
+{
+ "fixture": true,
+ "fixture_label": "FIXTURE data: illustrative layout content, not model predictions.",
+ "project_name": "Series A analogs",
+ "tier": "free",
+ "ensemble_n": 5,
+ "coverage": 0.9,
+ "endpoints": {
+  "solubility": {
+   "label": "Solubility",
+   "unit": "logS, thermodynamic",
+   "kind": "regression",
+   "higher": true,
+   "range": [
+    -7.0,
+    0.0
+   ],
+   "cal_width": 1.6,
+   "cal_n": 1000,
+   "dataset": "AqSolDB (thermodynamic)",
+   "tdc": "Solubility_AqSolDB",
+   "pos": null
+  },
+  "permeability": {
+   "label": "Permeability",
+   "unit": "Caco-2, log cm/s",
+   "kind": "regression",
+   "higher": true,
+   "range": [
+    -7.0,
+    -4.0
+   ],
+   "cal_width": 1.4,
+   "cal_n": 150,
+   "dataset": "Caco2_Wang",
+   "tdc": "Caco2_Wang",
+   "pos": null
+  },
+  "herg": {
+   "label": "hERG",
+   "unit": "P(blocker)",
+   "kind": "classification",
+   "higher": false,
+   "range": [
+    0,
+    1
+   ],
+   "cal_width": null,
+   "cal_n": 1240,
+   "dataset": "hERG_Karim",
+   "tdc": "hERG_Karim",
+   "pos": [
+    "blocker",
+    "non-blocker"
+   ]
+  },
+  "ames": {
+   "label": "AMES",
+   "unit": "P(mutagenic)",
+   "kind": "classification",
+   "higher": false,
+   "range": [
+    0,
+    1
+   ],
+   "cal_width": null,
+   "cal_n": 1100,
+   "dataset": "AMES",
+   "tdc": "AMES",
+   "pos": [
+    "mutagenic",
+    "non-mutagenic"
+   ]
+  },
+  "ld50": {
+   "label": "LD50",
+   "unit": "rodent, log mmol/kg",
+   "kind": "regression",
+   "higher": true,
+   "range": [
+    0.5,
+    4.0
+   ],
+   "cal_width": 1.5,
+   "cal_n": 1500,
+   "dataset": "LD50_Zhu",
+   "tdc": "LD50_Zhu",
+   "pos": null
+  }
+ },
+ "ranking_default": {
+  "lam": 0.25,
+  "weights": [
+   {
+    "endpoint": "solubility",
+    "weight": 8,
+    "higher_is_better": true
+   },
+   {
+    "endpoint": "permeability",
+    "weight": 5,
+    "higher_is_better": true
+   },
+   {
+    "endpoint": "herg",
+    "weight": 9,
+    "higher_is_better": false
+   },
+   {
+    "endpoint": "ames",
+    "weight": 7,
+    "higher_is_better": false
+   },
+   {
+    "endpoint": "ld50",
+    "weight": 3,
+    "higher_is_better": true
+   }
+  ],
+  "limits": [
+   {
+    "endpoint": "herg",
+    "min": null,
+    "max": 0.3,
+    "use_unfavorable_bound": false
+   },
+   {
+    "endpoint": "ames",
+    "min": null,
+    "max": 0.2,
+    "use_unfavorable_bound": false
+   },
+   {
+    "endpoint": "solubility",
+    "min": -4.5,
+    "max": null,
+    "use_unfavorable_bound": false
+   }
+  ]
+ },
+ "compounds": [
+  {
+   "id": 1,
+   "name": "Compound 1",
+   "smiles": "COCCOc1cc2ncnc(Nc3cccc(C#C)c3)c2cc1OCCOC",
+   "svg": "fixtures/svg/c1.svg",
+   "svg_highlight": "fixtures/svg/c1_hl.svg",
+   "fragment": {
+    "name": "quinazoline core",
+    "smarts": "c1ncnc2ccccc12",
+    "atom_indices": [
+     11,
+     10,
+     9,
+     8,
+     7,
+     6,
+     5,
+     23,
+     22,
+     21
+    ],
+    "training_count": 47,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 52 54  0  0  0  0  0  0  0  0999 V2000\n   -7.2919    2.9982   -0.1136 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.8138    2.4876    1.1238 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8997    1.4025    0.9633 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4777    1.8842    0.6766 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6278    0.7431    0.5783 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2965    0.9516    0.3172 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7046    2.2110    0.1710 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3486    2.3622   -0.0883 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1348    3.5996   -0.2228 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4423    3.7100   -0.4779 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3088    2.7024   -0.5993 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8209    1.4583   -0.4487 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.7047    0.3473   -0.5288 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.0289    0.3059   -1.0229 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4930    1.1693   -2.0226 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7884    1.0520   -2.5357 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.6345    0.0470   -2.0726 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1793   -0.8475   -1.1055 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.0353   -1.8953   -0.6394 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.7533   -2.7746   -0.2480 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8817   -0.7251   -0.5953 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4529    1.2201   -0.1970 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1418   -0.0617   -0.0625 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5066   -0.2020    0.1934 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1601   -1.3970    0.3477 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4468   -2.6163    0.1538 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7652   -3.0725    1.4447 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1074   -4.1823    1.2309 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5831   -5.4204    1.1203 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.0088    3.7957    0.1003 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4754    3.4197   -0.7057 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -7.8044    2.2149   -0.6802 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.2480    0.7057    0.1909 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.8985    0.8364    1.9019 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1535    2.5412    1.4930 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4605    2.4497   -0.2617 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2904    3.1212    0.2567 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8373    4.7133   -0.5947 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6110   -0.2080    0.3158 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.8470    1.9461   -2.4229 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1301    1.7425   -3.3021 H   0  0  0  0  0  0  0  0  0  0  0  0\n    7.6398   -0.0396   -2.4767 H   0  0  0  0  0  0  0  0  0  0  0  0\n    8.3906   -3.5543    0.0987 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5384   -1.4425    0.1462 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4922   -0.9351   -0.1727 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1938   -3.3656   -0.1325 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.7578   -2.5754   -0.6980 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1509   -2.2615    1.8493 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5055   -3.3006    2.2214 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1793   -5.6109    2.0178 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.1591   -6.2172    1.0216 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2205   -5.4336    0.2322 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  9 10  1  0\n 10 11  2  0\n 11 12  1  0\n 12 13  1  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  2  0\n 17 18  1  0\n 18 19  1  0\n 19 20  3  0\n 18 21  2  0\n 12 22  2  0\n 22 23  1  0\n 23 24  2  0\n 24 25  1  0\n 25 26  1  0\n 26 27  1  0\n 27 28  1  0\n 28 29  1  0\n 24  6  1  0\n 22  8  1  0\n 21 14  1  0\n  1 30  1  0\n  1 31  1  0\n  1 32  1  0\n  3 33  1  0\n  3 34  1  0\n  4 35  1  0\n  4 36  1  0\n  7 37  1  0\n 10 38  1  0\n 13 39  1  0\n 15 40  1  0\n 16 41  1  0\n 17 42  1  0\n 20 43  1  0\n 21 44  1  0\n 23 45  1  0\n 26 46  1  0\n 26 47  1  0\n 27 48  1  0\n 27 49  1  0\n 29 50  1  0\n 29 51  1  0\n 29 52  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {},
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -3.9,
+     "interval_high": -2.4,
+     "value": -3.1,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.37,
+      "similarity_to_training": 0.23,
+      "assay_noise": 0.4,
+      "ranges": [
+       [
+        0.3,
+        0.45
+       ],
+       [
+        0.16,
+        0.31
+       ],
+       [
+        0.33,
+        0.48
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.26
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.6,
+     "interval_high": -4.3,
+     "value": -4.9,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.55,
+      "similarity_to_training": 0.36,
+      "assay_noise": 0.09,
+      "ranges": [
+       [
+        0.48,
+        0.63
+       ],
+       [
+        0.29,
+        0.44
+       ],
+       [
+        0.02,
+        0.17
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.22
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.18,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.18,
+     "sample_size": 214,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 214,
+      "observed_fraction_near": 0.14
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.4,
+      "similarity_to_training": 0.35,
+      "assay_noise": 0.25,
+      "ranges": [
+       [
+        0.33,
+        0.48
+       ],
+       [
+        0.28,
+        0.43
+       ],
+       [
+        0.18,
+        0.33
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.41
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.07,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.07,
+     "sample_size": 388,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 388,
+      "observed_fraction_near": 0.04
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.44,
+      "similarity_to_training": 0.24,
+      "assay_noise": 0.32,
+      "ranges": [
+       [
+        0.37,
+        0.52
+       ],
+       [
+        0.17,
+        0.32
+       ],
+       [
+        0.25,
+        0.4
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.39
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 1.9,
+     "interval_high": 3.0,
+     "value": 2.4,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.41,
+      "similarity_to_training": 0.35,
+      "assay_noise": 0.24,
+      "ranges": [
+       [
+        0.34,
+        0.49
+       ],
+       [
+        0.28,
+        0.43
+       ],
+       [
+        0.17,
+        0.32
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.3
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_15",
+     "tanimoto": 0.57,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_05",
+     "tanimoto": 0.19,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_17",
+     "tanimoto": 0.16,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Compound 2",
+   "smiles": "CC(C)NCC(O)COc1cccc2ccccc12",
+   "svg": "fixtures/svg/c2.svg",
+   "svg_highlight": "fixtures/svg/c2_hl.svg",
+   "fragment": {
+    "name": "naphthalene",
+    "smarts": "c1ccc2ccccc2c1",
+    "atom_indices": [
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     9
+    ],
+    "training_count": 64,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 40 41  0  0  0  0  0  0  0  0999 V2000\n   -5.3874   -1.1928    0.2676 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9902    0.2711    0.4617 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.2784    1.0932   -0.7954 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6109    0.4307    0.9475 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5641   -0.0675    0.0369 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.1869    0.1092    0.7081 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2254   -0.5388    1.9897 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0690   -0.4967   -0.1506 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1897   -0.0183    0.3343 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3254   -0.3848   -0.3484 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3378   -1.2799   -1.4236 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5346   -1.5930   -2.0662 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7290   -1.0171   -1.6400 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7477   -0.1223   -0.5612 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9556    0.4532   -0.1313 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.9842    1.3415    0.9435 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8055    1.6654    1.6037 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5978    1.1019    1.1869 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5375    0.2013    0.1005 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1576   -1.7838    1.1609 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.4654   -1.2732    0.0884 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8788   -1.6491   -0.5878 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.6328    0.6675    1.2581 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9940    2.1415   -0.6536 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.3489    1.0712   -1.0276 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7442    0.7079   -1.6700 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4437    1.4229    1.1295 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7202   -1.1343   -0.1553 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5774    0.4711   -0.9160 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9847    1.1709    0.8936 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1338   -0.3819    2.3202 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1982   -0.1782   -1.1918 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0979   -1.5900   -0.0732 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4332   -1.7577   -1.7829 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5372   -2.2905   -2.8999 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.6509   -1.2767   -2.1560 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8895    0.2102   -0.6333 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9264    1.7765    1.2654 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8200    2.3532    2.4448 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6878    1.3662    1.7230 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  6  8  1  0\n  8  9  1  0\n  9 10  1  0\n 10 11  2  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  2  0\n 17 18  1  0\n 18 19  2  0\n 19 10  1  0\n 19 14  1  0\n  1 20  1  0\n  1 21  1  0\n  1 22  1  0\n  2 23  1  0\n  3 24  1  0\n  3 25  1  0\n  3 26  1  0\n  4 27  1  0\n  5 28  1  0\n  5 29  1  0\n  6 30  1  0\n  7 31  1  0\n  8 32  1  0\n  8 33  1  0\n 11 34  1  0\n 12 35  1  0\n 13 36  1  0\n 15 37  1  0\n 16 38  1  0\n 17 39  1  0\n 18 40  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {
+    "solubility": -4.0
+   },
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.9,
+     "interval_high": -3.0,
+     "value": -4.4,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.53,
+      "similarity_to_training": 0.25,
+      "assay_noise": 0.22,
+      "ranges": [
+       [
+        0.46,
+        0.61
+       ],
+       [
+        0.18,
+        0.33
+       ],
+       [
+        0.15,
+        0.3
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.24
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -6.0,
+     "interval_high": -4.5,
+     "value": -5.2,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.36,
+      "similarity_to_training": 0.24,
+      "assay_noise": 0.4,
+      "ranges": [
+       [
+        0.29,
+        0.44
+       ],
+       [
+        0.17,
+        0.32
+       ],
+       [
+        0.33,
+        0.48
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.34
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.21,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.21,
+     "sample_size": 96,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 96,
+      "observed_fraction_near": 0.17
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.37,
+      "similarity_to_training": 0.27,
+      "assay_noise": 0.36,
+      "ranges": [
+       [
+        0.3,
+        0.45
+       ],
+       [
+        0.2,
+        0.35
+       ],
+       [
+        0.29,
+        0.44
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.23
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.12,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.12,
+     "sample_size": 402,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 402,
+      "observed_fraction_near": 0.07
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.51,
+      "similarity_to_training": 0.32,
+      "assay_noise": 0.17,
+      "ranges": [
+       [
+        0.44,
+        0.59
+       ],
+       [
+        0.25,
+        0.4
+       ],
+       [
+        0.1,
+        0.25
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.5
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 1.4,
+     "interval_high": 2.9,
+     "value": 2.1,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.37,
+      "similarity_to_training": 0.24,
+      "assay_noise": 0.39,
+      "ranges": [
+       [
+        0.3,
+        0.45
+       ],
+       [
+        0.17,
+        0.32
+       ],
+       [
+        0.32,
+        0.47
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.43
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_17",
+     "tanimoto": 0.64,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_06",
+     "tanimoto": 0.46,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_05",
+     "tanimoto": 0.45,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Compound 3",
+   "smiles": "Cc1ccc(cc1)S(=O)(=O)Nc1ccc(cc1)N1CCN(C)CC1",
+   "svg": "fixtures/svg/c3.svg",
+   "svg_highlight": "fixtures/svg/c3_hl.svg",
+   "fragment": {
+    "name": "sulfonamide",
+    "smarts": "S(=O)(=O)N",
+    "atom_indices": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "training_count": 12,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 47 49  0  0  0  0  0  0  0  0999 V2000\n    4.1675    3.1575    0.6530 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.9786    1.6790    0.4765 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5953    0.7774    1.3551 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4494   -0.5990    1.1745 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6825   -1.0751    0.1080 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0902   -0.1891   -0.7951 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2387    1.1857   -0.6070 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5075   -2.8295   -0.1299 S   0  0  0  0  0  0  0  0  0  0  0  0\n    4.6647   -3.4659    0.4652 O   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1548   -3.0652   -1.5137 O   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1977   -3.2207    0.8637 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9681   -2.5277    0.6935 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2265   -2.6618   -0.4742 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.9621   -1.9391   -0.6397 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.4290   -1.0573    0.3461 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.6663   -0.9585    1.5231 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5198   -1.6799    1.6996 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6140   -0.3163    0.2244 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4290    1.1503    0.3395 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7933    1.8755    0.4480 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7840    1.5417   -0.5984 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4254    2.1277   -1.8875 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.9049    0.0690   -0.6800 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5698   -0.6983   -0.8361 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2871    3.4120    1.7114 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.0554    3.4891    0.1062 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.2967    3.7090    0.2832 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1993    1.1448    2.1825 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9408   -1.2864    1.8591 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5131   -0.5583   -1.6401 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.7763    1.8714   -1.3142 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4940   -3.4350    1.8139 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5561   -3.3312   -1.2652 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5004   -2.0770   -1.5722 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0107   -0.3275    2.3391 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0769   -1.5620    2.6238 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8751    1.5207   -0.5324 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8490    1.4159    1.2304 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6293    2.9599    0.4755 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2401    1.6211    1.4186 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1905    1.8953   -2.6366 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3885    3.2201   -1.8102 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.4598    1.7830   -2.2704 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.5828   -0.2057   -1.4975 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.3965   -0.2755    0.2397 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1452   -0.4933   -1.8265 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.7910   -1.7710   -0.7737 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  3  4  1  0\n  4  5  2  0\n  5  6  1  0\n  6  7  2  0\n  5  8  1  0\n  8  9  2  0\n  8 10  2  0\n  8 11  1  0\n 11 12  1  0\n 12 13  2  0\n 13 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  2  0\n 15 18  1  0\n 18 19  1  0\n 19 20  1  0\n 20 21  1  0\n 21 22  1  0\n 21 23  1  0\n 23 24  1  0\n  7  2  1  0\n 17 12  1  0\n 24 18  1  0\n  1 25  1  0\n  1 26  1  0\n  1 27  1  0\n  3 28  1  0\n  4 29  1  0\n  6 30  1  0\n  7 31  1  0\n 11 32  1  0\n 13 33  1  0\n 14 34  1  0\n 16 35  1  0\n 17 36  1  0\n 19 37  1  0\n 19 38  1  0\n 20 39  1  0\n 20 40  1  0\n 22 41  1  0\n 22 42  1  0\n 22 43  1  0\n 23 44  1  0\n 23 45  1  0\n 24 46  1  0\n 24 47  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {},
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -3.4,
+     "interval_high": -2.2,
+     "value": -2.8,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.4,
+      "similarity_to_training": 0.3,
+      "assay_noise": 0.3,
+      "ranges": [
+       [
+        0.33,
+        0.48
+       ],
+       [
+        0.23,
+        0.38
+       ],
+       [
+        0.23,
+        0.38
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.49
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -6.2,
+     "interval_high": -4.7,
+     "value": -5.4,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.54,
+      "similarity_to_training": 0.39,
+      "assay_noise": 0.07,
+      "ranges": [
+       [
+        0.47,
+        0.62
+       ],
+       [
+        0.32,
+        0.47
+       ],
+       [
+        0,
+        0.15
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.44
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 10,
+     "coverage": 0.9,
+     "probability": 0.72,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.72,
+     "sample_size": 151,
+     "method_note": "Ensemble mean of 10 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 151,
+      "observed_fraction_near": 0.74
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.46,
+      "similarity_to_training": 0.38,
+      "assay_noise": 0.16,
+      "ranges": [
+       [
+        0.38,
+        0.55
+       ],
+       [
+        0.33,
+        0.43
+       ],
+       [
+        0.12,
+        0.2
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.38
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.05,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.05,
+     "sample_size": 310,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 310,
+      "observed_fraction_near": 0.01
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.38,
+      "similarity_to_training": 0.3,
+      "assay_noise": 0.32,
+      "ranges": [
+       [
+        0.31,
+        0.46
+       ],
+       [
+        0.23,
+        0.38
+       ],
+       [
+        0.25,
+        0.4
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.41
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 2.0,
+     "interval_high": 3.2,
+     "value": 2.6,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.45,
+      "similarity_to_training": 0.32,
+      "assay_noise": 0.23,
+      "ranges": [
+       [
+        0.38,
+        0.53
+       ],
+       [
+        0.25,
+        0.4
+       ],
+       [
+        0.16,
+        0.31
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.48
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_09",
+     "tanimoto": 0.31,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_08",
+     "tanimoto": 0.29,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_19",
+     "tanimoto": 0.23,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Compound 4",
+   "smiles": "OC1(CCN(CCCC(=O)c2ccc(F)cc2)CC1)c1ccc(Cl)cc1",
+   "svg": "fixtures/svg/c4.svg",
+   "svg_highlight": "fixtures/svg/c4_hl.svg",
+   "fragment": {
+    "name": "4-fluorophenyl ketone",
+    "smarts": "O=C(CC)c1ccc(F)cc1",
+    "atom_indices": [
+     9,
+     8,
+     7,
+     6,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16
+    ],
+    "training_count": 98,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 49 51  0  0  0  0  0  0  0  0999 V2000\n   -2.5703   -2.1834   -0.6110 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6211   -0.7787   -0.3030 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0544   -0.6150    1.1209 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5635   -0.9609    1.1882 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2671   -0.2049    0.2411 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4257    1.2203    0.5704 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2797    1.4699    1.8248 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6598    0.8076    1.7732 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5413    1.3798    0.6761 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3762    2.5146    0.2301 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.6674    0.5526    0.1481 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2793    0.9506   -1.0516 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.3387    0.2121   -1.5830 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.7871   -0.9188   -0.9125 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8035   -1.6279   -1.4196 F   0  0  0  0  0  0  0  0  0  0  0  0\n    6.1986   -1.3233    0.2806 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.1377   -0.5867    0.8162 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2399   -0.4010   -1.1256 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7161   -0.0352   -1.3038 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.0828   -0.3431   -0.4721 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.8107    0.3214    0.5286 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.1445    0.6953    0.3236 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.7718    0.4082   -0.8845 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -8.4105    0.8684   -1.1303 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n   -6.0783   -0.2522   -1.8914 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.7470   -0.6244   -1.6850 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3880   -2.5862   -0.2694 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.1903    0.4108    1.4821 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5890   -1.2753    1.8162 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4310   -2.0320    0.9860 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.2037   -0.8271    2.2141 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9141    1.7291   -0.2697 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.5421    1.7189    0.6967 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3953    2.5534    1.9540 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7492    1.1156    2.7160 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.5387   -0.2714    1.6390 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.1729    0.9769    2.7268 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.9301    1.8378   -1.5773 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.8137    0.5135   -2.5112 H   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5714   -2.2081    0.7876 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.7046   -0.9155    1.7562 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0905   -1.4525   -1.4039 H   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3683    0.1692   -1.8389 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9921   -0.2870   -2.3355 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8461    1.0495   -1.1984 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.3661    0.5668    1.4892 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.6854    1.2110    1.1131 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -6.5622   -0.4820   -2.8368 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2229   -1.1475   -2.4846 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  1  0\n  4  5  1  0\n  5  6  1  0\n  6  7  1  0\n  7  8  1  0\n  8  9  1  0\n  9 10  2  0\n  9 11  1  0\n 11 12  2  0\n 12 13  1  0\n 13 14  2  0\n 14 15  1  0\n 14 16  1  0\n 16 17  2  0\n  5 18  1  0\n 18 19  1  0\n  2 20  1  0\n 20 21  2  0\n 21 22  1  0\n 22 23  2  0\n 23 24  1  0\n 23 25  1  0\n 25 26  2  0\n 19  2  1  0\n 26 20  1  0\n 17 11  1  0\n  1 27  1  0\n  3 28  1  0\n  3 29  1  0\n  4 30  1  0\n  4 31  1  0\n  6 32  1  0\n  6 33  1  0\n  7 34  1  0\n  7 35  1  0\n  8 36  1  0\n  8 37  1  0\n 12 38  1  0\n 13 39  1  0\n 16 40  1  0\n 17 41  1  0\n 18 42  1  0\n 18 43  1  0\n 19 44  1  0\n 19 45  1  0\n 21 46  1  0\n 22 47  1  0\n 25 48  1  0\n 26 49  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {},
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -4.4,
+     "interval_high": -2.9,
+     "value": -3.6,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.38,
+      "similarity_to_training": 0.33,
+      "assay_noise": 0.29,
+      "ranges": [
+       [
+        0.31,
+        0.46
+       ],
+       [
+        0.26,
+        0.41
+       ],
+       [
+        0.22,
+        0.37
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.47
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.5,
+     "interval_high": -4.0,
+     "value": -4.7,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.51,
+      "similarity_to_training": 0.24,
+      "assay_noise": 0.25,
+      "ranges": [
+       [
+        0.44,
+        0.59
+       ],
+       [
+        0.17,
+        0.32
+       ],
+       [
+        0.18,
+        0.33
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.48
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.64,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.64,
+     "sample_size": 180,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 180,
+      "observed_fraction_near": 0.68
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.44,
+      "similarity_to_training": 0.39,
+      "assay_noise": 0.17,
+      "ranges": [
+       [
+        0.37,
+        0.52
+       ],
+       [
+        0.32,
+        0.47
+       ],
+       [
+        0.1,
+        0.25
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.28
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.09,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.09,
+     "sample_size": 350,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 350,
+      "observed_fraction_near": 0.1
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.53,
+      "similarity_to_training": 0.33,
+      "assay_noise": 0.14,
+      "ranges": [
+       [
+        0.46,
+        0.61
+       ],
+       [
+        0.26,
+        0.41
+       ],
+       [
+        0.07,
+        0.22
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.42
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 1.6,
+     "interval_high": 2.9,
+     "value": 2.2,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.53,
+      "similarity_to_training": 0.34,
+      "assay_noise": 0.13,
+      "ranges": [
+       [
+        0.46,
+        0.61
+       ],
+       [
+        0.27,
+        0.42
+       ],
+       [
+        0.06,
+        0.21
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.37
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_18",
+     "tanimoto": 0.16,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_10",
+     "tanimoto": 0.16,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_06",
+     "tanimoto": 0.13,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Compound 5",
+   "smiles": "CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21",
+   "svg": "fixtures/svg/c5.svg",
+   "svg_highlight": "fixtures/svg/c5_hl.svg",
+   "fragment": {
+    "name": "aryl ketimine",
+    "smarts": "c-C=N",
+    "atom_indices": [
+     7,
+     6,
+     5
+    ],
+    "training_count": 115,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 33 35  0  0  0  0  0  0  0  0999 V2000\n    3.5089   -0.3881   -1.1753 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4068   -0.6617   -0.2624 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1851   -2.0053    0.0654 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.8279   -2.9244   -0.4512 O   0  0  0  0  0  0  0  0  0  0  0  0\n    1.1694   -2.2965    1.1615 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1722   -2.0119    0.6637 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.4971   -0.7778    0.4725 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8564   -0.5071   -0.0971 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9207   -1.3447    0.2578 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.1965   -1.1140   -0.2591 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.4111   -0.0540   -1.1393 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.3503    0.7717   -1.5116 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.0719    0.5446   -0.9972 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3920    0.3781    0.7896 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1885    1.4583    1.4809 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5450    2.6160    1.7101 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.1747    3.9376    2.5404 Cl  0  0  0  0  0  0  0  0  0  0  0  0\n    1.8543    2.7121    1.2592 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4425    1.6306    0.5949 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7369    0.4323    0.3708 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3068    0.5134   -1.7624 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.4312   -0.2721   -0.5975 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6469   -1.2135   -1.8808 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2294   -3.3633    1.4045 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.4133   -1.7569    2.0836 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7583   -2.1795    0.9361 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0201   -1.7663    0.0202 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4046    0.1212   -1.5449 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5182    1.5869   -2.2112 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2551    1.1828   -1.3222 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2168    1.3999    1.8320 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.4326    3.6166    1.4331 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.4834    1.7354    0.2978 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  3  5  1  0\n  5  6  1  0\n  6  7  2  0\n  7  8  1  0\n  8  9  2  0\n  9 10  1  0\n 10 11  2  0\n 11 12  1  0\n 12 13  2  0\n  7 14  1  0\n 14 15  2  0\n 15 16  1  0\n 16 17  1  0\n 16 18  2  0\n 18 19  1  0\n 19 20  2  0\n 20  2  1  0\n 13  8  1  0\n 20 14  1  0\n  1 21  1  0\n  1 22  1  0\n  1 23  1  0\n  5 24  1  0\n  5 25  1  0\n  9 26  1  0\n 10 27  1  0\n 11 28  1  0\n 12 29  1  0\n 13 30  1  0\n 15 31  1  0\n 18 32  1  0\n 19 33  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {
+    "solubility": -2.4
+   },
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -2.8,
+     "interval_high": -1.7,
+     "value": -2.2,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.43,
+      "similarity_to_training": 0.25,
+      "assay_noise": 0.32,
+      "ranges": [
+       [
+        0.36,
+        0.51
+       ],
+       [
+        0.18,
+        0.33
+       ],
+       [
+        0.25,
+        0.4
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.22
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.0,
+     "interval_high": -3.8,
+     "value": -4.4,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.48,
+      "similarity_to_training": 0.31,
+      "assay_noise": 0.21,
+      "ranges": [
+       [
+        0.41,
+        0.56
+       ],
+       [
+        0.24,
+        0.39
+       ],
+       [
+        0.14,
+        0.29
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.23
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.22,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.22,
+     "sample_size": 240,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 240,
+      "observed_fraction_near": 0.25
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.37,
+      "similarity_to_training": 0.34,
+      "assay_noise": 0.29,
+      "ranges": [
+       [
+        0.3,
+        0.45
+       ],
+       [
+        0.27,
+        0.42
+       ],
+       [
+        0.22,
+        0.37
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.38
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.15,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.15,
+     "sample_size": 290,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 290,
+      "observed_fraction_near": 0.14
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.49,
+      "similarity_to_training": 0.21,
+      "assay_noise": 0.3,
+      "ranges": [
+       [
+        0.42,
+        0.57
+       ],
+       [
+        0.14,
+        0.29
+       ],
+       [
+        0.23,
+        0.38
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.3
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 2.3,
+     "interval_high": 3.5,
+     "value": 2.9,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.46,
+      "similarity_to_training": 0.26,
+      "assay_noise": 0.28,
+      "ranges": [
+       [
+        0.39,
+        0.54
+       ],
+       [
+        0.19,
+        0.34
+       ],
+       [
+        0.21,
+        0.36
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.45
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_10",
+     "tanimoto": 0.27,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_11",
+     "tanimoto": 0.2,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_12",
+     "tanimoto": 0.15,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Compound 6",
+   "smiles": "Cc1ccc(cc1)-c1cc(nn1-c1ccc(cc1)S(N)(=O)=O)C(F)(F)F",
+   "svg": "fixtures/svg/c6.svg",
+   "svg_highlight": "fixtures/svg/c6_hl.svg",
+   "fragment": {
+    "name": "sulfonamide",
+    "smarts": "S(N)(=O)=O",
+    "atom_indices": [
+     18,
+     19,
+     20,
+     21
+    ],
+    "training_count": 132,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 40 42  0  0  0  0  0  0  0  0999 V2000\n   -4.4432   -2.9900   -0.4190 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5459   -1.7959   -0.2763 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.5797   -1.0198    0.8881 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7685    0.1112    1.0097 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9103    0.4802   -0.0319 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.8989   -0.2764   -1.2097 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7114   -1.4066   -1.3302 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0735    1.6686    0.0918 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5095    2.9802    0.1335 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3526    3.7849    0.0881 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.7502    3.0216    0.0279 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.3209    1.7291    0.1187 N   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3046    0.6921    0.2319 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.6563    1.0120   -0.0068 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6549    0.0392    0.0963 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3059   -1.2653    0.4413 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9769   -1.5960    0.7108 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.9800   -0.6182    0.6085 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5611   -2.5089    0.5865 S   0  0  0  0  0  0  0  0  0  0  0  0\n    4.5458   -3.1814   -0.9578 N   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1040   -3.5153    1.5143 O   0  0  0  0  0  0  0  0  0  0  0  0\n    5.8434   -1.8560    0.7139 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3037    5.2892    0.0708 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.5489    5.8349    0.1622 F   0  0  0  0  0  0  0  0  0  0  0  0\n    0.4137    5.7987    1.1067 F   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2442    5.7774   -1.0736 F   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.6211   -3.4630    0.5525 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.9880   -3.7449   -1.0688 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.4038   -2.6872   -0.8468 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.2406   -1.2905    1.7091 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8092    0.6967    1.9256 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2631    0.0102   -2.0446 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6921   -1.9793   -2.2550 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.5395    3.3144    0.1396 H   0  0  0  0  0  0  0  0  0  0  0  0\n    2.9521    2.0254   -0.2782 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.6921    0.3136   -0.0859 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.7079   -2.6061    1.0171 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0278   -0.9182    0.8728 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7687   -2.8566   -1.5314 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.4487   -3.0042   -1.4017 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  2  0\n  3  4  1  0\n  4  5  2  0\n  5  6  1  0\n  6  7  2  0\n  5  8  1  0\n  8  9  2  0\n  9 10  1  0\n 10 11  2  0\n 11 12  1  0\n 12 13  1  0\n 13 14  2  0\n 14 15  1  0\n 15 16  2  0\n 16 17  1  0\n 17 18  2  0\n 16 19  1  0\n 19 20  1  0\n 19 21  2  0\n 19 22  2  0\n 10 23  1  0\n 23 24  1  0\n 23 25  1  0\n 23 26  1  0\n  7  2  1  0\n 12  8  1  0\n 18 13  1  0\n  1 27  1  0\n  1 28  1  0\n  1 29  1  0\n  3 30  1  0\n  4 31  1  0\n  6 32  1  0\n  7 33  1  0\n  9 34  1  0\n 14 35  1  0\n 15 36  1  0\n 17 37  1  0\n 18 38  1  0\n 20 39  1  0\n 20 40  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {},
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.2,
+     "interval_high": -3.0,
+     "value": -4.1,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.54,
+      "similarity_to_training": 0.27,
+      "assay_noise": 0.19,
+      "ranges": [
+       [
+        0.47,
+        0.62
+       ],
+       [
+        0.2,
+        0.35
+       ],
+       [
+        0.12,
+        0.27
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.35
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.8,
+     "interval_high": -4.2,
+     "value": -5.0,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.41,
+      "similarity_to_training": 0.25,
+      "assay_noise": 0.34,
+      "ranges": [
+       [
+        0.34,
+        0.49
+       ],
+       [
+        0.18,
+        0.33
+       ],
+       [
+        0.27,
+        0.42
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.49
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.26,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.26,
+     "sample_size": 120,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 120,
+      "observed_fraction_near": 0.29
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.42,
+      "similarity_to_training": 0.35,
+      "assay_noise": 0.23,
+      "ranges": [
+       [
+        0.35,
+        0.5
+       ],
+       [
+        0.28,
+        0.43
+       ],
+       [
+        0.16,
+        0.31
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.36
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.1,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.1,
+     "sample_size": 260,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 260,
+      "observed_fraction_near": 0.13
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.53,
+      "similarity_to_training": 0.25,
+      "assay_noise": 0.22,
+      "ranges": [
+       [
+        0.46,
+        0.61
+       ],
+       [
+        0.18,
+        0.33
+       ],
+       [
+        0.15,
+        0.3
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.25
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 1.3,
+     "interval_high": 2.8,
+     "value": 2.0,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.43,
+      "similarity_to_training": 0.38,
+      "assay_noise": 0.19,
+      "ranges": [
+       [
+        0.36,
+        0.51
+       ],
+       [
+        0.31,
+        0.46
+       ],
+       [
+        0.12,
+        0.27
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.4
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_08",
+     "tanimoto": 0.22,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_09",
+     "tanimoto": 0.22,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_19",
+     "tanimoto": 0.19,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Compound 7",
+   "smiles": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+   "svg": "fixtures/svg/c7.svg",
+   "svg_highlight": "fixtures/svg/c7_hl.svg",
+   "fragment": {
+    "name": "carboxylic acid",
+    "smarts": "C(=O)[OH]",
+    "atom_indices": [
+     12,
+     13,
+     14
+    ],
+    "training_count": 149,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 33 33  0  0  0  0  0  0  0  0999 V2000\n   -4.5390    1.0620   -0.1130 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1252    0.6659    0.3196 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.2016   -0.3582    1.4549 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.3402    0.1275   -0.8927 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.8711   -0.0907   -0.6203 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3541   -1.3847   -0.4930 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.0044   -1.5854   -0.2345 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.8775   -0.4964   -0.1024 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3546    0.7990   -0.2251 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.0037    0.9991   -0.4836 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3486   -0.7348    0.1867 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2652   -0.1030   -0.8645 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.7155   -0.3202    1.6003 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.6196   -1.0204    2.5975 O   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1375    0.9549    1.7183 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.0915    0.2007   -0.5038 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -4.5062    1.8278   -0.8952 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -5.1038    1.4726    0.7308 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.6304    1.5659    0.7063 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.8015    0.0287    2.2857 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.6590   -1.2939    1.1159 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2076   -0.5885    1.8510 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.4218    0.8328   -1.7307 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7964   -0.8057   -1.2486 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0075   -2.2492   -0.5874 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.3727   -2.6042   -0.1330 H   0  0  0  0  0  0  0  0  0  0  0  0\n    1.9992    1.6689   -0.1153 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -0.3818    2.0149   -0.5756 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.5492   -1.8146    0.1424 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1667    0.9871   -0.9058 H   0  0  0  0  0  0  0  0  0  0  0  0\n    5.3149   -0.3260   -0.6432 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.0389   -0.4937   -1.8629 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.2779    1.0621    2.6827 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  2  4  1  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  2  0\n  8  9  1  0\n  9 10  2  0\n  8 11  1  0\n 11 12  1  0\n 11 13  1  0\n 13 14  2  0\n 13 15  1  0\n 10  5  1  0\n  1 16  1  0\n  1 17  1  0\n  1 18  1  0\n  2 19  1  0\n  3 20  1  0\n  3 21  1  0\n  3 22  1  0\n  4 23  1  0\n  4 24  1  0\n  6 25  1  0\n  7 26  1  0\n  9 27  1  0\n 10 28  1  0\n 11 29  1  0\n 12 30  1  0\n 12 31  1  0\n 12 32  1  0\n 15 33  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {},
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -4.7,
+     "interval_high": -3.1,
+     "value": -3.9,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.35,
+      "similarity_to_training": 0.24,
+      "assay_noise": 0.41,
+      "ranges": [
+       [
+        0.28,
+        0.43
+       ],
+       [
+        0.17,
+        0.32
+       ],
+       [
+        0.34,
+        0.49
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.49
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -5.3,
+     "interval_high": -3.9,
+     "value": -4.6,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.54,
+      "similarity_to_training": 0.35,
+      "assay_noise": 0.11,
+      "ranges": [
+       [
+        0.47,
+        0.62
+       ],
+       [
+        0.28,
+        0.43
+       ],
+       [
+        0.04,
+        0.19
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.38
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.12,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.12,
+     "sample_size": 260,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 260,
+      "observed_fraction_near": 0.14
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.51,
+      "similarity_to_training": 0.25,
+      "assay_noise": 0.24,
+      "ranges": [
+       [
+        0.44,
+        0.59
+       ],
+       [
+        0.18,
+        0.33
+       ],
+       [
+        0.17,
+        0.32
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.5
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.04,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.04,
+     "sample_size": 420,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 420,
+      "observed_fraction_near": 0.03
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.43,
+      "similarity_to_training": 0.24,
+      "assay_noise": 0.33,
+      "ranges": [
+       [
+        0.36,
+        0.51
+       ],
+       [
+        0.17,
+        0.32
+       ],
+       [
+        0.26,
+        0.41
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.49
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 2.1,
+     "interval_high": 3.3,
+     "value": 2.7,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.51,
+      "similarity_to_training": 0.28,
+      "assay_noise": 0.21,
+      "ranges": [
+       [
+        0.44,
+        0.59
+       ],
+       [
+        0.21,
+        0.36
+       ],
+       [
+        0.14,
+        0.29
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.38
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_03",
+     "tanimoto": 0.42,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_16",
+     "tanimoto": 0.25,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_07",
+     "tanimoto": 0.22,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Compound 8",
+   "smiles": "Cn1cnc2c1c(=O)n(C)c(=O)n2C",
+   "svg": "fixtures/svg/c8.svg",
+   "svg_highlight": "fixtures/svg/c8_hl.svg",
+   "fragment": {
+    "name": "N,N-dimethyl uracil-like ring",
+    "smarts": "c(=O)n(C)c(=O)",
+    "atom_indices": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "training_count": 166,
+    "training_total": 8400
+   },
+   "conformer": {
+    "molblock": "\n     RDKit          3D\n\n 24 25  0  0  0  0  0  0  0  0999 V2000\n    3.1748   -1.0111    0.0721 C   0  0  0  0  0  0  0  0  0  0  0  0\n    2.1584    0.0102    0.0740 N   0  0  0  0  0  0  0  0  0  0  0  0\n    2.3703    1.3625    0.1298 C   0  0  0  0  0  0  0  0  0  0  0  0\n    1.2354    2.0334    0.1151 N   0  0  0  0  0  0  0  0  0  0  0  0\n    0.2737    1.0710    0.0478 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.8076   -0.1814    0.0211 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.0203   -1.3625   -0.0482 C   0  0  0  0  0  0  0  0  0  0  0  0\n    0.5117   -2.4871   -0.0717 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.3516   -1.0968   -0.0855 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.2638   -2.2214   -0.1569 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.9425    0.1841   -0.0597 C   0  0  0  0  0  0  0  0  0  0  0  0\n   -3.1695    0.3173   -0.0968 O   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.0833    1.2813    0.0090 N   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.6109    2.6332    0.0395 C   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0874   -1.5874   -0.8522 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.0261   -1.6519    0.9447 H   0  0  0  0  0  0  0  0  0  0  0  0\n    4.1615   -0.5435    0.1225 H   0  0  0  0  0  0  0  0  0  0  0  0\n    3.3588    1.8018    0.1793 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.8710   -2.1297   -1.0635 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.7455   -3.1832   -0.1738 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.9316   -2.1934    0.7104 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2870    3.1224    0.9636 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -2.7033    2.6457    0.0026 H   0  0  0  0  0  0  0  0  0  0  0  0\n   -1.2260    3.1865   -0.8231 H   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0\n  2  3  1  0\n  3  4  2  0\n  4  5  1  0\n  5  6  2  0\n  6  7  1  0\n  7  8  2  0\n  7  9  1  0\n  9 10  1  0\n  9 11  1  0\n 11 12  2  0\n 11 13  1  0\n 13 14  1  0\n  6  2  1  0\n 13  5  1  0\n  1 15  1  0\n  1 16  1  0\n  1 17  1  0\n  3 18  1  0\n 10 19  1  0\n 10 20  1  0\n 10 21  1  0\n 14 22  1  0\n 14 23  1  0\n 14 24  1  0\nM  END\n",
+    "method": "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens",
+    "label": "computed conformer, not an experimental structure"
+   },
+   "measured": {},
+   "predictions": {
+    "solubility": {
+     "endpoint": "solubility",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -1.5,
+     "interval_high": -0.1,
+     "value": -0.8,
+     "sample_size": 1000,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1000), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1000,
+      "median_width": 1.6
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.47,
+      "similarity_to_training": 0.31,
+      "assay_noise": 0.22,
+      "ranges": [
+       [
+        0.4,
+        0.55
+       ],
+       [
+        0.24,
+        0.39
+       ],
+       [
+        0.15,
+        0.3
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.4
+    },
+    "permeability": {
+     "endpoint": "permeability",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": -6.4,
+     "interval_high": -4.4,
+     "value": -5.3,
+     "sample_size": 150,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=150), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 150,
+      "median_width": 1.4
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.38,
+      "similarity_to_training": 0.31,
+      "assay_noise": 0.31,
+      "ranges": [
+       [
+        0.31,
+        0.46
+       ],
+       [
+        0.24,
+        0.39
+       ],
+       [
+        0.24,
+        0.39
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.22
+    },
+    "herg": {
+     "endpoint": "herg",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.08,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.08,
+     "sample_size": 300,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1240). FIXTURE values.",
+     "calibration": {
+      "set_n": 1240,
+      "n_near": 300,
+      "observed_fraction_near": 0.12
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.49,
+      "similarity_to_training": 0.39,
+      "assay_noise": 0.12,
+      "ranges": [
+       [
+        0.42,
+        0.57
+       ],
+       [
+        0.32,
+        0.47
+       ],
+       [
+        0.05,
+        0.2
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.5
+    },
+    "ames": {
+     "endpoint": "ames",
+     "kind": "classification",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": 0.03,
+     "interval_low": null,
+     "interval_high": null,
+     "value": 0.03,
+     "sample_size": 440,
+     "method_note": "Ensemble mean of 5 Chemprop models, isotonic recalibration on a scaffold-split calibration set (n=1100). FIXTURE values.",
+     "calibration": {
+      "set_n": 1100,
+      "n_near": 440,
+      "observed_fraction_near": 0.03
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.45,
+      "similarity_to_training": 0.26,
+      "assay_noise": 0.29,
+      "ranges": [
+       [
+        0.38,
+        0.53
+       ],
+       [
+        0.19,
+        0.34
+       ],
+       [
+        0.22,
+        0.37
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.25
+    },
+    "ld50": {
+     "endpoint": "ld50",
+     "kind": "regression",
+     "model_version_id": "00000000-0000-4000-8000-000000000001",
+     "ensemble_n": 5,
+     "coverage": 0.9,
+     "probability": null,
+     "interval_low": 1.5,
+     "interval_high": 3.1,
+     "value": 2.3,
+     "sample_size": 1500,
+     "method_note": "Ensemble of 5 Chemprop models; split conformal interval from a scaffold-split calibration set (n=1500), width scaled by similarity to training. FIXTURE values.",
+     "calibration": {
+      "set_n": 1500,
+      "median_width": 1.5
+     },
+     "breakdown": {
+      "ensemble_disagreement": 0.45,
+      "similarity_to_training": 0.36,
+      "assay_noise": 0.19,
+      "ranges": [
+       [
+        0.38,
+        0.53
+       ],
+       [
+        0.29,
+        0.44
+       ],
+       [
+        0.12,
+        0.27
+       ]
+      ]
+     },
+     "fragment_share_of_disagreement": 0.39
+    }
+   },
+   "nearest": [
+    {
+     "train_id": "train_13",
+     "tanimoto": 0.46,
+     "measured_herg_positive": false,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_19",
+     "tanimoto": 0.14,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    },
+    {
+     "train_id": "train_20",
+     "tanimoto": 0.1,
+     "measured_herg_positive": true,
+     "measured_ames_positive": false
+    }
+   ]
+  }
+ ],
+ "conformer_label": "computed conformer, not an experimental structure"
+}
