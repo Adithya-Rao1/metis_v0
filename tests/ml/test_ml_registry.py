@@ -96,7 +96,9 @@ def test_manifest_records_provenance(pub):
 def test_time_estimate_formula(pub):
     reg = FileModelRegistry(pub["root"])
     t = [reg.time_estimate_seconds("synreg", n, 10) for n in (3, 5, 10, 20)]
-    assert all(x > 0 for x in t) and t[0] < t[-1]
+    assert all(x > 0 for x in t)  # per-N cost is measured, so ordering across N is not asserted (timing noise)
+    rt = json.loads((pub['root'] / 'manifest.json').read_text())['models']['synreg']['runtime']
+    assert t[1] == pytest.approx(rt['fixed_overhead_seconds'] + 10 * rt['seconds_per_compound_by_n']['5'])
     assert reg.time_estimate_seconds("synreg", 5, 10) > reg.time_estimate_seconds("synreg", 5, 1)
     with pytest.raises(ValueError):
         reg.time_estimate_seconds("synreg", 4, 3)
