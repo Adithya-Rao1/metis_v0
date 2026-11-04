@@ -9,32 +9,28 @@
 <body>
 <main>
  <div class="screen-head"><h1>Export and report</h1>
-  <p class="muted">Static preview of what Export (CSV, SDF) and Report (PDF) will contain. Built from fixture data. Nothing is generated or downloaded in this build.</p>
-  <p class="legend"><a href="app.html">Back to project table</a></p></div>
- <div class="frame">
+  <p class="muted">Download this project as CSV, SDF or a PDF report. Every format carries the disclaimer.</p>
+  <p class="legend"><a id="back" href="app.html">Back to the project table</a></p></div>
+ <div id="page-state"></div>
+ <div class="frame" id="export-frame" hidden>
   <div class="report">
-    <p class="draft-note" role="note" data-testid="fixture-report-note"><strong>FIXTURE preview.</strong> Every value below is illustrative layout content from the fixture project, not a model result.</p>
-    <section aria-labelledby="x-h"><h2 id="x-h">Export</h2>
+    <section aria-labelledby="x-h"><h2 id="x-h">Export: <span id="xname"></span></h2>
       <div class="rgrid">
         <div class="rcard" data-format="csv"><span class="t">CSV</span><span class="n">Table of predictions</span>
-          <span class="legend" id="csv-note"></span></div>
+          <span class="legend">One row per compound. Columns per property: value or calibrated probability, interval, coverage, ensemble size N and sample size, with the disclaimer.</span></div>
         <div class="rcard" data-format="sdf"><span class="t">SDF</span><span class="n">Structures with properties</span>
-          <span class="legend" id="sdf-note"></span></div>
+          <span class="legend">One record per compound with the same values as SD properties. Coordinates are a computed conformer (method written into each record), not an experimental structure.</span></div>
+        <div class="rcard" data-format="pdf"><span class="t">PDF</span><span class="n">Report</span>
+          <span class="legend">Every compound with its properties, intervals or calibrated probabilities, N and sample size, and the disclaimer.</span></div>
       </div>
-      <p class="mt8"><button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Download CSV</button>
-        <button class="btn" type="button" disabled title="Needs the backend (not connected in fixture mode)">Download SDF</button></p>
-      <div class="tablewrap"><table id="csv-prev"><caption>CSV preview: the first rows and columns that the file will contain.</caption><thead></thead><tbody></tbody></table></div>
+      <p class="mt8"><button class="btn" type="button" data-dl="csv">Download CSV</button>
+        <button class="btn" type="button" data-dl="sdf">Download SDF</button>
+        <button class="btn primary" type="button" data-dl="pdf">Download PDF report</button></p>
+      <p class="legend" id="dl-msg" role="status" aria-live="polite"></p>
     </section>
-    <section aria-labelledby="r-h"><h2 id="r-h">Report (PDF)</h2>
-      <p>The PDF has one page per compound: 2D structure, 3D conformer image labeled as computed, every property with its interval or calibrated probability, N and sample size, the ranking breakdown, and the disclaimer on every page.</p>
-      <div class="note-box" id="report-page" data-testid="report-page">
-        <h3 class="mt0">Page preview (fixture)</h3>
-        <div class="molcell"><img class="mol" id="rp-img" alt="2D structure of the preview compound" src="fixtures/svg/c3.svg"><span id="rp-title" class="chip"></span></div>
-        <ul id="rp-list" class="loglist"></ul>
-        <p class="legend" id="rp-conf"></p>
-        <p class="legend" data-testid="report-disclaimer-foot" id="rp-foot"></p>
-      </div>
-      <p class="mt8"><button class="btn primary" type="button" disabled title="Needs the backend (not connected in fixture mode)">Generate PDF</button></p>
+    <section aria-labelledby="pv-h"><h2 id="pv-h">CSV preview</h2>
+      <div id="preview-state"></div>
+      <div class="tablewrap" id="preview-wrap" hidden><table id="csv-prev"><caption>The first rows of the CSV file, exactly as downloaded.</caption><thead></thead><tbody></tbody></table></div>
     </section>
   </div>
  </div>

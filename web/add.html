@@ -8,11 +8,14 @@
 </head>
 <body>
 <main>
- <div class="screen-head"><h1>Add compounds</h1>
-  <p class="muted" data-testid="cap-note">Up to 10 compounds per submission. All input paths are available.</p></div>
- <div class="frame">
+ <div class="screen-head"><h1>Add compounds and predict</h1>
+  <p class="muted" data-testid="cap-note">Up to 10 compounds per project. Every input path is parsed on the server; a problem is reported per record and nothing is silently fixed.</p>
+  <p class="legend"><a id="back" href="app.html">Back to the project</a></p></div>
+ <div id="page-state"></div>
+ <div class="frame" id="add-frame" hidden>
   <div class="tabs" role="tablist" aria-label="Input method">
     <button class="tab" role="tab" id="t-paste" aria-controls="p-paste" aria-selected="true" type="button">Paste SMILES</button>
+    <button class="tab" role="tab" id="t-mol" aria-controls="p-mol" aria-selected="false" tabindex="-1" type="button">Paste molfile or SDF</button>
     <button class="tab" role="tab" id="t-upload" aria-controls="p-upload" aria-selected="false" tabindex="-1" type="button">Upload CSV or SDF</button>
     <button class="tab" role="tab" id="t-draw" aria-controls="p-draw" aria-selected="false" tabindex="-1" type="button">Draw structure</button>
   </div>
@@ -20,38 +23,50 @@
     <div>
       <section id="p-paste" role="tabpanel" aria-labelledby="t-paste">
         <label for="smi" class="muted">One SMILES per line, optional name after a space</label>
-        <textarea id="smi" spellcheck="false" placeholder="CC(=O)Oc1ccccc1C(=O)O aspirin">CC(=O)Oc1ccccc1C(=O)O aspirin
-CC(C)Cc1ccc(cc1)C(C)C(=O)O ibuprofen
-Cn1cnc2c1c(=O)n(C)c(=O)n2C caffeine</textarea>
+        <textarea id="smi" spellcheck="false" placeholder="CC(=O)Oc1ccccc1C(=O)O aspirin"></textarea>
+      </section>
+      <section id="p-mol" role="tabpanel" aria-labelledby="t-mol" hidden>
+        <label for="molblock" class="muted">A single molfile (V2000 or V3000), or several records in SDF format</label>
+        <textarea id="molblock" spellcheck="false" placeholder="Paste a molfile or SDF here"></textarea>
       </section>
       <section id="p-upload" role="tabpanel" aria-labelledby="t-upload" hidden>
-        <label for="file" class="muted">CSV with a SMILES column, or an SDF file (at most 10 structures are used)</label><br>
-        <input id="file" type="file" accept=".csv,.sdf">
-        <p class="legend" id="file-note" role="status">Files are parsed on the server in a sandbox. This static build only reads the file name and size.</p>
+        <label for="file" class="muted">CSV with a header row and a smiles column (an optional name column is used as the label), or an SDF file. At most 10 structures.</label><br>
+        <input id="file" type="file" accept=".csv,.sdf,.sd">
+        <p class="legend" id="file-note" role="status"></p>
       </section>
       <section id="p-draw" role="tabpanel" aria-labelledby="t-draw" hidden>
-        <div class="note-box mb8">The free-hand structure editor is not part of this static build (handoff to wiring). Pick a fixture structure to see the live 2D and 3D preview that the editor will drive.</div>
-        <label for="tpl">Fixture structure <select id="tpl"></select></label>
-        <div class="pair mt8"><div><div id="draw2d"></div></div>
-          <div class="viewer-wrap"><div class="viewer" id="viewer" aria-label="3D preview"></div><p class="caption" id="viewer-cap"></p></div></div>
+        <p class="legend">Draw with Ketcher (EPAM, Apache-2.0, bundled with this site). The drawing leaves your browser only when you press Add.</p>
+        <iframe id="ketcher" class="ketcher-frame" title="Structure editor (Ketcher)" data-src="vendor/ketcher/index.html"></iframe>
+        <p class="legend" id="draw-note" role="status"></p>
       </section>
     </div>
     <div>
       <div class="parsed" id="check" aria-live="polite"><b>Check (live)</b></div>
-      <p class="legend">Format check only (brackets, ring closures, characters). Full parsing happens on the server and explains any problem; nothing is silently fixed.</p>
-      <div class="checks mt12"><b>Properties to predict</b><div id="props" class="checks"></div></div>
-      <div class="checks mt12"><b>Ensemble size N</b>
-        <label for="ens">Members per estimate <select id="ens"></select></label>
-        <label for="tier" class="legend">Preview as account type <select id="tier"><option value="free" selected>free (cap 10)</option><option value="edu">verified .edu (cap 20)</option><option value="paid">paid (cap 20)</option></select></label>
-        <span class="legend" id="eta" data-testid="eta"></span></div>
-      <p class="mt12"><button class="btn primary" id="submit" type="button">Submit (fixture mode)</button></p>
-      <pre class="formula" id="payload" hidden></pre>
+      <p class="legend">Format check only (brackets, ring closures, characters). Full parsing happens on the server and explains any problem.</p>
+      <p class="mt12"><button class="btn primary" id="add-submit" type="button">Add to project</button></p>
+      <p id="add-msg" class="legend" role="status" aria-live="polite"></p>
+      <div id="add-problems" class="parsed"></div>
     </div>
   </div>
   <div class="foot"><span data-testid="consent-line">Your structures are private by default. Nothing is shared or used to train any model unless you opt in under <a href="account.html">Account</a>.</span></div>
  </div>
+
+ <div class="frame mt16" id="predict" hidden>
+  <div class="report">
+   <h2>Predict</h2>
+   <div id="models-state"></div>
+   <div id="predict-form" hidden>
+    <div class="checks"><b>Properties to predict</b><div id="props" class="checks"></div></div>
+    <div class="checks mt12"><b>Ensemble size N</b>
+      <label for="ens">Members per estimate <select id="ens"></select></label>
+      <span class="legend" id="tier-note" data-testid="tier-note"></span>
+      <span class="legend" id="eta" data-testid="eta"></span></div>
+    <p class="mt12"><button class="btn primary" id="predict-submit" type="button">Run predictions</button></p>
+   </div>
+   <div id="job" aria-live="polite"></div>
+  </div>
+ </div>
 </main>
-<script src="vendor/3Dmol-min.js"></script>
 <script type="module" src="js/add.js"></script>
 </body>
 </html>

@@ -1,73 +1,111 @@
-import { el, loadJSON, qs, renderChrome } from "./chrome.js";
+// Uncertainty panel for one prediction: GET /predictions/{id}/uncertainty (PredictionDetail) plus the compound's depiction and conformer.
+import { el, qs, qsId, renderChrome, showError, showLoading, stateBox } from "./chrome.js";
+import { authed, depictionUrl, describeError, get, post, requireSession } from "./api.js";
 import { SharedViewer, CONFORMER_LABEL } from "./viewer.js";
 import { fmtInt, fmtVal } from "./format.js";
 
-const cid = Number(qs("c", 3)), ep = qs("e", "herg");
-const project = await loadJSON("fixtures/project.json");
-const training = await loadJSON("fixtures/training.json");
-const c = project.compounds.find((x) => x.id === cid) || project.compounds[0];
-const known = Object.hasOwn(project.endpoints, ep);
-const key = known ? ep : "herg";
-const info = project.endpoints[key];
-const p = c.predictions[key];
-renderChrome({ current: "app.html", crumb: `Project / ${c.name} / ${info.label}` });
-document.title = `${c.name}, ${info.label} | Metis`;
-document.getElementById("h").textContent = `Uncertainty panel (${c.name}, ${info.label})`;
+const $ = (id) => document.getElementById(id);
+const user = await requireSession();
+const pid = qsId("p"), cid = qsId("c"), ep = qs("e", "") || "";
+renderChrome({ current: "app.html", crumb: "Projects / Uncertainty", user });
+const page = $("page-state");
+const ENSEMBLE_SIZES = [3, 5, 10, 20], TIER_MAX_N = { free: 10, edu: 20, paid: 20 };
 
-// value card
-const card = document.getElementById("valcard");
-if (p.kind === "classification") {
-  const cal = p.calibration;
-  card.append(el("span", { class: "t", text: `Calibrated probability (${info.unit})` }),
-    el("span", { class: "n mono", "data-testid": "panel-value", text: p.probability.toFixed(2) }),
-    el("span", { class: "legend", text: `Of ${fmtInt(cal.n_near)} calibration compounds scored near ${p.probability.toFixed(2)}, ${Math.round(cal.observed_fraction_near * 100)}% were measured ${info.pos[0]}s. Ensemble N = ${p.ensemble_n}, scaffold-split calibration set (n=${fmtInt(cal.set_n)}).` }));
-} else {
-  card.append(el("span", { class: "t", text: `Predicted value (${info.unit})` }),
-    el("span", { class: "n mono", "data-testid": "panel-value", text: `${fmtVal(p.value, "regression")} [${fmtVal(p.interval_low, "regression")}, ${fmtVal(p.interval_high, "regression")}]` }),
-    el("span", { class: "legend", text: `${Math.round(p.coverage * 100)}% interval from split conformal prediction. Ensemble N = ${p.ensemble_n}, scaffold-split calibration set (n=${fmtInt(p.calibration.set_n)}); median calibration width ${p.calibration.median_width}.` }));
+if (!pid || !cid || !/^[a-z0-9_]{1,64}$/.test(ep)) {
+  page.replaceChildren(stateBox("empty", "Open this panel from a value in the project table."));
+  page.append(el("p", {}, el("a", { class: "btn", href: "app.html", text: "Go to projects" })));
+} else load();
+
+async function load() {
+  showLoading(page, "Loading the uncertainty panel");
+  $("back").href = `app.html?p=${pid}`;
+  let project, detail, card = null, comp, entry;
+  try {
+    project = await authed(() => get(`/projects/${pid}`));
+    comp = project.compounds.find((c) => c.id === cid);
+    entry = comp && comp.predictions.find((x) => x.prediction.endpoint === ep);
+    if (!entry) { page.replaceChildren(stateBox("empty", "No prediction exists for this compound and property yet. Run predictions from the project.")); return; }
+    detail = await authed(() => get(`/predictions/${entry.id}/uncertainty`));
+  } catch (e) {
+    return showError(page, e, load);
+  }
+  try { card = (await get(`/models/${encodeURIComponent(ep)}`)); } catch (e) { card = null; }
+  page.replaceChildren();
+  $("panel-frame").hidden = false;
+  const p = detail.prediction;
+  const cname = comp.label || `Compound ${project.compounds.indexOf(comp) + 1}`;
+  $("h").textContent = `Uncertainty panel (${cname}, ${ep})`;
+  document.title = `${cname}, ${ep} | Metis`;
+  document.querySelector(".crumb").textContent = `Projects / ${project.name} / ${cname} / ${ep}`;
+
+  // ---- value card: every field the contract requires ----
+  const units = card?.units ? ` (${card.units})` : "";
+  const card0 = $("valcard");
+  if (p.kind === "classification") {
+    card0.append(el("span", { class: "t", text: `Calibrated probability${units}` }),
+      el("span", { class: "n mono", "data-testid": "panel-value", text: p.probability.toFixed(2) }),
+      el("span", { class: "legend", "data-testid": "panel-meta", text: `Calibrated probability. Ensemble N = ${p.ensemble_n}. Calibration set size n = ${fmtInt(p.sample_size)}. Empirical coverage ${Math.round(p.coverage * 100)}%.` }));
+  } else {
+    card0.append(el("span", { class: "t", text: `Predicted value${units}` }),
+      el("span", { class: "n mono", "data-testid": "panel-value", text: `${fmtVal(p.value, "regression")} [${fmtVal(p.interval_low, "regression")}, ${fmtVal(p.interval_high, "regression")}]` }),
+      el("span", { class: "legend", "data-testid": "panel-meta", text: `${Math.round(p.coverage * 100)}% interval. Ensemble N = ${p.ensemble_n}. Calibration set size n = ${fmtInt(p.sample_size)}.` }));
+  }
+  $("methodnote").textContent = `Method: ${p.method_note}`;
+  $("runtime").textContent = `This detail view took ${detail.runtime_seconds.toFixed(2)} s to compute.`;
+  $("modellink").href = `model.html?e=${encodeURIComponent(ep)}`;
+
+  const b = p.breakdown;
+  const rowsB = [["Model disagreement", b.ensemble_disagreement], ["Distance from training data", b.similarity_to_training], ["Assay noise", b.assay_noise]];
+  $("shares").replaceChildren(...rowsB.map(([label, v], i) => el("div", { "data-share": i },
+    `${label} `, el("span", { class: "mono", text: `${Math.round(v * 100)}%` }),
+    el("div", { class: "bar" }, el("i", { pct: v * 100 })))));
+
+  // ---- 2D + 3D with the same fragment highlighted ----
+  const viewer = new SharedViewer($("viewer"));
+  let molblock = null;
+  const cap = $("viewer-cap");
+  async function ensureConformer() {
+    if (molblock) return molblock;
+    try {
+      const conf = await get(`/projects/${pid}/compounds/${cid}/conformer`);
+      molblock = conf.molblock; return molblock;
+    } catch (e) { cap.textContent = `3D view unavailable: ${describeError(e).message}`; return null; }
+  }
+  async function show(frag) {
+    const hl = frag ? frag.atom_indices : [];
+    $("d2").replaceChildren(el("img", { class: "mol big", src: depictionUrl(pid, cid, hl), alt: `2D structure of ${cname}${frag ? " with the selected fragment highlighted" : ""}` }));
+    $("d2cap").textContent = frag ? `Highlighted fragment: ${Math.round(frag.share * 100)}% of model disagreement.` : cname;
+    const mb = await ensureConformer();
+    if (mb) { viewer.showMolblock(mb, hl); cap.textContent = `${cname}${frag ? ", highlighted fragment" : ""}. ${CONFORMER_LABEL}.`; }
+  }
+  const fr = $("fragments");
+  if (!detail.fragments.length) fr.replaceChildren(stateBox("empty", "No fragment attribution was returned for this prediction."));
+  else {
+    fr.replaceChildren(...detail.fragments.map((f, i) => el("div", { class: "inline", "data-fragment": i },
+      el("button", { class: "btn small", type: "button", "aria-label": `Highlight fragment ${i + 1}`, text: "Highlight", onclick: () => show(f) }),
+      el("span", { class: "hl", text: `${Math.round(f.share * 100)}%` }),
+      el("span", { class: "legend", text: `range ${Math.round(f.share_low * 100)} to ${Math.round(f.share_high * 100)}% | atoms ${f.atom_indices.join(", ")} | in ${Math.round(f.train_frequency * 100)}% of training compounds` }))));
+  }
+  const nb = $("nearest");
+  if (!detail.nearest_training.length) nb.replaceChildren(stateBox("empty", "No nearest training compounds were returned."));
+  else nb.replaceChildren(...detail.nearest_training.map((n, i) => el("div", { "data-nearest": i, class: "legend mono",
+    text: `Tanimoto ${Number(n.similarity).toFixed(2)} | measured label ${n.label} | ${n.smiles}` })));
+  await show(null);
+
+  // ---- re-run ----
+  const cap2 = TIER_MAX_N[user.tier] ?? 10;
+  const ens2 = $("ens2");
+  ens2.replaceChildren(...ENSEMBLE_SIZES.map((n) => {
+    const calibrated = !card || String(n) in card.coverage_by_n;
+    const ok = n <= cap2 && calibrated;
+    return el("option", { value: n, disabled: !ok, selected: n === p.ensemble_n, text: ok ? String(n) : `${n} (${n > cap2 ? "tier cap" : "not calibrated"})` });
+  }));
+  $("rerun").addEventListener("click", async () => {
+    const msg = $("rerun-msg");
+    msg.textContent = "Starting...";
+    try {
+      const j = await authed(() => post(`/projects/${pid}/predict`, { endpoints: [ep], ensemble_n: Number(ens2.value) }));
+      msg.textContent = `Started: about ${Math.round(j.estimated_seconds)} s for ${j.total} predictions. The project table shows the new values when it finishes.`;
+    } catch (e) { msg.textContent = describeError(e).message; }
+  });
 }
-document.getElementById("methodnote").textContent = `Method: ${p.method_note}`;
-
-// decomposition with resampling ranges
-const b = p.breakdown, r = b.ranges;
-const rowsB = [["Model disagreement", b.ensemble_disagreement, r[0]], ["Distance from training data", b.similarity_to_training, r[1]], ["Assay noise", b.assay_noise, r[2]]];
-document.getElementById("shares").replaceChildren(...rowsB.map(([label, v, rg], i) => el("div", { "data-share": i },
-  `${label} `, el("span", { class: "mono", text: `${Math.round(v * 100)}%` }), " ",
-  el("span", { class: "legend", text: `range ${Math.round(rg[0] * 100)} to ${Math.round(rg[1] * 100)} over resamples` }),
-  el("div", { class: "bar" }, el("i", { pct: v * 100 })))));
-
-// 2D + 3D with same fragment highlighted (atom-index map shared by RDKit depiction and conformer)
-const f = c.fragment;
-document.getElementById("d2").append(el("img", { class: "mol big", src: c.svg_highlight, alt: `2D structure of ${c.name} with the ${f.name} fragment highlighted` }));
-document.getElementById("d2cap").replaceChildren(el("span", { class: "hl", text: `${f.name}: ${Math.round(p.fragment_share_of_disagreement * 100)}%` }));
-const viewer = new SharedViewer(document.getElementById("viewer"));
-const cap = document.getElementById("viewer-cap");
-function showMain() { viewer.showMolblock(c.conformer.molblock, f.atom_indices); cap.textContent = `${c.name}, highlighted fragment: ${f.name}. ${CONFORMER_LABEL}.`; }
-showMain();
-document.getElementById("fragtext").replaceChildren(el("span", { class: "hl", text: f.name }),
-  ` accounts for ${Math.round(p.fragment_share_of_disagreement * 100)}% of model disagreement. It appears in ${fmtInt(f.training_count)} of ${fmtInt(f.training_total)} training compounds.`);
-
-// nearest training compounds: 2D thumbnail, 3D on click (same viewer)
-const nb = document.getElementById("nearest");
-c.nearest.forEach((n, i) => {
-  const t = training.compounds.find((x) => x.id === n.train_id);
-  let meas = "";
-  if (p.kind === "classification") meas = key === "herg" ? (n.measured_herg_positive ? "blocker" : "non-blocker") : "non-mutagenic";
-  else meas = "see model page";
-  nb.append(el("div", { class: "molcell", "data-nearest": i },
-    el("img", { class: "mol", src: t.svg, alt: `2D structure of training compound ${t.id}` }),
-    el("span", { class: "mono", text: `Tanimoto ${n.tanimoto.toFixed(2)}, measured (fixture label): ${meas}` }),
-    el("button", { class: "btn small", type: "button", "aria-label": `Show 3D structure of nearest training compound ${i + 1}`, text: "3D",
-      onclick: () => { viewer.showMolblock(t.conformer_molblock); cap.textContent = `Training compound ${t.id} (stand-in). ${CONFORMER_LABEL}.`; } })));
-});
-nb.append(el("button", { class: "btn small self-start", type: "button", text: "Back to this compound", onclick: showMain }));
-
-document.getElementById("ens2").value = String(p.ensemble_n);
-document.getElementById("rerun").addEventListener("click", () => {
-  document.getElementById("rerun-msg").textContent = `Fixture mode: re-running at N = ${document.getElementById("ens2").value} needs the backend. Nothing was run.`;
-});
-for (const id of ["datalink", "modellink", "limlink", "howlink"]) {
-  const a = document.getElementById(id);
-  a.href = `model.html?e=${key}` + (a.getAttribute("href").includes("#") ? "#" + a.getAttribute("href").split("#")[1] : "");
-}
-document.getElementById("datalink").textContent = info.dataset;
