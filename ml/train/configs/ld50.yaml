@@ -1,0 +1,12 @@
+# Training config. The CLI refuses unless every dataset below is `cleared` in ml/data/datasets.yaml.
+endpoint: ld50
+version: v1
+kind: regression
+datasets: [LD50_Zhu]
+backend: chemprop
+split: scaffold            # scaffold or butina; random splits are not offered
+split_frac: [0.7, 0.15, 0.15]
+seed: 0                    # member seeds are seed*1000 + k
+n_members: 20
+data_cache_dir: data
+member_params: {max_epochs: 50, batch_size: 64, hidden_dim: 300, depth: 3, accelerator: auto}
