@@ -11,6 +11,6 @@ private/
 node_modules/
 *.pt
 *.ckpt
-data/
+/data/
 .pytest_cache/
 .tmpvenv/
