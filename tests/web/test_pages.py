@@ -325,4 +325,4 @@ def test_account_consents_default_off_and_delete(make_page):
     pg.fill("#c-in", "DELETE")
     assert pg.locator("#c-ok").is_enabled()
     pg.click("#c-ok")
-    assert "nothing was deleted" in pg.inner_text("#del-msg").lower() or "nothing is stored" in pg.inner_text("#del-msg")
+    pg.wait_for_function("document.getElementById('del-msg').textContent.includes('nothing is stored')")
