@@ -6,11 +6,17 @@ Atom indices always refer to ``Chem.MolFromSmiles(smiles)`` of the SMILES passed
 
 from __future__ import annotations
 
+import time
+
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdFMCS
 
 EMBED_SEED = 7
 MCS_TIMEOUT_S = 2
+EMBED_BUDGET_S = (
+    3.0  # wall-clock cap for all ETKDG attempts of one molecule (RDKit checks it inside the search)
+)
+EMBED_MIN_RETRY_S = 0.5
 
 MolLike = str | Chem.Mol
 
@@ -28,8 +34,14 @@ def embed_raw(smiles: str, seed: int = EMBED_SEED) -> Chem.Mol | None:
     params = AllChem.ETKDGv3()
     params.randomSeed = seed
     params.maxIterations = 200
+    deadline = time.monotonic() + EMBED_BUDGET_S
+    params.timeout = max(1, int(EMBED_BUDGET_S * 0.8))
     if AllChem.EmbedMolecule(mh, params) != 0:
+        left = deadline - time.monotonic()
+        if left < EMBED_MIN_RETRY_S:
+            return None
         params.useRandomCoords = True
+        params.timeout = max(1, int(left))
         if AllChem.EmbedMolecule(mh, params) != 0:
             return None
     try:

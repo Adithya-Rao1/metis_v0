@@ -11,14 +11,17 @@ the scorer wrapped for that run only; the shared engine is never mutated.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 
 from rdkit import Chem
 
-from leadstudio.profiles import ProfileBody
+from leadstudio.matching import match
+from leadstudio.profiles import MAX_SMARTS_ATOMS, ProfileBody
 from leadstudio.schema import AlertHit, RunConfig, ScoreResult
 
 USER_PENALTY = 0.8
+SCORE_MATCH_BUDGET_S = 0.5
 
 
 class ProfileScorer:
@@ -26,7 +29,10 @@ class ProfileScorer:
         self.base = base
         self.profile = profile if isinstance(profile, ProfileBody) else ProfileBody.model_validate(profile)
         self._patterns = [(s, Chem.MolFromSmarts(s)) for s in self.profile.avoid_smarts]
-        self._patterns = [(s, q) for s, q in self._patterns if q is not None]
+        # a stored pattern above the validation cap (older rows) is skipped, never matched
+        self._patterns = [
+            (s, q) for s, q in self._patterns if q is not None and q.GetNumAtoms() <= MAX_SMARTS_ATOMS
+        ]
 
     def _config(self, config: RunConfig) -> RunConfig:
         if not self.profile.objectives:
@@ -39,10 +45,15 @@ class ProfileScorer:
         mol = Chem.MolFromSmiles(smiles)
         hits: list[AlertHit] = []
         if mol is not None:
+            deadline = (
+                time.monotonic() + SCORE_MATCH_BUDGET_S
+            )  # one budget for all patterns of this candidate
             for smarts, q in self._patterns:
-                m = mol.GetSubstructMatch(q)
-                if m:
-                    hits.append(AlertHit(name=f"avoid: {smarts}", family="USER", atom_indices=list(m)))
+                found = match(mol, q, max(0.0, deadline - time.monotonic()))
+                if found.matches:
+                    hits.append(
+                        AlertHit(name=f"avoid: {smarts}", family="USER", atom_indices=list(found.matches[0]))
+                    )
         if not hits:
             return res
         n = len(hits)

@@ -1,4 +1,8 @@
-"""Upload validation and 3D helpers for the server (RDKit only, no network)."""
+"""Upload validation and 3D helpers for the server (RDKit only, no network).
+
+Not sandboxed: SMILES / MOL text is parsed with RDKit in the request thread (unlike dock-prep, which uses a worker
+process). Cost is bounded by the size limits below, the ETKDG time budget in `engine.geometry` and the
+deadline-limited SMARTS matcher in `leadstudio.matching`. See docs/THREAT_MODEL.md."""
 
 from __future__ import annotations
 

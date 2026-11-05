@@ -328,9 +328,6 @@ def test_ordinary_avoid_patterns_score_a_large_seed_quickly():
     assert out.returncode == 0 and out.stdout.startswith("done"), out.stderr[-400:]
 
 
-@pytest.mark.xfail(strict=True, reason="F-162 MEDIUM: an avoid_smarts pattern passes validation (it is only PARSED) but GetSubstructMatch is exponential on a dense 60-heavy-atom seed that the "
-                                        "service also accepts: an 80-character chain of 18 atoms takes ~75 s on one core, 22 atoms effectively never returns. The scorer call sits in "
-                                        "the run worker, which STUDIO_RUN_TIMEOUT cannot interrupt (F-145): two such runs by one account stall the Lead Studio engine until restart")
 def test_a_valid_avoid_pattern_cannot_stall_scoring():
     smarts = "~".join(["[#6]"] * 22) + "~[#6;R0;R1]"
     assert len(smarts) <= 200
@@ -378,9 +375,6 @@ EMBED_CODE = textwrap.dedent("""
 """)
 
 
-@pytest.mark.xfail(strict=True, reason="F-146 MEDIUM: 3D embedding has no time limit. A small square-lattice SMILES accepted by parse_molecule needs 4 to 45 s of CPU (load dependent) to FAIL in ETKDG at 16 atoms, "
-                                        "and a 30-atom one did not finish within 40 s; 60 atoms is effectively unbounded. It runs in validate/preview (holding one of the 6 HeavyGate slots and a "
-                                        "pool thread, 429 for everyone else) and as the first step of every run (a run worker that STUDIO_RUN_TIMEOUT cannot free, F-145)")
 def test_embedding_a_small_accepted_molecule_is_time_bounded():
     try:
         out = subprocess.run([sys.executable, "-I", "-c", EMBED_CODE, "x", str(ROOT)], cwd=ROOT, env={"PATH": "/usr/bin:/bin"}, capture_output=True, text=True, timeout=5)

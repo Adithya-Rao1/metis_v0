@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import unicodedata
+
 from pydantic import BaseModel, Field, field_validator
 from rdkit import Chem, RDLogger
 
 from leadstudio.schema import ObjectiveSpec
 
 MAX_SMARTS, MAX_SMARTS_LEN, MAX_ALLOW, MAX_OBJECTIVES = 20, 200, 300, 20
+MAX_SMARTS_ATOMS = (
+    24  # query atoms; matching cost is exponential in this, and matching also runs under a time limit
+)
+MAX_SMARTS_RECURSION = 4  # '$(' sub-queries
 
 
 def check_smarts(s: str) -> str | None:
@@ -25,6 +31,10 @@ def check_smarts(s: str) -> str | None:
         RDLogger.EnableLog("rdApp.*")
     if q is None or q.GetNumAtoms() == 0:
         return "not a valid SMARTS pattern"
+    if q.GetNumAtoms() > MAX_SMARTS_ATOMS:
+        return f"more than {MAX_SMARTS_ATOMS} atoms"
+    if s.count("$(") > MAX_SMARTS_RECURSION:
+        return f"more than {MAX_SMARTS_RECURSION} recursive sub-patterns"
     return None
 
 
@@ -50,6 +60,8 @@ class ProfileBody(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("name is empty")
+        if any(unicodedata.category(c) == "Cc" for c in v):  # the table CHECK rejects control characters
+            raise ValueError("name must not contain control characters")
         return v
 
     @field_validator("objectives")

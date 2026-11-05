@@ -25,6 +25,7 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import BRICS, rdFingerprintGenerator
 
 from leadstudio.contracts import EditOp, Policy, Registry
+from leadstudio.matching import match as match_under_limit
 from leadstudio.schema import EditRecord, RunConfig, ScoreResult
 
 MAX_HEAVY_ATOMS = 60  # same limit as /api/molecules/validate
@@ -108,8 +109,9 @@ class Locks:
         mapped = tuple(amap[i] for i in parent.locked)
         child = Chem.MolFromSmiles(child_smiles)
         want = set(mapped)
-        for match in child.GetSubstructMatches(self._patt, uniquify=False, maxMatches=2000):
-            if set(match) == want:
+        res = match_under_limit(child, self._patt, seconds=1.0, max_matches=2000, uniquify=False)
+        for found in res.matches:
+            if set(found) == want:
                 return mapped
         return None
 

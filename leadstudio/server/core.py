@@ -15,9 +15,8 @@ import os
 import threading
 import time
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,6 +25,8 @@ from fastapi import HTTPException
 from leadstudio.schema import RunConfig
 
 log = logging.getLogger("leadstudio.server")
+
+MAX_ABANDONED = 4  # timed-out runs whose thread has not returned yet; beyond this new runs are refused
 
 
 def _env(name: str, default, cast=float):
@@ -108,6 +109,92 @@ class HeavyGate:
 
 
 @dataclass
+class SlotPool:
+    """Runs at most `workers` tasks at once, each on its own daemon thread.
+
+    Unlike a ThreadPoolExecutor a slot can be taken back from a task that no longer answers (`Slot.abandon`): the
+    stuck thread keeps running (Python cannot kill it) but no longer counts against the concurrency limit. The
+    number of such abandoned threads is bounded by the caller (`abandoned`), which refuses new work beyond it."""
+
+    def __init__(self, workers: int, name: str = "lead-run"):
+        self.workers, self.name = max(1, workers), name
+        self._lock = threading.Lock()
+        self._free = self.workers
+        self._waiting: deque[tuple[Slot, Callable[..., None], tuple]] = deque()
+        self._threads: set[threading.Thread] = set()
+        self.abandoned = 0
+        self._closed = False
+
+    def submit(self, slot: Slot, fn: Callable[..., None], *args: Any) -> None:
+        with self._lock:
+            self._waiting.append((slot, fn, args))
+        self._pump()
+
+    def _pump(self) -> None:
+        while True:
+            with self._lock:
+                if self._closed or self._free <= 0 or not self._waiting:
+                    return
+                slot, fn, args = self._waiting.popleft()
+                self._free -= 1
+                t = threading.Thread(target=self._run, args=(slot, fn, args), name=self.name, daemon=True)
+                self._threads.add(t)
+            t.start()
+
+    def _run(self, slot: Slot, fn: Callable[..., None], args: tuple) -> None:
+        try:
+            fn(*args)
+        finally:
+            with self._lock:
+                self._threads.discard(threading.current_thread())
+                if slot.abandoned:
+                    self.abandoned = max(0, self.abandoned - 1)
+            slot.release()
+            self._pump()
+
+    def _give_back(self) -> None:
+        with self._lock:
+            self._free += 1
+
+    def shutdown(self, wait: bool = True) -> None:
+        with self._lock:
+            self._closed = True
+            self._waiting.clear()
+            threads = list(self._threads)
+        if wait:
+            for t in threads:
+                t.join(timeout=5)
+
+
+class Slot:
+    """One run's claim on a pool worker; released exactly once, either when the task ends or when it is abandoned."""
+
+    def __init__(self, pool: SlotPool):
+        self._pool = pool
+        self._lock = threading.Lock()
+        self._released = False
+        self.abandoned = False
+
+    def release(self) -> None:
+        with self._lock:
+            if self._released:
+                return
+            self._released = True
+        self._pool._give_back()
+
+    def abandon(self) -> None:
+        """The task is stuck: free its worker now. The thread counts as abandoned until it finally ends."""
+        with self._lock:
+            if self._released or self.abandoned:
+                return
+            self.abandoned = True
+        with self._pool._lock:
+            self._pool.abandoned += 1
+        self.release()
+        self._pool._pump()
+
+
+@dataclass
 class Run:
     run_id: str
     owner: uuid.UUID
@@ -127,6 +214,7 @@ class Run:
     timer: threading.Timer | None = None
     streams: int = 0  # open SSE connections reading this run
     orphan: threading.Timer | None = None  # armed while nobody reads the run (see RunManager.detach)
+    slot: Slot | None = None  # the worker slot of a live/mock run
 
     def push(self, type_: str, payload: dict) -> bool:
         with self.lock:
@@ -169,9 +257,10 @@ def config_key(owner: uuid.UUID, seed_canonical: str, cfg: RunConfig) -> str:
 class RunManager:
     def __init__(self, settings: Settings, engine: Any, mock_events: list[dict]):
         self.s, self.engine, self.mock_events = settings, engine, mock_events
-        self.pool = ThreadPoolExecutor(max_workers=settings.max_concurrent, thread_name_prefix="lead-run")
+        self.pool = SlotPool(settings.max_concurrent)
         self.runs: OrderedDict[str, Run] = OrderedDict()
         self.cache: OrderedDict[str, list[dict]] = OrderedDict()
+        self._cache_owner: dict[str, uuid.UUID] = {}
         self.lock = threading.Lock()
         self._streams: dict[uuid.UUID, int] = {}
 
@@ -200,6 +289,8 @@ class RunManager:
                 run.finished, run.status = True, "done"
                 self._register(run)
                 return run
+            if self.pool.abandoned >= MAX_ABANDONED:
+                raise Rejected(503, "Lead Studio is recovering from stuck runs, try again later", 30)
             active = self._active()
             if sum(r.owner == owner for r in active) >= self.s.per_user_active:
                 raise Rejected(
@@ -219,7 +310,8 @@ class RunManager:
                 scorer_wrap=scorer_wrap if source == "live" else None,
             )
             self._register(run)
-        self.pool.submit(self._execute, run)
+        run.slot = Slot(self.pool)
+        self.pool.submit(run.slot, self._execute, run)
         self._arm_orphan(run)  # released again if the client never opens (or leaves) the event stream
         return run
 
@@ -249,6 +341,20 @@ class RunManager:
         """The caller's own run, else None. Another user's run is indistinguishable from a missing one."""
         run = self.runs.get(run_id)
         return run if run is not None and run.owner == owner else None
+
+    def forget_user(self, owner: uuid.UUID) -> int:
+        """Cancel and drop every run of one user, and their replay-cache entries (account deletion)."""
+        with self.lock:
+            mine = [k for k, r in self.runs.items() if r.owner == owner]
+            dropped = [self.runs.pop(k) for k in mine]
+            for k in [k for k, o in self._cache_owner.items() if o == owner]:
+                self.cache.pop(k, None)
+                self._cache_owner.pop(k, None)
+            self._streams.pop(owner, None)
+        for r in dropped:
+            r.finish("cancelled", "Run cancelled", recoverable=True)
+            r.events.clear()
+        return len(dropped)
 
     def cancel(self, run: Run) -> bool:
         return run.finish("cancelled", "Run cancelled", recoverable=True)
@@ -309,6 +415,8 @@ class RunManager:
     def _on_timeout(self, run: Run) -> None:
         if run.finish("error", f"Run exceeded the {self.s.run_timeout:g}s time limit", recoverable=True):
             log.warning("run %s timed out", run.run_id[:6])
+            if run.slot is not None:
+                run.slot.abandon()  # the engine may be stuck in one step: hand its worker back
 
     def _engine_for(self, run: Run) -> Any:
         if run.scorer_wrap is not None and hasattr(self.engine, "with_scorer"):
@@ -376,5 +484,7 @@ class RunManager:
     def _remember(self, run: Run) -> None:
         with self.lock:
             self.cache[run.cache_key] = list(run.events)
+            self._cache_owner[run.cache_key] = run.owner
             while len(self.cache) > self.s.cache_size:
-                self.cache.popitem(last=False)
+                old, _ = self.cache.popitem(last=False)
+                self._cache_owner.pop(old, None)
