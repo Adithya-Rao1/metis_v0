@@ -15,6 +15,7 @@ import asyncio
 import importlib.util
 import json
 import logging
+import re
 import secrets
 import threading
 import time
@@ -29,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from backend.accounts import security
 from backend.accounts.deps import rate_limit
+from backend.accounts.hooks import on_account_deleted
 from backend.jobs.deps import Scope, current_user, not_found, scope
 from leadstudio.adapt.dataset import MAX_TRANSITIONS, MIN_VALID_STEPS
 from leadstudio.adapt.jobs import QueueFull
@@ -54,6 +56,7 @@ from leadstudio.server.core import Rejected
 from leadstudio.server.manual import export_jsonl
 from leadstudio.server.state import LeadState, get_state
 
+TARGET_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 log = logging.getLogger("leadstudio.server")
 
 MAX_SAVED_PAYLOAD = 1_500_000  # bytes of JSON for one saved run
@@ -238,6 +241,12 @@ async def run_events(
     run = st.mgr.get(run_id, user.id)
     if run is None:
         raise HTTPException(404, "unknown run")
+    last = request.headers.get("last-event-id")
+    if (
+        last and not last.isascii()
+    ):  # str.isdigit() accepts e.g. U+00B2 but int() rejects it; refuse before any slot is taken
+        raise HTTPException(400, "invalid Last-Event-ID")
+    start = int(last) + 1 if last and last.isdigit() and len(last) < 9 else 0
     if not st.mgr.open_stream(user.id):
         raise Rejected(429, "Too many open event streams", 5)
     st.mgr.attach(run)
@@ -252,8 +261,6 @@ async def run_events(
             st.mgr.close_stream(user.id)
             st.mgr.detach(run)
 
-    last = request.headers.get("last-event-id")
-    start = int(last) + 1 if last and last.isdigit() and len(last) < 9 else 0
     heartbeat = st.settings.heartbeat
 
     async def stream():
@@ -526,8 +533,10 @@ def save_run(body: RunIn, sc: Scope = Depends(scope)) -> dict:
     if stage not in ("binding", "pharmacology"):
         raise HTTPException(422, "only binding and pharmacology runs can be saved")
     target = body.target_id or rc.get("target_id")
-    if target is not None and (not isinstance(target, str) or len(target) > 64):
-        target = None
+    if target is not None and not (
+        isinstance(target, str) and TARGET_ID_RE.fullmatch(target) and len(target) <= 64
+    ):
+        raise HTTPException(422, "invalid target_id")
     title = (body.title or "").strip() or (headline or "Lead Studio run")
     title = "".join(ch for ch in title if ch.isprintable())[:120] or "Lead Studio run"
     with sc.session() as s:
@@ -753,3 +762,20 @@ def delete_profile(pid: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
 router.include_router(api)
 router.include_router(library)
 router.include_router(profiles)
+
+
+# ================================================================================================= account deletion
+@on_account_deleted
+def _forget_user(app: Any, uid: uuid.UUID) -> None:
+    """DELETE /account/data: drop the user's in-memory Lead Studio state and adapter files (no content is logged)."""
+    st = getattr(app.state, "lead", None)
+    if st is not None:
+        st.mgr.forget_user(uid)
+        st.manual.sessions.forget_user(uid)
+        st.poses.forget_user(uid)
+    adapt = getattr(app.state, "lead_adapt", None)
+    if adapt is not None:
+        adapt.forget_owner(str(uid))
+    from leadstudio.adapt import store as adapter_store
+
+    adapter_store.delete_owner(str(uid))

@@ -83,6 +83,14 @@ class Sessions:
                 self.started.pop(k, None)
             return s.model_copy(deep=True)
 
+    def forget_user(self, owner: uuid.UUID) -> int:
+        with self.lock:
+            mine = [k for k, (o, _) in self.items.items() if o == owner]
+            for k in mine:
+                self.items.pop(k, None)
+                self.started.pop(k, None)
+            return len(mine)
+
     def get(self, sid: str, owner: uuid.UUID) -> ManualSession | None:
         with self.lock:
             hit = self.items.get(sid)

@@ -147,8 +147,6 @@ def test_last_event_id_values_never_crash_the_stream_route(lead, value):
     assert mgr._streams == {}                                  # the slot of a finished stream is released
 
 
-@pytest.mark.xfail(strict=True, reason="F-140 LOW: 'Last-Event-ID: <non-ASCII digit>' (e.g. U+00B2) passes str.isdigit() but int() raises ValueError AFTER open_stream() took the "
-                                        "per-user slot: 500, and the slot is never released (4 such requests lock the user out of SSE until the process restarts)")
 def test_a_malformed_last_event_id_neither_500s_nor_leaks_a_stream_slot(lead):
     c = signed_in(lead)
     rid, mgr = _ids(lead, c)
@@ -174,8 +172,6 @@ def test_the_per_user_stream_cap_holds_and_slots_are_returned(lead):
 BAD_NAMES = ["a\nb", "a\x00b", "a\tb", "a\x1bb", "a\x7fb", "\u0085", "a\rb"]
 
 
-@pytest.mark.xfail(strict=True, reason="F-141 LOW: a profile name with a control character (LF, TAB, NUL, ESC, DEL, CR) passes ProfileBody validation and then violates the "
-                                        "table CHECK (name !~ '[[:cntrl:]]') or the NUL rule: 500 instead of 422. Saved-run titles are sanitised; profile names are not")
 def test_control_characters_in_a_profile_name_are_a_422_not_a_500(lead):
     c = signed_in(lead)
     for nm in BAD_NAMES:
@@ -207,8 +203,6 @@ def _events(c, run_json_patch=None):
     return evs
 
 
-@pytest.mark.xfail(strict=True, reason="F-142 LOW: saving a run whose run_start config carries a target_id that is 'valid' for RunConfig (<= 64 chars, any characters, or '') but not for the "
-                                        "table CHECK (^[A-Za-z0-9_-]+$) is a 500 instead of a 422 (the request body's own target_id has the pattern, the embedded one does not)")
 def test_saving_a_run_with_an_odd_embedded_target_id_is_a_422_not_a_500(lead):
     c = signed_in(lead)
     for tid in ("bad id!", "", "a/b", "x\n"):
@@ -410,9 +404,6 @@ def test_live_manual_sessions_are_bounded_per_user_and_overall(lead):
     assert codes == [200, 200, 200, 429, 429]
 
 
-@pytest.mark.xfail(strict=True, reason="F-143 LOW: DELETE /account/data removes the database rows only. The user's runs (SSE event lists with molblocks), live manual sessions, pose "
-                                        "jobs (ligand/protein payloads) and adapt jobs stay in process memory until eviction or restart, and adapter files under STUDIO_CACHE_DIR "
-                                        "are never removed: nothing in the deletion path knows about Lead Studio state")
 def test_account_deletion_clears_the_users_in_memory_lead_studio_state(lead):
     c = signed_in(lead)
     uid = c.uid
@@ -427,8 +418,6 @@ def test_account_deletion_clears_the_users_in_memory_lead_studio_state(lead):
     assert left == (0, 0, 0), left
 
 
-@pytest.mark.xfail(strict=True, reason="F-144 LOW: PoseManager keeps up to 50 jobs PER USER (each holds a full pose payload; precomputed ones are re-read from disk per job) and has no "
-                                        "process-wide cap on finished jobs, only a 1 h TTL purged on access: memory grows linearly with the number of active accounts per hour")
 def test_pose_job_memory_has_a_process_wide_bound(lead):
     from leadstudio.server.poses import MAX_ACTIVE, PoseManager
 
@@ -440,8 +429,6 @@ def test_pose_job_memory_has_a_process_wide_bound(lead):
 
 
 # ================================================================================================= run timeout
-@pytest.mark.xfail(strict=True, reason="F-145 LOW: STUDIO_RUN_TIMEOUT only marks the run finished; the pool thread stays inside the engine until the engine yields. One engine step that does "
-                                        "not return (see F-146 and F-162) permanently removes a worker (STUDIO_MAX_CONCURRENT=2 by default), and new runs wait 'queued' behind it")
 def test_a_timed_out_run_frees_its_worker():
     from leadstudio.server.core import RunManager, Settings
 

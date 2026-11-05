@@ -61,6 +61,17 @@ class JobManager:
             self._ensure_worker()
         return jid
 
+    def forget_owner(self, owner: str) -> int:
+        """Drop the owner's jobs that are not running (account deletion); a running one is flagged and unreadable."""
+        with self.lock:
+            mine = [k for k, j in self.jobs.items() if j["owner"] == owner]
+            for k in mine:
+                j = self.jobs[k]
+                j["payload"], j["result"] = None, None
+                if j["status"] != "running":
+                    del self.jobs[k]
+            return len(mine)
+
     def get(self, jid: str, owner: str) -> dict | None:
         j = self.jobs.get(jid)
         if j is None or j["owner"] != owner:

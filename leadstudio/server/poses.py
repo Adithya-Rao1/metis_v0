@@ -35,6 +35,7 @@ DATA = Path(__file__).resolve().parents[1] / "data"
 MAX_ACTIVE = 8  # queued + running dock jobs, whole process
 MAX_ACTIVE_PER_USER = 2
 MAX_JOBS_PER_USER = 50
+MAX_JOBS_TOTAL = 100  # finished + active jobs (each holds a pose payload), whole process
 MAX_RESPONSE_BYTES = 8_000_000
 REMOTE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 DEFAULT_URL = "http://127.0.0.1:8100"
@@ -214,6 +215,16 @@ class PoseManager:
             self.owners.pop(k, None)
             self.stamp.pop(k, None)
 
+    def forget_user(self, owner: uuid.UUID) -> int:
+        """Drop every job of one user (account deletion). A running job's later updates find nothing and stop."""
+        with self.lock:
+            mine = [k for k, o in self.owners.items() if o == owner]
+            for k in mine:
+                self.jobs.pop(k, None)
+                self.owners.pop(k, None)
+                self.stamp.pop(k, None)
+            return len(mine)
+
     def get(self, job_id: str, owner: uuid.UUID) -> PoseResult | None:
         with self.lock:
             self._purge()
@@ -264,6 +275,14 @@ class PoseManager:
                     return j.model_copy()
             if len(mine) >= MAX_JOBS_PER_USER:
                 oldest = min(mine, key=lambda k: self.stamp[k])
+                self.jobs.pop(oldest, None)
+                self.owners.pop(oldest, None)
+                self.stamp.pop(oldest, None)
+            while len(self.jobs) >= MAX_JOBS_TOTAL:  # process-wide bound: drop the oldest finished job
+                idle = [k for k, j in self.jobs.items() if j.status not in ("queued", "running")]
+                if not idle:
+                    raise Rejected(429, "Pose queue is full, try again shortly", 30)
+                oldest = min(idle, key=lambda k: self.stamp[k])
                 self.jobs.pop(oldest, None)
                 self.owners.pop(oldest, None)
                 self.stamp.pop(oldest, None)

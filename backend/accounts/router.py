@@ -32,6 +32,7 @@ from backend.accounts.deps import (
     rate_limit,
     terms_current,
 )
+from backend.accounts.hooks import run_account_deleted
 from backend.accounts.mailer import deliver
 from backend.core.db import request_session
 from backend.schemas.contracts import (
@@ -625,6 +626,7 @@ def delete_account(
         s.execute(
             text("DELETE FROM app_user WHERE id = :u"), {"u": uid}
         )  # ON DELETE CASCADE removes all rows
+    run_account_deleted(request.app, uid)  # other modules purge their in-memory / on-disk state for this user
     response.delete_cookie(COOKIE_SESSION, path="/", secure=cfg.cookie_secure, httponly=True, samesite="lax")
     response.delete_cookie(COOKIE_CSRF, path="/", secure=cfg.cookie_secure, samesite="lax")
     return {"status": "deleted", "backups_purge_within_days": 30}

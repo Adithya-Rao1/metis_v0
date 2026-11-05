@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -10,8 +11,6 @@ import secrets
 import time
 from collections.abc import Sequence
 from pathlib import Path
-
-import torch
 
 ID_RE = re.compile(r"^[a-f0-9]{16}$")
 MAX_ADAPTERS_PER_OWNER = 10
@@ -47,6 +46,8 @@ def save(
     existing = list_adapters(owner)
     for old in existing[MAX_ADAPTERS_PER_OWNER - 1 :]:  # keep the newest MAX-1, then add this one
         delete(owner, old["adapter_id"])
+    import torch
+
     torch.save({"op_ids": op_ids, "state": policy.net.state_dict()}, d / f"{aid}.pt")
     meta = {
         "adapter_id": aid,
@@ -63,6 +64,23 @@ def save(
     }
     (d / f"{aid}.json").write_text(json.dumps(meta))
     return meta
+
+
+def delete_owner(owner: str) -> int:
+    """Remove every adapter file of one owner (account deletion). Returns the number of files removed."""
+    d, n = owner_dir(owner), 0
+    if not d.is_dir():
+        return 0
+    for p in d.iterdir():
+        try:
+            if p.is_file() or p.is_symlink():
+                p.unlink()
+                n += 1
+        except OSError:
+            continue
+    with contextlib.suppress(OSError):
+        d.rmdir()
+    return n
 
 
 def get_meta(owner: str, adapter_id: str) -> dict | None:
