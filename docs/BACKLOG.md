@@ -22,3 +22,14 @@ The Terms of Service, Privacy Policy and Disclaimer linked from sign-up are draf
 
 ## Before launch: Lead Studio disclaimer
 The banner on Metis Lead Studio (Beta) ("Generated molecules, binding scores and poses are model outputs, not measurements. Treat them as hypotheses to test.") was removed from the page on the owner's instruction. Restore a model-output disclaimer before launch (the terms/disclaimer drafts still need lawyer review).
+
+## Added after Wave 4 (2026-11-05)
+Fixed in Wave 4 (regression tests kept): F-120..F-129, F-131..F-134, F-121 (Ketcher now sandboxed), F-140..F-148, F-150..F-152, F-154, F-157..F-159; decision 0005 (unverified sign-up credentials); migration 0006.
+Still open (strict xfail unless noted):
+- HIGH, launch blocker F-155: no real mailer (console only, silent fallback). Needs provider, credentials, domain with SPF/DKIM; `get_mailer` must refuse the console fallback in production.
+- MEDIUM F-153: Docker image never built/scanned in CI; no SBOM. F-156: no backup, restore or deletion-drill tooling (30-day purge promise). F-161: no TLS-terminating reverse proxy / single-origin routing in deploy/ (needs domain; Caddy or nginx; X-Forwarded-For handling; SSE buffering off).
+- LOW F-149: LICENSES.md gaps (moocore, pdb2pqr, propka, IBM Plex, ChemBERTa, DynamicBind, PLAPT, Open Babel, Meeko, RCSB, ChEMBL, fpocket) and no root LICENSE (owner decision). F-160: THREAT_MODEL wording on container scan/SBOM stays corrected until they exist.
+- Older open: F-75 (ranking weight bound), F-105 (coverage field semantics), Wave 1 items listed in the DEVLOG.
+- Lead Studio: parsing still runs in the API process (an RDKit native crash would take the API down; move to a worker process); runs/jobs are single-process only; a Python thread cannot be killed, so a timed-out run leaks a thread (bounded to 4, then 503); PLAPT (binding) and DynamicBind (pose) need a GPU host and their model licences are unchecked; `adapter_id` cannot yet be applied to a run; saved profile `edit_allowlist` is not applied to the GA; `seed_molblock` ignored; mypy does not cover leadstudio (128 errors in copied code).
+- Web/docs: in-house accessibility audit instead of real axe-core (re-run with axe); POST /auth/verify accepts an optional password that the verify page does not send yet; no notes UI; compose/Dockerfile changes unverified (Docker not installed); MinIO app key created by hand; restore a model-output disclaimer on Lead Studio and a sign-up draft notice before launch.
+- Real models: training, calibration, benchmarks (G1, G2), fragment-attribution validation (G3), external review + closed beta (G4). See docs/LAUNCH_READINESS.md.

@@ -32,3 +32,11 @@
 - NOTE: demo launcher exposed a sandbox bug (503 when all slots busy); SLOT_WAIT_S = 5 s added.
 - QA: 0 critical/high, 3 medium, 11 low open (see BACKLOG). Python 1153 passed, 2 skipped, 33 xfailed; browser 175 passed, 4 xfailed; ruff, format, mypy clean.
 - Owner approved Wave 3. Wave 4 deliberately on hold until the demo video is filmed.
+
+## 2026-11-05 Lead Studio merge and Wave 4
+- Merged the GraphDQN studio into this repo as Metis Lead Studio (Beta): package `leadstudio/`, routes under `/lead`, front end under `web/lead/` (browser path `/api/lead`), Metis sign-in, migration 0005 (owner-RLS tables for runs, manual sessions, profiles). PLAPT binding and DynamicBind run on the GPU box; the merged site runs there (`scripts/lambda_run.sh`).
+- NOTE: found by driving it in a browser: the front end used `/lead/api` but the site forwards only `/api/*`. SUBSTITUTION: `make demo` runs the merged site locally with SYNTHETIC Metis models; Lead Studio needs the GPU box for binding.
+- NOTE: my `--reset` once deleted the state of a running demo; `scripts/demo.py --dir` now keeps test runs separate.
+- Wave 4: hardening (migration 0006, decision 0005), web hardening (sandboxed Ketcher, HSTS, new UI routes, pose view leaks), independent QA (1 high, 6 medium, 16 low new findings), round 2 fixes (Lead Studio time limits, compose, health/ready, hygiene). Docs: LAUNCH_READINESS, THREAT_MODEL, LICENSES, TRACEABILITY status note.
+- Tests on merged main: python 1707 passed, 5 skipped, 23 xfailed, 1 timing-flaky failure (passes alone); browser 266 passed, 3 xfailed, 1 timing-flaky failure (passes alone); ruff, format, mypy (81 files), bandit clean.
+- Not done: gates G1-G4; real mailer; Docker build; backup/restore drills; TLS proxy; licence decisions; lawyer review.
