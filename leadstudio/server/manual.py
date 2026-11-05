@@ -111,8 +111,11 @@ class Sessions:
 
 
 class ManualService:
-    def __init__(self, svc: Any, scorer: Any, settings: Any):
-        self.svc, self._scorer, self.s = svc, scorer, settings
+    """Manual mode. Anything that runs RDKit on user text (checks, applicable edits, previews, rewards) executes in
+    the heavy worker pool (`heavy`), never in the API process; the `*_local` methods are what the workers run."""
+
+    def __init__(self, svc: Any, scorer: Any, settings: Any, heavy: Any = None):
+        self.svc, self._scorer, self.s, self.heavy = svc, scorer, settings, heavy
         self.sessions = Sessions(settings.max_live_sessions_per_user, settings.max_live_steps)
         self._lock = threading.Lock()
 
@@ -147,6 +150,13 @@ class ManualService:
             raise HTTPException(422, str(exc)) from None
 
     def applicable(self, smiles: str, locked: str) -> list[dict]:
+        return self.heavy.call("applicable", {"smiles": smiles, "locked": locked})
+
+    def preview(self, req: ManualPreviewRequest) -> ManualPreview:
+        res = self.heavy.call("preview", {"request": req.model_dump(mode="json")})
+        return ManualPreview.model_validate(res)
+
+    def applicable_local(self, smiles: str, locked: str) -> list[dict]:
         self.check_smiles(smiles)
         try:
             lock = [int(x) for x in locked.split(",") if x.strip()]
@@ -169,7 +179,7 @@ class ManualService:
                 break
         return out
 
-    def preview(self, req: ManualPreviewRequest) -> ManualPreview:
+    def preview_local(self, req: ManualPreviewRequest) -> ManualPreview:
         self.check_smiles(req.smiles)
         if req.target_id is not None and self.svc.get_target(req.target_id) is None:
             raise HTTPException(422, "unknown target_id")
@@ -241,7 +251,7 @@ class ManualService:
 
     def create_session(self, owner: uuid.UUID, seed_smiles: str, target_id: str | None) -> ManualSession:
         try:
-            seed = molio.canonical(molio.parse_molecule(seed_smiles))
+            seed = self.heavy.parse(seed_smiles)[0]
         except molio.InvalidMolecule as exc:
             raise HTTPException(422, str(exc)) from None
         if target_id is not None and self.svc.get_target(target_id) is None:
@@ -251,16 +261,16 @@ class ManualService:
     def add_step(self, owner: uuid.UUID, session_id: str, step: ManualStep) -> ManualSession:
         if self.sessions.get(session_id, owner) is None:
             raise HTTPException(404, "unknown session")
-        self.check_smiles(step.parent_smiles)
-        self.check_smiles(step.child_smiles)
-        if step.reward_delta is None:  # server-side RDKit composite delta
-            sc, cfg = self.rdkit_scorer(), RunConfig(seed_smiles=step.parent_smiles)
-            step = step.model_copy(
-                update={
-                    "reward_delta": sc.score(step.child_smiles, cfg).composite
-                    - sc.score(step.parent_smiles, cfg).composite
-                }
-            )
+        res = self.heavy.call(
+            "step_reward",
+            {
+                "parent": step.parent_smiles,
+                "child": step.child_smiles,
+                "reward": step.reward_delta is None,  # server-side RDKit composite delta
+            },
+        )
+        if step.reward_delta is None:
+            step = step.model_copy(update={"reward_delta": res["reward_delta"]})
         s = self.sessions.append(session_id, owner, step)
         if s is None:
             raise HTTPException(404, "unknown session")

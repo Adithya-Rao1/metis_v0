@@ -34,7 +34,7 @@ from backend.accounts.hooks import on_account_deleted
 from backend.jobs.deps import Scope, current_user, not_found, scope
 from leadstudio.adapt.dataset import MAX_TRANSITIONS, MIN_VALID_STEPS
 from leadstudio.adapt.jobs import QueueFull
-from leadstudio.profiles import MAX_SMARTS, ProfileBody, check_smarts
+from leadstudio.profiles import MAX_SMARTS, ProfileBody
 from leadstudio.schema import (
     SCHEMA_VERSION,
     Descriptors,
@@ -53,6 +53,7 @@ from leadstudio.schema import (
 )
 from leadstudio.server import molio, stages, store
 from leadstudio.server.core import Rejected
+from leadstudio.server.heavy import HeavyFailed
 from leadstudio.server.manual import export_jsonl
 from leadstudio.server.state import LeadState, get_state
 
@@ -112,39 +113,26 @@ def validate(
     req: ValidateRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
 ) -> ValidateResponse:
     throttle(sc, "validate", st.settings.validates_per_minute)
-    with st.heavy:
-        try:
-            mol = molio.parse_molecule(req.smiles, req.molfile)
-        except molio.InvalidMolecule as exc:
-            return ValidateResponse(ok=False, error=str(exc), source=st.source)
-        smi = molio.canonical(mol)
-        block, _provider = molio.molblock_3d(smi)
-        if block is None:
-            return ValidateResponse(
-                ok=False,
-                canonical_smiles=smi,
-                heavy_atoms=mol.GetNumHeavyAtoms(),
-                source=st.source,
-                error="Could not generate a 3D conformer for this molecule",
-            )
-        score: ScoreResult | None = None
-        if st.scorer is not None:
-            try:
-                score = st.scorer.score(smi, RunConfig(seed_smiles=smi))
-            except Exception as exc:
-                log.warning("seed scoring failed: %s", type(exc).__name__)
-        return ValidateResponse(
-            ok=True,
-            canonical_smiles=smi,
-            heavy_atoms=mol.GetNumHeavyAtoms(),
-            molblock=block,
-            score=score,
-            source=st.source,
+    try:
+        res = st.heavy.call(
+            "validate", {"smiles": req.smiles, "molfile": req.molfile, "score": st.scorer is not None}
         )
+    except HeavyFailed as exc:  # the input hung or crashed the parser: a plain answer, the API is unaffected
+        return ValidateResponse(ok=False, error=exc.message, source=st.source)
+    score = ScoreResult.model_validate(res["score"]) if res.get("score") else None
+    return ValidateResponse(
+        ok=res["ok"],
+        canonical_smiles=res.get("canonical_smiles"),
+        heavy_atoms=res.get("heavy_atoms"),
+        molblock=res.get("molblock"),
+        score=score,
+        error=res.get("error"),
+        source=st.source,
+    )
 
 
-def _profile_wrapper(sc: Scope, cfg: RunConfig):
-    """Scorer wrapper for the caller's own saved profile (404 if it is not theirs), else None."""
+def _profile_wrapper(sc: Scope, cfg: RunConfig) -> ProfileBody | None:
+    """The caller's own saved profile (404 if it is not theirs), else None. The run's child process applies it."""
     if cfg.profile_id is None:
         return None
     if cfg.stage != "pharmacology":
@@ -161,9 +149,7 @@ def _profile_wrapper(sc: Scope, cfg: RunConfig):
         prof = ProfileBody.model_validate(row["body"])
     except ValidationError:
         raise HTTPException(422, "the saved profile is no longer valid; edit and save it again") from None
-    from leadstudio.profile_scorer import ProfileScorer
-
-    return lambda base: ProfileScorer(base, prof)
+    return prof
 
 
 @api.post("/runs", response_model=RunCreated)
@@ -176,17 +162,16 @@ def create_run(cfg: RunConfig, sc: Scope = Depends(scope), st: LeadState = Depen
     if cfg.adapter_id is not None:
         raise HTTPException(422, "policy adapters are not available in this service")
     try:
-        mol = molio.parse_molecule(cfg.seed_smiles)
+        seed_canonical, n = st.heavy.parse(cfg.seed_smiles)
     except molio.InvalidMolecule as exc:
         raise HTTPException(422, str(exc)) from None
-    n = mol.GetNumHeavyAtoms()
     if any(i < 0 or i >= n for i in cfg.locked_atoms):
         raise HTTPException(422, "locked_atoms index out of range")
     cfg = stages.prepare_config(cfg, st.svc, st.engine is not None)
     wrap = _profile_wrapper(sc, cfg)
     cfg = cfg.model_copy(
         update={
-            "seed_smiles": molio.canonical(mol),
+            "seed_smiles": seed_canonical,
             "generations": max(1, min(cfg.generations, s.max_generations)),
             "population_size": max(2, min(cfg.population_size, s.max_population)),
             "policy_guidance": max(0.0, min(cfg.policy_guidance, 1.0)),
@@ -195,7 +180,7 @@ def create_run(cfg: RunConfig, sc: Scope = Depends(scope), st: LeadState = Depen
             "seed_molblock": None,  # the engine builds its own 3D seed; a client-supplied block is never used
         }
     )
-    run = st.mgr.submit(sc.user.id, cfg, secrets.token_urlsafe(9), scorer_wrap=wrap)
+    run = st.mgr.submit(sc.user.id, cfg, secrets.token_urlsafe(9), profile=wrap)
     log.info(
         "run %s created source=%s heavy_atoms=%d gens=%d pop=%d",
         run.run_id[:6],
@@ -323,7 +308,7 @@ def create_pose(
     if st.svc.get_target(req.target_id) is None:
         raise HTTPException(422, "unknown target_id")
     try:
-        smi = molio.canonical(molio.parse_molecule(req.smiles))
+        smi = st.heavy.parse(req.smiles)[0]
     except molio.InvalidMolecule as exc:
         raise HTTPException(422, str(exc)) from None
     if not st.poses.precomputed_exists(req.target_id, smi):
@@ -352,8 +337,7 @@ def applicable(
     st: LeadState = Depends(get_state),
 ) -> list:
     throttle(sc, "applicable", 120)
-    with st.heavy:
-        return st.manual.applicable(smiles, locked)
+    return st.manual.applicable(smiles, locked)
 
 
 @api.post("/manual/preview", response_model=ManualPreview)
@@ -361,8 +345,7 @@ def preview(
     req: ManualPreviewRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
 ) -> ManualPreview:
     throttle(sc, "preview", 120)
-    with st.heavy:
-        return st.manual.preview(req)
+    return st.manual.preview(req)
 
 
 class SessionCreate(BaseModel):
@@ -387,8 +370,7 @@ def add_step(
     st: LeadState = Depends(get_state),
 ) -> ManualSession:
     throttle(sc, "mstep", 240)
-    with st.heavy:
-        return st.manual.add_step(sc.user.id, session_id, step)
+    return st.manual.add_step(sc.user.id, session_id, step)
 
 
 @api.get("/manual/sessions/{session_id}/export")
@@ -617,7 +599,7 @@ def list_manual(sc: Scope = Depends(scope)) -> dict:
 
 
 @library.post("/manual", status_code=201)
-def save_manual(body: ManualIn, sc: Scope = Depends(scope)) -> dict:
+def save_manual(body: ManualIn, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> dict:
     throttle(sc, "lib_write", 30)
     steps = body.steps
     if steps is None and body.jsonl is not None:
@@ -635,10 +617,9 @@ def save_manual(body: ManualIn, sc: Scope = Depends(scope)) -> dict:
         raise HTTPException(422, f"steps must contain 1..{MAX_MANUAL_STEPS} items")
     seed_raw = body.seed_smiles or steps[0].seed_smiles or steps[0].parent_smiles
     try:
-        seed = molio.canonical(molio.parse_molecule(seed_raw))
-        for st_ in steps:
-            molio.parse_molecule(st_.parent_smiles)
-            molio.parse_molecule(st_.child_smiles)
+        seed = st.heavy.parse_many(
+            [seed_raw, *(m for x in steps for m in (x.parent_smiles, x.child_smiles))]
+        )[0][0]
     except molio.InvalidMolecule as exc:
         raise HTTPException(422, str(exc)) from None
     if any(i < 0 or i > 10_000 for st_ in steps for i in st_.site):
@@ -683,7 +664,17 @@ def _profile_out(p: dict[str, Any]) -> dict[str, Any]:
     return {"id": p["id"], "created_at": p["created_at"], **p["body"]}
 
 
-def _parse_profile(raw: dict[str, Any]) -> ProfileBody:
+def _parse_profile(raw: dict[str, Any], st: LeadState) -> ProfileBody:
+    patterns = raw.get("avoid_smarts")
+    if (
+        isinstance(patterns, list)
+        and 0 < len(patterns) <= MAX_SMARTS
+        and all(isinstance(p, str) for p in patterns)
+    ):
+        # parse the patterns in a worker first: only patterns it survived are parsed again by the validator below
+        for i, r in enumerate(st.heavy.call("smarts", {"patterns": patterns})):
+            if r["error"] is not None:
+                raise HTTPException(422, f"avoid_smarts: avoid_smarts[{i}]: {r['error']}")
     try:
         return ProfileBody.model_validate(raw)
     except ValidationError as exc:
@@ -705,8 +696,7 @@ def check_smarts_route(
     """Live validation for the editor: [{ok, error}] per pattern. Stores nothing. At most MAX_SMARTS patterns of
     MAX_SMARTS_LEN characters each, parsed under the process-wide heavy-operation gate (busy -> 429)."""
     throttle(sc, "smarts", 120)
-    with st.heavy:
-        return {"results": [{"ok": (e := check_smarts(p)) is None, "error": e} for p in body.patterns]}
+    return {"results": st.heavy.call("smarts", {"patterns": body.patterns})}
 
 
 @profiles.get("")
@@ -717,9 +707,11 @@ def list_profiles(sc: Scope = Depends(scope)) -> dict:
 
 
 @profiles.post("", status_code=201)
-def create_profile(raw: dict[str, Any], sc: Scope = Depends(scope)) -> dict:
+def create_profile(
+    raw: dict[str, Any], sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> dict:
     throttle(sc, "lib_write", 30)
-    body = _parse_profile(raw)
+    body = _parse_profile(raw, st)
     with sc.session() as s:
         store.lock_owner(s, sc.user.id, "profile")
         _cap(store.count_profiles(s, sc.user.id), store.MAX_PROFILES, "profiles")
@@ -741,9 +733,11 @@ def get_profile(pid: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
 
 
 @profiles.put("/{pid}")
-def update_profile(pid: uuid.UUID, raw: dict[str, Any], sc: Scope = Depends(scope)) -> dict:
+def update_profile(
+    pid: uuid.UUID, raw: dict[str, Any], sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> dict:
     throttle(sc, "lib_write", 30)
-    body = _parse_profile(raw)
+    body = _parse_profile(raw, st)
     with sc.session() as s:
         row = store.update_profile(s, sc.user.id, pid, body.name, body.model_dump(mode="json"))
         if row is None:

@@ -17,7 +17,8 @@ from typing import Any
 from fastapi import Request
 
 from leadstudio.server import stages
-from leadstudio.server.core import HeavyGate, RunManager, Settings
+from leadstudio.server.core import RunManager, Settings
+from leadstudio.server.heavy import HeavyPool
 from leadstudio.server.manual import ManualService
 from leadstudio.server.poses import PoseManager
 from leadstudio.wiring import describe
@@ -42,7 +43,7 @@ class LeadState:
     mgr: RunManager
     poses: PoseManager
     manual: ManualService
-    heavy: HeavyGate
+    heavy: HeavyPool
     details: dict[str, Any]
     components: dict[str, Any]
     presets: list[Any]
@@ -50,6 +51,11 @@ class LeadState:
     @property
     def source(self) -> str:
         return "live" if self.engine is not None else "mock"
+
+    def shutdown(self) -> None:
+        """Cancel all runs and kill every child process (run children and heavy workers)."""
+        self.mgr.shutdown()
+        self.heavy.close()
 
 
 def _load_component(name: str) -> Any | None:
@@ -113,6 +119,13 @@ def build_state(
         "mock_run": bool(mock_events),
         **({} if s.force_mock else svc.health()),
     }
+    heavy = HeavyPool(
+        workers=s.heavy_workers,
+        timeout=s.heavy_timeout,
+        recycle_after=s.heavy_recycle,
+        max_waiting=max(0, s.max_heavy_ops - s.heavy_workers),
+        mem_mb=s.child_mem_mb,
+    )
     return LeadState(
         settings=s,
         engine=engine,
@@ -125,8 +138,8 @@ def build_state(
             poll=_envf("DYNAMICBIND_POLL", 2.0),
             timeout=_envf("DYNAMICBIND_TIMEOUT", 900.0),
         ),
-        manual=ManualService(svc, scorer, s),
-        heavy=HeavyGate(s.max_heavy_ops),
+        manual=ManualService(svc, scorer, s, heavy),
+        heavy=heavy,
         details=details,
         components=components,
         presets=_load_presets(),
