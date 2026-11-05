@@ -93,8 +93,6 @@ def test_no_home_directory_paths_in_product_code_data_web_or_deploy():
     assert hits == [], hits[:5]
 
 
-@pytest.mark.xfail(strict=True, reason="F-147 LOW: personal absolute paths (macOS user name, local worktree layout) are committed in docs/agent_prompts/*.md and scripts/make_depictions.py "
-                                        "(the prompts also name sibling private checkouts). Harmless to run, but it publishes the account name and directory layout of the author")
 def test_no_home_directory_paths_in_docs_or_scripts():
     hits = scan(r"/Users/[A-Za-z0-9._-]+|/home/[a-z][a-z0-9_-]+/|C:\\Users\\", only=("docs/", "scripts/"))
     assert hits == [], sorted({h[0] for h in hits})
@@ -172,9 +170,6 @@ def test_gitignore_covers_the_files_that_must_never_be_committed(path):
     assert r.returncode == 0, path
 
 
-@pytest.mark.xfail(strict=True, reason="F-148 LOW: .gitignore does not cover several things a public repo with a database, object store and local model cache will produce: SQL/pg dumps "
-                                        "(*.dump, dump.sql, *.pgdump), *.sqlite/*.db, .cache/ (STUDIO_CACHE_DIR default: per-user adapter sidecars *.json, PLAPT embeddings, HF cache), "
-                                        "*.p12/*.pfx, credentials.json/service-account*.json, id_rsa*, *.tfstate, .netrc/.pypirc, .envrc, .aws/")
 def test_gitignore_also_covers_backups_local_caches_and_credential_files():
     missing = [p for p in ("dump.sql", "backup.dump", "a.pgdump", "x.sqlite", "x.db", ".cache/studio/adapters/x/a.json", ".cache/huggingface/x", "x.p12", "x.pfx",
                            "credentials.json", "service-account.json", "a/id_rsa", "terraform.tfstate", ".netrc", ".pypirc", ".envrc", ".aws/credentials")

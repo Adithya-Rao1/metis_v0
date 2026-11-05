@@ -15,7 +15,7 @@ Required in production (`METIS_ENV=production`; startup refuses on a missing, pl
 | `METIS_DATABASE_URL` | app, maintenance | Must connect as the least-privilege login role (a member of `metis_app`), never the owner or `postgres`. |
 | `METIS_SECRET_KEY` | accounts | At least **64 bytes** (HS512-sized), not trivially repetitive; startup refuses a shorter one with `METIS_SECRET_KEY must be at least 64 bytes`. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. JWT, CSRF and rate-limit pepper keys are derived from it; **rotating it signs everyone out and resets CSRF tokens**. |
 | `METIS_REDIS_URL` | settings | Required by the settings check. **[unverified]** No backend code path uses Redis today; do not rely on it for sessions or rate limits (both are in Postgres). |
-| `METIS_OBJECT_STORE_ENDPOINT`, `METIS_OBJECT_STORE_ACCESS_KEY`, `METIS_OBJECT_STORE_SECRET_KEY` | settings | Required by the settings check. |
+| `METIS_OBJECT_STORE_ENDPOINT`, `METIS_OBJECT_STORE_ACCESS_KEY`, `METIS_OBJECT_STORE_SECRET_KEY` | settings | Required by the settings check. The access key is a **bucket-scoped key you create in MinIO**, never the MinIO root credential (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`, which only the `minio` service receives). |
 
 Optional tunables:
 
@@ -33,7 +33,14 @@ Optional tunables:
 | `METIS_DOCKPREP_FETCH`, `METIS_PDB2PQR`, `METIS_FPOCKET` | unset | Docking-prep feature switches and tool paths (not owned by this runbook). |
 
 Never given to the app container: `METIS_MIGRATION_URL` (schema owner), `POSTGRES_PASSWORD`,
-`METIS_APP_DB_PASSWORD`, `REDIS_PASSWORD` (`deploy/docker-compose.yml` allow-lists the app environment).
+`METIS_APP_DB_PASSWORD`, `REDIS_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` (`deploy/docker-compose.yml` allow-lists the app
+environment). The allow-list contains **every** setting documented in sections 1 and 7, each as `${NAME:-code default}`, so putting
+a value in `deploy/.env` is enough to change it; compose cannot pass a name that is not listed.
+
+Health probes: `GET /health` is liveness only (touches nothing, used by the container `HEALTHCHECK`). `GET /health/ready` runs
+`SELECT 1` through the app's database pool and answers `{"status":"ok"}` or `503 {"status":"unavailable"}`; it reads no tables, returns no
+data or error detail and is the probe for a load balancer. The `app` service has a restart policy (`unless-stopped`) and limits
+(`mem_limit` 2g, `cpus` 2, `pids_limit` 256); tune them to the host.
 
 **Mail is not wired.** `backend/accounts/mailer.py` has only a console mailer (logs that a mail would be sent,
 never the address or token) and a test double. A production deployment has no way to deliver verification or
@@ -155,10 +162,14 @@ Backup tooling and retention in production are outside this repository.
 | --- | --- | --- |
 | `METIS_LEAD_DOCK_URL` | unset | Allow-list entry for the DynamicBind docking service. By default only a loopback `STUDIO_DYNAMICBIND_URL` is accepted; any other host must equal this value exactly (scheme, host, port). The URL is never taken from a request. |
 | `STUDIO_DYNAMICBIND_URL` | `http://127.0.0.1:8100` | Docking service. Down means `503` with a plain message; precomputed poses work without it. |
+| `STUDIO_ALL_EDITS` | off | **Warning:** `1` disables the demo-safe edit filter for every user (all registry edits and far crossovers become available). For local experiments only; with `METIS_ENV=production` the app refuses to start when it is `1`. |
+| `STUDIO_EMBED` | `morgan` | Embedding used for niching. `chemberta` downloads model weights from Hugging Face at run time (needs `transformers`, not shipped); leave `morgan` on a locked-down host. |
+| `STUDIO_CACHE_DIR` | `/var/lib/metis/cache` (image/compose), `.cache/studio` otherwise | Adapter files (`adapters/<user id>/`) and model caches. Must be writable; the compose root filesystem is read-only, so the stack mounts a volume here. Account deletion removes the user's adapter folder. |
+| `DYNAMICBIND_POLL`, `DYNAMICBIND_TIMEOUT` | 2, 900 | Seconds between polls of a docking job, and the longest a job may take. |
 | `STUDIO_FORCE_MOCK` | off | Serves recorded mock runs; every response states `source: "mock"` or `"live"`. |
 | `STUDIO_MAX_GENERATIONS`, `STUDIO_MAX_POPULATION`, `STUDIO_BINDING_MAX_GENERATIONS`, `STUDIO_BINDING_MAX_POPULATION` | 15, 40, set in code | Server caps. |
 | `STUDIO_PER_USER_RUNS`, `STUDIO_MAX_CONCURRENT`, `STUDIO_MAX_QUEUE` | 2, 2, 4 | Per-user and per-process run limits. |
-| `STUDIO_RUN_TIMEOUT` | 90 | Seconds, cooperative. |
+| `STUDIO_RUN_TIMEOUT` | 90 | Seconds. When it fires the run is finished with an error and its worker slot is handed back at once (a thread stuck in the engine cannot be killed; after four such abandoned threads new runs answer 503 until the process restarts). 3D embedding (3 s budget) and SMARTS matching (0.25 s per pattern, 0.5 s per candidate) have their own deadlines. |
 | `STUDIO_RUNS_PER_MIN`, `STUDIO_VALIDATES_PER_MIN` | 6, 30 | Per-user limits in the shared database limiter. |
 | `STUDIO_HEARTBEAT`, `STUDIO_MOCK_DELAY`, `STUDIO_REPLAY_DELAY` | 15, 0.4, 0.25 | SSE pacing. |
 | `STUDIO_ORPHAN_GRACE` | 30 | Seconds. A live or mock run that no event stream reads for this long is cancelled (closed tab, dropped connection); a reconnecting `EventSource` re-attaches within the grace period and keeps the run. The per-user stream slot is released when the response ends however it ends. `0` disables the cancel. |

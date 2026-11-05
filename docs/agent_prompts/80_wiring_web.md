@@ -1,6 +1,6 @@
 # Agent 8a: web wiring + end-to-end (Wave 3)
 
-Worktree: `/Users/adithyarao/.superset/worktrees/metis_v0/agent8-web` (branch `wave3/web`). Python: `/Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python` (Playwright 1.64 and cached Chromium are installed there; run commands from your worktree root). Do not create new virtualenvs. Do NOT commit to main, push, contact anyone, or train anything.
+Worktree: `<worktrees>/metis_v0/agent8-web` (branch `wave3/web`). Python: `<project>/.venv/bin/python` (Playwright 1.64 and cached Chromium are installed there; run commands from your worktree root). Do not create new virtualenvs. Do NOT commit to main, push, contact anyone, or train anything.
 
 You own: `web/`, `tests/web/`, `tests/e2e/`, `docs/WEB_WIRING.md` (new). You may NOT edit `backend/`, `ml/`, `backend/db/migrations/`, `docs/` other than your file, or `tests/security/` (QA owns it). Anything you need from the backend that does not exist goes into your handoff as `BACKEND-GAP: <route, request, response, why>`; do not work around it by faking data.
 

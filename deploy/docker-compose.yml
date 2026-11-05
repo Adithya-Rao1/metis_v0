@@ -34,33 +34,101 @@ services:
   minio:
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     command: ["server", "/data"]
-    environment:
-      MINIO_ROOT_USER: ${METIS_OBJECT_STORE_ACCESS_KEY:?set METIS_OBJECT_STORE_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${METIS_OBJECT_STORE_SECRET_KEY:?set METIS_OBJECT_STORE_SECRET_KEY}
+    environment:  # root credential: for the operator only, never passed to the app (create a bucket-scoped key for it)
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
     volumes: [miniodata:/data]
     networks: [backend]
 
   app:
     build: {context: .., dockerfile: deploy/Dockerfile}
     # Explicit allow-list: the app never receives POSTGRES_PASSWORD, METIS_MIGRATION_URL (schema owner),
-    # METIS_APP_DB_PASSWORD or REDIS_PASSWORD. Values are interpolated from deploy/.env by compose only.
+    # METIS_APP_DB_PASSWORD, REDIS_PASSWORD or the MinIO root credential. Every setting documented in
+    # docs/OPERATIONS.md is listed here; values come from deploy/.env (compose interpolation) and fall back to the
+    # code default shown. An empty default means "unset".
     environment:
       METIS_ENV: ${METIS_ENV:-production}
       METIS_DATABASE_URL: ${METIS_DATABASE_URL:?set METIS_DATABASE_URL (metis_app_login role)}
       METIS_SECRET_KEY: ${METIS_SECRET_KEY:?set METIS_SECRET_KEY}
       METIS_REDIS_URL: ${METIS_REDIS_URL:?set METIS_REDIS_URL}
+      # Object store: a bucket-scoped access key created by the operator, NOT the MinIO root credential.
       METIS_OBJECT_STORE_ENDPOINT: ${METIS_OBJECT_STORE_ENDPOINT:?set METIS_OBJECT_STORE_ENDPOINT}
       METIS_OBJECT_STORE_ACCESS_KEY: ${METIS_OBJECT_STORE_ACCESS_KEY:?set METIS_OBJECT_STORE_ACCESS_KEY}
       METIS_OBJECT_STORE_SECRET_KEY: ${METIS_OBJECT_STORE_SECRET_KEY:?set METIS_OBJECT_STORE_SECRET_KEY}
       METIS_OBJECT_STORE_BUCKET: ${METIS_OBJECT_STORE_BUCKET:-metis}
+      METIS_LOG_LEVEL: ${METIS_LOG_LEVEL:-INFO}
+      METIS_DB_POOL_SIZE: ${METIS_DB_POOL_SIZE:-5}
+      METIS_DB_STATEMENT_TIMEOUT_MS: ${METIS_DB_STATEMENT_TIMEOUT_MS:-30000}
+      METIS_TERMS_VERSION: ${METIS_TERMS_VERSION:-2026-01}
       # Client-IP handling for rate limits. Default false: the socket peer address is used. Set to "true" ONLY
       # when the app is reachable exclusively through your own reverse proxy that appends the real client IP as
       # the LAST X-Forwarded-For hop (only that last hop is trusted). If the proxy is in front and this stays
       # false, every client shares the proxy IP and the per-IP login/register limits lock everyone out together.
       METIS_ACCOUNTS_TRUST_PROXY: ${METIS_ACCOUNTS_TRUST_PROXY:-false}
+      METIS_ACCOUNTS_COOKIE_SECURE: ${METIS_ACCOUNTS_COOKIE_SECURE:-true}
+      METIS_ACCOUNTS_SESSION_TTL_S: ${METIS_ACCOUNTS_SESSION_TTL_S:-3600}
+      METIS_ACCOUNTS_BCRYPT_COST: ${METIS_ACCOUNTS_BCRYPT_COST:-12}
+      METIS_ACCOUNTS_VERIFY_TTL_HOURS: ${METIS_ACCOUNTS_VERIFY_TTL_HOURS:-24}
+      METIS_ACCOUNTS_RESET_TTL_S: ${METIS_ACCOUNTS_RESET_TTL_S:-3600}
+      # Rate limits, JSON [limit, window_seconds]; window 1..7200.
+      METIS_ACCOUNTS_RL_REGISTER_IP: ${METIS_ACCOUNTS_RL_REGISTER_IP:-[10,3600]}
+      METIS_ACCOUNTS_RL_REGISTER_EMAIL: ${METIS_ACCOUNTS_RL_REGISTER_EMAIL:-[3,3600]}
+      METIS_ACCOUNTS_RL_LOGIN_IP: ${METIS_ACCOUNTS_RL_LOGIN_IP:-[30,300]}
+      METIS_ACCOUNTS_RL_LOGIN_EMAIL: ${METIS_ACCOUNTS_RL_LOGIN_EMAIL:-[10,900]}
+      METIS_ACCOUNTS_RL_VERIFY_IP: ${METIS_ACCOUNTS_RL_VERIFY_IP:-[20,900]}
+      METIS_ACCOUNTS_RL_DELETE_USER: ${METIS_ACCOUNTS_RL_DELETE_USER:-[5,900]}
+      METIS_ACCOUNTS_RL_RESEND_IP: ${METIS_ACCOUNTS_RL_RESEND_IP:-[10,3600]}
+      METIS_ACCOUNTS_RL_RESEND_EMAIL: ${METIS_ACCOUNTS_RL_RESEND_EMAIL:-[3,3600]}
+      METIS_ACCOUNTS_RL_FORGOT_IP: ${METIS_ACCOUNTS_RL_FORGOT_IP:-[10,3600]}
+      METIS_ACCOUNTS_RL_FORGOT_EMAIL: ${METIS_ACCOUNTS_RL_FORGOT_EMAIL:-[3,3600]}
+      METIS_ACCOUNTS_RL_RESET_IP: ${METIS_ACCOUNTS_RL_RESET_IP:-[20,900]}
+      METIS_ACCOUNTS_RL_CHANGE_PASSWORD_USER: ${METIS_ACCOUNTS_RL_CHANGE_PASSWORD_USER:-[5,900]}
+      METIS_ACCOUNTS_RL_TERMS_ACCEPT_USER: ${METIS_ACCOUNTS_RL_TERMS_ACCEPT_USER:-[10,900]}
+      # Docking-prep switches and tool paths.
+      METIS_DOCKPREP_FETCH: ${METIS_DOCKPREP_FETCH:-}
+      METIS_PDB2PQR: ${METIS_PDB2PQR:-}
+      METIS_FPOCKET: ${METIS_FPOCKET:-}
+      # Lead Studio (Beta).
+      METIS_LEAD_DOCK_URL: ${METIS_LEAD_DOCK_URL:-}
+      STUDIO_DYNAMICBIND_URL: ${STUDIO_DYNAMICBIND_URL:-http://127.0.0.1:8100}
+      DYNAMICBIND_POLL: ${DYNAMICBIND_POLL:-2}
+      DYNAMICBIND_TIMEOUT: ${DYNAMICBIND_TIMEOUT:-900}
+      STUDIO_FORCE_MOCK: ${STUDIO_FORCE_MOCK:-}
+      # Never set to 1 in production (turns off the demo-safe edit filter); the app refuses to start with it.
+      STUDIO_ALL_EDITS: ${STUDIO_ALL_EDITS:-}
+      STUDIO_EMBED: ${STUDIO_EMBED:-morgan}
+      STUDIO_CACHE_DIR: ${STUDIO_CACHE_DIR:-/var/lib/metis/cache}
+      STUDIO_STRUCTURES_DIR: ${STUDIO_STRUCTURES_DIR:-}
+      STUDIO_POSES_DIR: ${STUDIO_POSES_DIR:-}
+      STUDIO_MAX_GENERATIONS: ${STUDIO_MAX_GENERATIONS:-15}
+      STUDIO_MAX_POPULATION: ${STUDIO_MAX_POPULATION:-40}
+      STUDIO_BINDING_MAX_GENERATIONS: ${STUDIO_BINDING_MAX_GENERATIONS:-10}
+      STUDIO_BINDING_MAX_POPULATION: ${STUDIO_BINDING_MAX_POPULATION:-30}
+      STUDIO_PER_USER_RUNS: ${STUDIO_PER_USER_RUNS:-2}
+      STUDIO_MAX_CONCURRENT: ${STUDIO_MAX_CONCURRENT:-2}
+      STUDIO_MAX_QUEUE: ${STUDIO_MAX_QUEUE:-4}
+      STUDIO_RUN_TIMEOUT: ${STUDIO_RUN_TIMEOUT:-90}
+      STUDIO_RUNS_PER_MIN: ${STUDIO_RUNS_PER_MIN:-6}
+      STUDIO_VALIDATES_PER_MIN: ${STUDIO_VALIDATES_PER_MIN:-30}
+      STUDIO_HEARTBEAT: ${STUDIO_HEARTBEAT:-15}
+      STUDIO_MOCK_DELAY: ${STUDIO_MOCK_DELAY:-0.4}
+      STUDIO_REPLAY_DELAY: ${STUDIO_REPLAY_DELAY:-0.25}
+      STUDIO_ORPHAN_GRACE: ${STUDIO_ORPHAN_GRACE:-30}
     ports: ["127.0.0.1:8000:8000"]
     read_only: true
     tmpfs: [/tmp]
+    volumes: [studiocache:/var/lib/metis/cache]  # adapter files and model caches (the root filesystem is read-only)
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    healthcheck:  # liveness (cheap, no database): /health. Use /health/ready as the load balancer's readiness probe.
+      test: ["CMD", "python", "-c", "import sys,urllib.request as u; sys.exit(0 if u.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     depends_on:
@@ -72,6 +140,7 @@ services:
 volumes:
   pgdata: {}
   miniodata: {}
+  studiocache: {}
 
 networks:
   backend: {}

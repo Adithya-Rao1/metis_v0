@@ -40,9 +40,6 @@ def test_the_app_service_is_hardened_and_bound_to_loopback():
         assert not COMPOSE["services"][svc].get("ports")                                       # backing services are not published
 
 
-@pytest.mark.xfail(strict=True, reason="F-151 MEDIUM: the compose 'app' environment is an allow-list that omits every documented tunable except METIS_ACCOUNTS_TRUST_PROXY: METIS_TERMS_VERSION, "
-                                        "METIS_LOG_LEVEL, METIS_ACCOUNTS_COOKIE_SECURE/SESSION_TTL/RL_*, METIS_DB_*, METIS_LEAD_DOCK_URL and every STUDIO_* setting cannot reach the container, "
-                                        "so the runbook (OPERATIONS sections 1 and 7) cannot be followed with the shipped compose file")
 def test_every_documented_setting_can_reach_the_app_container():
     names = sorted(set(re.findall(r"`((?:METIS|STUDIO)_[A-Z0-9_]+)`", OPS)) - {"METIS_MIGRATION_URL", "METIS_APP_DB_PASSWORD"})
     env = COMPOSE["services"]["app"]["environment"]
@@ -51,16 +48,12 @@ def test_every_documented_setting_can_reach_the_app_container():
     assert missing == [], (len(passthrough), missing)
 
 
-@pytest.mark.xfail(strict=True, reason="F-154 LOW: no resource limits or liveness for the app container: no mem_limit/cpus/pids_limit (in-process Lead Studio run state, RDKit and torch can use all of the "
-                                        "host), no restart policy, no HEALTHCHECK in the image or the service")
 def test_the_app_container_has_resource_limits_a_restart_policy_and_a_healthcheck():
     app = COMPOSE["services"]["app"]
     limits = {"mem_limit", "cpus", "pids_limit", "deploy"} & set(app)
     assert limits and "restart" in app and ("healthcheck" in app or "HEALTHCHECK" in DOCKERFILE), (sorted(app))
 
 
-@pytest.mark.xfail(strict=True, reason="F-159 LOW: in the compose stack the application connects to MinIO with the MinIO ROOT credentials (MINIO_ROOT_USER/PASSWORD are the same variables the app "
-                                        "receives as access/secret key): a compromised app owns the whole object store, not one bucket")
 def test_the_app_does_not_hold_the_object_store_root_credential():
     minio = COMPOSE["services"]["minio"]["environment"]
     app = COMPOSE["services"]["app"]["environment"]
@@ -93,8 +86,6 @@ def test_ci_builds_and_scans_the_image_and_produces_an_sbom():
     assert re.search(r"image-ref|trivy image|grype|syft|sbom", CI_TEXT, re.I)
 
 
-@pytest.mark.xfail(strict=True, reason="F-158 LOW: the secret scanner binary is downloaded with curl in the job and executed without a checksum or signature check (a supply-chain hop in the job "
-                                        "that guards secrets); everything else in the workflow is pinned by commit SHA")
 def test_ci_verifies_the_downloaded_scanner():
     block = CI_TEXT.split("gitleaks", 1)[1][:600]
     assert re.search(r"sha256sum|shasum|cosign|gpg --verify|--digest", block)
@@ -142,8 +133,6 @@ def test_backup_restore_and_deletion_drill_tooling_exists():
     assert "## backup" in OPS.lower() or "restore" in OPS.lower()
 
 
-@pytest.mark.xfail(strict=True, reason="F-157 LOW: GET /health always answers ok and touches nothing (no database, no migration check, no queue), and there is no readiness or metrics route; a load "
-                                        "balancer keeps routing to an instance whose database is gone. Structure-free monitoring (error and 429 counters, queue depth, run counts) does not exist")
 def test_there_is_a_readiness_signal_that_checks_the_database():
     from backend.main import create_app
 
@@ -190,9 +179,6 @@ def test_documented_lead_studio_defaults_equal_the_code():
     assert poses.DEFAULT_URL == "http://127.0.0.1:8100"
 
 
-@pytest.mark.xfail(strict=True, reason="F-150 LOW: OPERATIONS section 7 omits settings the code reads: STUDIO_ALL_EDITS (=1 turns OFF the demo-safe edit filter for every user), STUDIO_EMBED "
-                                        "(chemberta downloads model weights from Hugging Face at run time), STUDIO_CACHE_DIR (adapter files and caches; the default .cache/studio is read-only "
-                                        "under the compose root filesystem), STUDIO_BINDING_MAX_GENERATIONS/POPULATION (listed only in the row title), DYNAMICBIND_POLL and DYNAMICBIND_TIMEOUT")
 def test_every_environment_variable_the_lead_studio_code_reads_is_documented():
     used = set()
     for p in (ROOT / "leadstudio").rglob("*.py"):
@@ -211,9 +197,6 @@ def test_lead_studio_settings_object_reads_exactly_the_documented_names():
 
 
 # ==================================================================================== THREAT_MODEL.md vs code
-@pytest.mark.xfail(strict=True, reason="F-152 LOW: THREAT_MODEL.md does not mention Lead Studio at all (SSRF through the docking URL, SMARTS/SMILES cost, long-lived SSE streams, in-process run "
-                                        "state, optional torch/transformers model loading, copied third-party code) and states that hostile uploads are 'parsed in sandboxed worker with "
-                                        "time/memory limits' while the Lead Studio routes parse SMILES and MOL files inside the request thread (only dockprep uses the sandbox)")
 def test_the_threat_model_covers_lead_studio_and_its_sandbox_claim_is_true_for_it():
     assert "lead studio" in TM.lower() and ("ssrf" in TM.lower() or "docking" in TM.lower())
     lead_src = "".join(p.read_text() for p in (ROOT / "leadstudio/server").glob("*.py"))

@@ -17,3 +17,30 @@ node_modules/
 
 # local demo launcher data (database, synthetic models)
 .demo*/
+
+# database dumps and local databases
+*.dump
+*.pgdump
+*.sql.gz
+dump*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# local caches (STUDIO_CACHE_DIR default: per-user adapters, embeddings, Hugging Face cache)
+.cache/
+
+# credentials and key material
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+id_rsa*
+id_ed25519*
+*.tfstate
+*.tfstate.*
+.terraform/
+.netrc
+.pypirc
+.envrc
+.aws/

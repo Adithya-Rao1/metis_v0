@@ -30,8 +30,8 @@ from rdkit.Chem.Draw import rdMolDraw2D
 RDLogger.DisableLog("rdApp.*")
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
-DEF_PDB = "/Users/adithyarao/.superset/worktrees/GraphDQN/demo/main/studio/data/structures/egfr.pdb"
-DEF_SDF = "/Users/adithyarao/.superset/worktrees/GraphDQN/demo/main/studio/data/ligands/egfr_reference.sdf"
+DEF_PDB = str(ROOT / "leadstudio" / "data" / "structures" / "egfr.pdb")
+DEF_SDF = str(ROOT / "leadstudio" / "data" / "ligands" / "egfr_reference.sdf")
 CONFORMER_LABEL = "computed conformer, not an experimental structure"
 CONFORMER_METHOD = "RDKit ETKDGv3 embedding (seed 7) + MMFF94 optimisation, explicit hydrogens"
 FIXTURE_UUID = "00000000-0000-4000-8000-000000000001"

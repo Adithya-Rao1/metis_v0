@@ -1,6 +1,6 @@
 # Agent: Wave 4 web hardening (branch wave4/w4-web)
 
-Worktree: `/Users/adithyarao/.superset/worktrees/metis_v0/w4-web`. Python `/Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python`. Do NOT push or touch `backend/`, `leadstudio/`, migrations, `tests/security/` (except removing the strict-xfail marker of a finding you fix), docs other than `web/README.md`/`docs/WEB_WIRING.md`. You own `web/`, `tests/web/`, `tests/e2e/`. Findings detail: `/Users/adithyarao/.superset/projects/metis_v0/private/qa_wave3.md` (read-only, never copy exploit detail into public files).
+Worktree: `<worktrees>/metis_v0/w4-web`. Python `<project>/.venv/bin/python`. Do NOT push or touch `backend/`, `leadstudio/`, migrations, `tests/security/` (except removing the strict-xfail marker of a finding you fix), docs other than `web/README.md`/`docs/WEB_WIRING.md`. You own `web/`, `tests/web/`, `tests/e2e/`. Findings detail: `<project>/private/qa_wave3.md` (read-only, never copy exploit detail into public files).
 
 ## Do
 1. F-120: model page prints arrays of objects as `[object Object]`: render reliability bins and per-similarity-bin coverage as small readable tables (textContent only).

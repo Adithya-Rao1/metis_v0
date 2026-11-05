@@ -1,9 +1,9 @@
 # Agent: Lead Studio web port (branch wave3b/lead-web)
 
-Worktree: `/Users/adithyarao/.superset/worktrees/metis_v0/lead-web`. Python: `/Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python`. Do NOT push, contact anyone or touch `backend/`, `leadstudio/`, migrations (another agent owns them; they are being written in parallel). You own `web/lead/`, the small nav/link edits in other `web/` pages, `web/_headers` (per-path CSP for the new pages), `tests/web*/` additions.
+Worktree: `<worktrees>/metis_v0/lead-web`. Python: `<project>/.venv/bin/python`. Do NOT push, contact anyone or touch `backend/`, `leadstudio/`, migrations (another agent owns them; they are being written in parallel). You own `web/lead/`, the small nav/link edits in other `web/` pages, `web/_headers` (per-path CSP for the new pages), `tests/web*/` additions.
 
 ## Goal
-Bring the studio front-end from `/Users/adithyarao/.superset/worktrees/GraphDQN/restyle/studio/web` (read-only source, already restyled on Metis tokens) into this repo as **Metis Lead Studio (Beta)** under `web/lead/` so one site, one sign-in, no tab switching.
+Bring the studio front-end from `<worktrees>/GraphDQN/restyle/studio/web` (read-only source, already restyled on Metis tokens) into this repo as **Metis Lead Studio (Beta)** under `web/lead/` so one site, one sign-in, no tab switching.
 
 ## Build
 1. Copy the app (index.html -> `web/lead/index.html`, js, css, fonts, assets, vendor) into `web/lead/`. Reuse Metis's shared tokens/fonts/vendored 3Dmol if identical (check hashes in `web/vendor`; do not keep two copies of the same library). Page `<title>` and the visible product name: **Metis Lead Studio (Beta)**. Keep the benzene logo.

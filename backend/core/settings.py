@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from functools import lru_cache
 from typing import Literal
@@ -114,6 +115,10 @@ class Settings(BaseSettings):
                 problems.append("METIS_SECRET_KEY is trivially guessable")
         if self.database_url and _db_user_forbidden(self.database_url.get_secret_value()):
             problems.append("METIS_DATABASE_URL must not use the postgres superuser or schema owner")
+        if os.environ.get("STUDIO_ALL_EDITS") == "1":
+            problems.append(
+                "STUDIO_ALL_EDITS=1 disables the Lead Studio demo-safe edit filter and is not allowed"
+            )
         if problems:
             # Names only; never include secret values in the message.
             raise SettingsError("refusing to start in production: " + "; ".join(problems))

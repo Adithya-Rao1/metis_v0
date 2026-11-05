@@ -1,6 +1,6 @@
 # Agent 9: backend completion (Wave 3)
 
-Worktree: `/Users/adithyarao/.superset/worktrees/metis_v0/agent9-backend` (branch `wave3/backend`, from main at the commit that contains migration 0004). Python: `/Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python`, run from your worktree root. No new virtualenvs. Do NOT push, contact anyone, train anything, or touch `web/`, `ml/`, `backend/db/migrations/`, `tests/security/`, `tests/e2e/` (other agents own them). If you need a schema change, describe the exact SQL in your handoff as `SCHEMA-REQUEST:`; the integrator writes migrations.
+Worktree: `<worktrees>/metis_v0/agent9-backend` (branch `wave3/backend`, from main at the commit that contains migration 0004). Python: `<project>/.venv/bin/python`, run from your worktree root. No new virtualenvs. Do NOT push, contact anyone, train anything, or touch `web/`, `ml/`, `backend/db/migrations/`, `tests/security/`, `tests/e2e/` (other agents own them). If you need a schema change, describe the exact SQL in your handoff as `SCHEMA-REQUEST:`; the integrator writes migrations.
 
 You own: `backend/accounts/`, `backend/jobs/`, `backend/maintenance/` (new), `backend/projects/` (only where the job table needs it), their tests under `tests/accounts`, `tests/api`, `tests/maintenance` (new), `backend/main.py` only to mount or start things, and `docs/OPERATIONS.md` (new).
 

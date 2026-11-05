@@ -1,6 +1,6 @@
 # Agent 8b: restyle the Metis Lead Optimization Studio to match Metis v1 (Wave 3)
 
-Worktree: `/Users/adithyarao/.superset/worktrees/GraphDQN/restyle` (repo GraphDQN, branch `demo/restyle-metis`, created from `origin/demo/integrate`). Reference design: `/Users/adithyarao/.superset/projects/metis_v0/web/` (read-only for you). Python with Playwright for screenshots: `/Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python`. Do not create virtualenvs. You may commit to branch `demo/restyle-metis` in this worktree; do NOT push, merge, or touch any other branch or worktree, and do not change backend behaviour.
+Worktree: `<worktrees>/GraphDQN/restyle` (repo GraphDQN, branch `demo/restyle-metis`, created from `origin/demo/integrate`). Reference design: `<project>/web/` (read-only for you). Python with Playwright for screenshots: `<project>/.venv/bin/python`. Do not create virtualenvs. You may commit to branch `demo/restyle-metis` in this worktree; do NOT push, merge, or touch any other branch or worktree, and do not change backend behaviour.
 
 You own: `studio/web/` only (css, html, js, fixtures only when a visual change needs it). You may NOT edit `studio/server`, `studio/engine`, `studio/policy`, scoring, API routes or tests outside `studio/web/`.
 
