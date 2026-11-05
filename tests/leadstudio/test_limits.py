@@ -1,19 +1,14 @@
-"""Time and size limits added for F-145/F-146/F-162: deadline-limited SMARTS matching, bounded embedding, stuck-run slots."""
+"""Time and size limits added for F-145/F-146/F-162: deadline-limited SMARTS matching, bounded embedding, stuck runs (now killed with their process, see test_runproc.py)."""
 
 from __future__ import annotations
 
-import threading
 import time
-import uuid
 
-import pytest
 from rdkit import Chem
 
 from leadstudio import matching
 from leadstudio.engine import geometry
 from leadstudio.profiles import MAX_SMARTS_ATOMS, check_smarts
-from leadstudio.schema import RunConfig
-from leadstudio.server.core import MAX_ABANDONED, Rejected, RunManager, Settings
 
 
 def _grid(w: int, h: int) -> Chem.Mol:
@@ -50,29 +45,3 @@ def test_embedding_a_hopeless_molecule_returns_within_the_budget():
     t = time.monotonic()
     geometry.embed_raw(smi)
     assert time.monotonic() - t < geometry.EMBED_BUDGET_S + 2
-
-
-def test_stuck_runs_are_bounded_after_their_slots_are_handed_back():
-    release = threading.Event()
-
-    class Hung:
-        def run(self, run_id, config):
-            yield {"type": "run_start", "payload": {}}
-            release.wait(30)
-
-    mgr = RunManager(Settings(max_concurrent=1, run_timeout=0.2, per_user_active=50, max_queue=50, orphan_grace=0), Hung(), [])
-    cfg = RunConfig(seed_smiles="CCO")
-    try:
-        for i in range(MAX_ABANDONED):
-            mgr.submit(uuid.uuid4(), cfg.model_copy(update={"rng_seed": i}), f"r{i}")
-            deadline = time.monotonic() + 5
-            while mgr.pool.abandoned <= i and time.monotonic() < deadline:
-                time.sleep(0.05)
-        assert mgr.pool.abandoned == MAX_ABANDONED
-        with pytest.raises(Rejected) as e:
-            mgr.submit(uuid.uuid4(), cfg, "late")
-        assert e.value.status_code == 503
-    finally:
-        release.set()
-        mgr.pool.shutdown(wait=True)
-    assert mgr.pool.abandoned == 0
