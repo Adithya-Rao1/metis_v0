@@ -163,6 +163,14 @@ export class Pocket {
     this.viewer.render();
   }
 
+  /** Cheapest picture of the protein for the pose wait: ONE plain cartoon (no bands, no sticks, no surface). showMain() restores the full scene. */
+  showWaitCartoon() {
+    if (!this.main) return;
+    this.removeSurfaces(this.main);
+    this.main.model.setStyle({}, { cartoon: { color: 0xc9d3e6, opacity: 0.9, thickness: 0.2 } });
+    this.viewer.render();
+  }
+
   hideMain() { if (this.main) { this.removeSurfaces(this.main); this.main.model.setStyle({}, {}); this.viewer.render(); } }
   async showMain() {
     if (!this.main) return;

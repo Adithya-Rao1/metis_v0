@@ -7,6 +7,7 @@ import { atomColors, alertMasks, haloAt, SCALES } from "./overlays.js";
 
 const STICK_R = 0.13;
 const SPIN_DEG_PER_S = 9;
+import "./dpr.js"; // caps window.devicePixelRatio at 1.5 before the 3Dmol viewer is created
 const BG = [0.04, 0.06, 0.1]; // approx. colour of the dark stage, used to fade atoms out
 
 export class Stage {
@@ -15,7 +16,7 @@ export class Stage {
     this.overlay = overlay;
     this.ctx = overlay.getContext("2d");
     if (!window.$3Dmol) throw new Error("3Dmol.js failed to load");
-    this.viewer = window.$3Dmol.createViewer(host, { backgroundAlpha: 0, antialias: true });
+    this.viewer = window.$3Dmol.createViewer(host, { backgroundAlpha: 0, antialias: true, upscale: false });
     this.kf = null;
     this.morph = null;
     this.p = 0;

@@ -409,6 +409,7 @@ async function enterStage(st) {
     closeStream();
     $("stage-empty").hidden = true;
     await ensureScene("apo");
+    if (tok !== viewToken) return;   // the user already moved to another stage while the scene loaded: add nothing to it
     if (!docking && S.pose && poseView.result && S.pose.smiles === (S.lead?.smiles || S.seedSmiles)) await playCachedPose();
     else if (!poseView.active) poseView._enter();
     paintPoseCard();

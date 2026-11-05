@@ -345,3 +345,87 @@ def test_pose_metrics_hud_is_only_visible_on_the_pose_stage(lead_page):
     for stage, shown in (("binding", False), ("pharmacology", False), ("pose", True)):
         pg.evaluate("s => { document.body.dataset.stage = s; const h = document.getElementById('hud-pose'); h.hidden = false; h.textContent = 'Pose confidence 0.66' }", stage)
         assert pg.evaluate("getComputedStyle(document.getElementById('hud-pose')).display !== 'none'") is shown, stage
+
+
+# ---------------- Wave 4: pose wait, leftovers on other stages, pixel ratio ----------------
+def run_pose(pg):
+    pg.keyboard.press("w")
+    wait_for(pg, "document.body.dataset.stage === 'pose'", 10)
+    pg.click("#btn-stage-run")
+
+
+def test_pose_wait_shows_one_cartoon_and_elapsed_seconds(lead_page):
+    pg = lead_page(lead=LeadMockApi(pose_polls=6))
+    open_lead(pg)
+    run_pose(pg)
+    pg.wait_for_selector("[data-testid=pose-wait-label]", timeout=15000)
+    # one plain cartoon on the protein, no sticks, no surface, a single colour
+    shape = pg.evaluate("""() => { const m = window.metis.pocket.main; const at = m.model.selectedAtoms({});
+        return { kinds: [...new Set(at.map(a => Object.keys(a.style || {}).sort().join('+')))], colors: [...new Set(at.map(a => a.style.cartoon && a.style.cartoon.color))].length, surfaces: m.surfaces.length }; }""")
+    assert shape == {"kinds": ["cartoon"], "colors": 1, "surfaces": 0}, shape
+    # software GL can stall the page for seconds, so record every label the wait shows instead of sampling at fixed times
+    pg.evaluate("""() => { window.__labels = []; new MutationObserver(() => { const t = document.querySelector('[data-testid=pose-wait-label]'); if (t) window.__labels.push(t.textContent); })
+        .observe(document.getElementById('hud-progress'), { childList: true, subtree: true, characterData: true }); }""")
+    wait_for(pg, "!!window.metis.poseView.result", 60)
+    secs = [int(m.group(1)) for t in pg.evaluate("window.__labels") if (m := re.search(r"\((\d+) s\)", t))]
+    assert len(set(secs)) >= 2 and secs == sorted(secs), secs      # the count of elapsed seconds is shown and moves forward
+    assert real_errors(pg) == []
+
+
+def test_pose_wait_is_reachable_and_startable_from_the_keyboard(lead_page):
+    pg = lead_page()
+    open_lead(pg)
+    pg.keyboard.press("w")
+    wait_for(pg, "document.body.dataset.stage === 'pose'", 10)
+    pg.focus("#btn-stage-run")
+    pg.keyboard.press("Enter")
+    wait_for(pg, "!!window.metis.poseView.result", 30)
+    assert any(c[0] == "POST" and c[1] == "/api/poses" for c in pg.lead.calls)
+
+
+def test_pose_card_and_3d_marks_do_not_stay_on_other_stages(lead_page):
+    pg = lead_page()
+    open_lead(pg)
+    run_pose(pg)
+    wait_for(pg, "!!window.metis.poseView.result && window.metis.poseView.main", 30)
+    # force a displacement mark set so there is something to leak
+    pg.evaluate("""() => { const v = window.metis.poseView; const a = v.main.atoms.filter(x => x.name === 'CA').slice(0, 3);
+        v.moved = a.map((x, i) => ({ d: 2 + i, resi: x.resi, resn: x.resn, apo: x, pred: { x: x.x + 1, y: x.y, z: x.z } })); v._marks(); }""")
+    assert pg.evaluate("window.metis.poseView.shapes.length > 0 && window.metis.poseView.labels.length > 0")
+    assert pg.evaluate("getComputedStyle(document.getElementById('card-pose')).display") != "none"
+    for key, stage in (("q", "binding"), ("e", "pharmacology"), ("r", "manual")):
+        pg.keyboard.press("w")
+        wait_for(pg, "document.body.dataset.stage === 'pose'", 10)
+        pg.evaluate("() => { const v = window.metis.poseView; if (v.main) { v.moved = v.moved || []; } }")
+        pg.keyboard.press(key)
+        wait_for(pg, f"document.body.dataset.stage === '{stage}'", 10)
+        pg.wait_for_timeout(400)
+        left = pg.evaluate("""() => { const v = window.metis.poseView; return { active: v.active, shapes: v.shapes.length, labels: v.labels.length, layers: v.layers.length, lig: !!v.lig, orbit: !!v.orbit,
+            card: getComputedStyle(document.getElementById('card-pose')).display, hud: getComputedStyle(document.getElementById('hud-pose')).display,
+            prog: getComputedStyle(document.getElementById('hud-progress')).display }; }""")
+        assert left == {"active": False, "shapes": 0, "labels": 0, "layers": 0, "lig": False, "orbit": False, "card": "none", "hud": "none", "prog": "none"}, (stage, left)
+        shapes = pg.evaluate("window.metis.stage.viewer.getInternalState ? (window.metis.stage.viewer.getInternalState().shapes || []).length : 0")
+        assert shapes == 0, (stage, shapes)
+
+
+def test_leaving_the_pose_stage_during_the_wait_stops_the_waiting_ligand(lead_page):
+    pg = lead_page(lead=LeadMockApi(pose_polls=50))
+    open_lead(pg)
+    run_pose(pg)
+    pg.wait_for_selector("[data-testid=pose-wait-label]", timeout=15000)
+    pg.keyboard.press("q")
+    wait_for(pg, "document.body.dataset.stage === 'binding'", 10)
+    pg.wait_for_timeout(500)
+    assert pg.evaluate("({ orbit: !!window.metis.poseView.orbit, tick: !!window.metis.poseView._tickTimer })") == {"orbit": False, "tick": False}
+
+
+def test_lead_viewer_pixel_ratio_is_capped_at_1_5(lead_page):
+    pg = lead_page(device_scale_factor=3)
+    open_lead(pg)
+    assert pg.evaluate("window.devicePixelRatio") == 1.5
+    r = pg.evaluate("""() => { const c = document.querySelector('#stage canvas, canvas'); const cs = [...document.querySelectorAll('canvas')].filter(x => x.clientWidth > 100);
+        return cs.map(x => x.width / x.clientWidth); }""")
+    assert r and all(x <= 1.51 for x in r), r
+    pg2 = lead_page(device_scale_factor=1)
+    open_lead(pg2)
+    assert pg2.evaluate("window.devicePixelRatio") == 1

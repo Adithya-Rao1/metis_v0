@@ -225,8 +225,9 @@ def _hostile(obj, key=None):
 class LeadMockApi:
     """Install on a page AFTER the Metis MockApi (later routes win): `install_lead(page, lead)`. Session comes from the Metis MockApi (/api/auth/me)."""
 
-    def __init__(self, hostile=False, fail_health=False, events_delay_first=False):
+    def __init__(self, hostile=False, fail_health=False, events_delay_first=False, pose_polls=0):
         self.hostile, self.fail_health = hostile, fail_health
+        self.pose_polls, self._pose_seen = pose_polls, 0     # a pose job reports "running" this many polls before it is done
         self.calls: list[tuple[str, str, object]] = []
         self.runs: dict[str, dict] = {}
         self.status_overrides: dict[tuple[str, str], tuple[int, object]] = {}   # (method, path regex) -> (status, body)
@@ -282,6 +283,16 @@ class LeadMockApi:
             return (200, hit[0], {}) if hit else (404, {"detail": "not found"}, {})
         if path.startswith("/api/data/"):
             return 200, (LEAD_FX / "fixture1.pdb").read_text(), {"content-type": "chemical/x-pdb"}
+        if path == "/api/poses" and method == "POST":
+            self._pose_seen = 0
+            return 200, {"job_id": "pose-1", "status": "queued"}, {}
+        if re.fullmatch(r"/api/poses/[\w-]+", path):
+            self._pose_seen += 1
+            if self._pose_seen <= self.pose_polls:
+                return 200, {"job_id": "pose-1", "status": "running", "progress": 0.3}, {}
+            smi = "CCO"
+            return 200, {"job_id": "pose-1", "status": "done", "progress": 1, "pose_confidence": 0.66, "affinity": -7.1, "note": "mock pose (test data)",
+                         "ligand_sdf": molblock(smi), "protein_pdb": (LEAD_FX / "fixture1.pdb").read_text(), "apo_pdb": (LEAD_FX / "fixture1.pdb").read_text()}, {}
         if path == "/api/presets":
             return 200, [], {}
         if path == "/api/molecules/validate":

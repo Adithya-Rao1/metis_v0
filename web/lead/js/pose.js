@@ -105,6 +105,8 @@ export class PoseView {
   leave() {
     this.run++;
     cancelAnimationFrame(this.raf);
+    this._stopTicker();
+    this._stopOrbit();                 // the waiting ligand must not keep tumbling on other stages
     this._clearScene();
     this._active = false;
     this.pocket.showMain?.();
@@ -132,10 +134,13 @@ export class PoseView {
     this._enter();
     this._clearScene();
     this.target = target; this.smiles = smiles; this.leadAffinity = leadAffinity;
-    this.pocket.showMain?.();
+    this.pocket.showWaitCartoon?.();       // one protein cartoon while we wait; the full scene returns with the result
     this.pocket.fit(700);
     $("hud-pose").hidden = true;
-    this._progress(0, "Requesting pose… (known drugs are instant; a new molecule needs a live DynamicBind run, about 1-2 min)");
+    this._waitStart = performance.now();
+    this._waitLabel = "Requesting pose… (known drugs are instant; a new molecule needs a live DynamicBind run, about 1-2 min)";
+    this._progress(0, this._waitLabel);
+    this._startTicker(my);
     this._startOrbit(smiles, my);
     let job;
     try {
@@ -145,10 +150,11 @@ export class PoseView {
     for (let i = 0; i < 400 && this.run === my; i++) {
       try { res = await API.getPose(job.job_id); } catch (e) { return this._fail(my, e.message || String(e)); }
       if (res.status === "done" || res.status === "failed") break;
-      const label = res.status === "queued" ? "Queued for DynamicBind…" : "DynamicBind: sampling pose + protein flexibility…";
-      this._progress(res.progress ?? 0, label);
+      this._waitLabel = res.status === "queued" ? "Queued for DynamicBind…" : "DynamicBind: sampling pose + protein flexibility…";
+      this._progress(res.progress ?? 0, this._waitLabel);
       await new Promise((r) => setTimeout(r, 900));
     }
+    this._stopTicker();
     if (this.run !== my) return;
     if (res.status !== "done") return this._fail(my, res.note || "Pose prediction failed");
     this._progress(1, "Pose ready");
@@ -162,6 +168,7 @@ export class PoseView {
 
   _fail(my, msg) {
     if (this.run !== my) return null;
+    this._stopTicker();
     this._stopOrbit();
     $("hud-progress").hidden = false;
     $("hud-progress").innerHTML = `<div class="prog-card failed"><b>Pose prediction failed</b><div>${esc(msg)}</div></div>`;
@@ -173,7 +180,26 @@ export class PoseView {
     const el = $("hud-progress");
     el.hidden = false;
     const pct = Math.round(clamp01(p) * 100);
-    el.innerHTML = `<div class="prog-card"><div class="pbar"><i><b data-style="width:${pct}%"></b></i><span>${pct}%</span></div><div class="prog-txt"><b>${esc(label)}</b><div class="muted">${esc(this.smiles || "")}</div></div></div>`;
+    this._pct = p;
+    const secs = this._waitStart != null && this._ticking ? ` (${Math.floor((performance.now() - this._waitStart) / 1000)} s)` : "";
+    el.innerHTML = `<div class="prog-card"><div class="pbar"><i><b data-style="width:${pct}%"></b></i><span>${pct}%</span></div><div class="prog-txt"><b data-testid="pose-wait-label">${esc(label)}${secs}</b><div class="muted">${esc(this.smiles || "")}</div></div></div>`;
+  }
+
+  // elapsed seconds in the wait label: re-painted once a second, independent of the 0.9 s poll
+  _startTicker(my) {
+    this._stopTicker();
+    this._ticking = true;
+    this._tickTimer = setInterval(() => {
+      if (this.run !== my) return this._stopTicker();
+      this._progress(this._pct ?? 0, this._waitLabel);
+    }, 1000);
+    this._progress(0, this._waitLabel);
+  }
+
+  _stopTicker() {
+    clearInterval(this._tickTimer);
+    this._tickTimer = 0;
+    this._ticking = false;
   }
 
   // ---- waiting animation: the ligand (server conformer) tumbles outside the pocket
@@ -221,6 +247,7 @@ export class PoseView {
 
   // ------------------------------------------------------------------------------- the glide + morph
   async play(res, structureText, my = this.run) {
+    this._enter();                 // a cached replay starts from a left view: mark it active so leave() will clean up what play() adds
     this._posePlaying = true;
     this._stopOrbit();
     $("hud-progress").hidden = true;
