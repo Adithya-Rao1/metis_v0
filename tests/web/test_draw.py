@@ -94,13 +94,13 @@ def test_bridge_ignores_unknown_commands_and_foreign_senders(make_hpage):
         addEventListener('message', (e) => { if (e.source === f.contentWindow) out.push(e.data); });
         for (const m of [{ metis_draw: 1, id: 5, cmd: 'eval', arg: 'alert(1)' }, { metis_draw: 1, id: 'x', cmd: 'getSmiles' }, { id: 6, cmd: 'getSmiles' }, 'getSmiles', null, { metis_draw: 1, id: 7, cmd: '__proto__' }])
           f.contentWindow.postMessage(m, '*');
-        setTimeout(() => res(out), 600);
+        setTimeout(() => res(out), 2000);
     })""")
     assert heard == []
     # a window that is not the frame's parent (here: the frame itself posting to itself) is ignored too: the parent hears nothing back
     pg.evaluate("() => { window.__heard = []; addEventListener('message', (e) => { if (e.data && e.data.id === 9) window.__heard.push(e.data); }); }")
     fr.evaluate("() => postMessage({ metis_draw: 1, id: 9, cmd: 'getSmiles' }, '*')")
-    pg.wait_for_timeout(600)
+    pg.wait_for_timeout(2000)
     assert pg.evaluate("window.__heard") == []
 
 

@@ -50,7 +50,9 @@ def test_rename_project_from_the_project_page(make_page):
 def test_rename_project_from_the_list(make_page):
     pg = make_page()
     pg.goto(pg.base + "/app.html")
+    pg.wait_for_selector("button:has-text('Rename')", state="visible")
     pg.click("button:has-text('Rename')")
+    pg.wait_for_selector("#cd-name", state="visible")
     pg.fill("#cd-name", "From list")
     pg.click("#cd-ok")
     pg.wait_for_function("() => document.querySelector('.proj-link') && document.querySelector('.proj-link').textContent === 'From list'")
