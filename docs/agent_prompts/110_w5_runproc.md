@@ -1,6 +1,6 @@
 # Agent: Lead Studio run isolation (branch wave5/w5-runproc)
 
-Worktree `/Users/adithyarao/.superset/worktrees/metis_v0/w5-runproc`. Python `/Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python` (absolute path: /Users/adithyarao/.superset/projects/metis_v0/.venv/bin/python). Do NOT push, contact anyone, touch `web/`, migrations, `backend/accounts`. You own `leadstudio/` (server/core.py, engine, scoring plumbing needed), `tests/leadstudio/`, `docs/OPERATIONS.md` section 7, `docs/THREAT_MODEL.md` Lead Studio rows. Security is critical; read `/Users/adithyarao/.superset/projects/metis_v0/private/qa_wave4.md` (read-only, never copy exploit detail into public files).
+Worktree `<worktrees>/metis_v0/w5-runproc`. Python `<project>/metis_v0/.venv/bin/python` (absolute path: <project>/metis_v0/.venv/bin/python). Do NOT push, contact anyone, touch `web/`, migrations, `backend/accounts`. You own `leadstudio/` (server/core.py, engine, scoring plumbing needed), `tests/leadstudio/`, `docs/OPERATIONS.md` section 7, `docs/THREAT_MODEL.md` Lead Studio rows. Security is critical; read `<project>/metis_v0/private/qa_wave4.md` (read-only, never copy exploit detail into public files).
 
 ## Goal
 Today Lead Studio parses molecules and runs the GA inside the API process (a native RDKit crash would take the API down; a timed-out run leaks a Python thread, bounded to 4). Move the compute out of the API process.
