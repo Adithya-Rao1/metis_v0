@@ -1,0 +1,159 @@
+/* Pipeline UI (stage nav, target card, leads, pose HUD). Loaded after app.css; reuses its Metis tokens. */
+:root{--nav-h:49px;--top-h:45px}
+
+/* -------------------------------------------------------------- banner */
+.banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 16px;background:var(--note-bg);border-bottom:1px solid var(--note-line);color:var(--fg);font-size:12px}
+.banner b{font-weight:600}
+
+/* ------------------------------------------------------------- stage nav (Metis .nav) */
+.stages{position:sticky;top:var(--top-h);z-index:15;display:flex;align-items:center;gap:14px;padding:8px 16px;min-height:var(--nav-h);background:var(--panel);border-bottom:1px solid var(--line)}
+.steps{list-style:none;margin:0;padding:0;display:flex;align-items:center;gap:4px;flex:1;min-width:0;flex-wrap:wrap}
+.step{display:flex;align-items:center;flex:0 1 auto;min-width:0}
+.step button{display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:3px;border:1px solid transparent;background:transparent;cursor:pointer;text-align:left;color:var(--fg)}
+.step button:hover{border-color:var(--accent)}
+.step .num{width:20px;height:20px;border-radius:3px;display:grid;place-items:center;font-weight:500;font-size:12px;background:var(--soft);border:1px solid var(--line);color:var(--muted);flex:none}
+.step .lbl{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.step .lbl b{font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap}
+.step .lbl small{font-size:12px;color:var(--muted);white-space:nowrap}
+.step .tick{display:none;color:var(--fg);font-weight:600}
+.step.on button{border-color:var(--line);background:var(--soft)}
+.step.on .num{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.step.on .lbl b{color:var(--fg)}
+.step.past .num,.step.done .num{border-color:var(--accent);color:var(--accent)}
+.step.done .tick{display:inline}
+.step .link{flex:0 0 14px;height:1px;margin:0 2px;background:var(--line)}
+.step .link i{display:none}
+.manual-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel);user-select:none;flex:none}
+.manual-toggle input{position:absolute;opacity:0;pointer-events:none}
+.manual-toggle .sw{width:30px;height:16px;border-radius:3px;background:var(--soft);border:1px solid var(--line);position:relative;flex:none}
+.manual-toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:2px;background:var(--muted)}
+.manual-toggle input:checked + .sw{background:var(--accent);border-color:var(--accent)}
+.manual-toggle input:checked + .sw::after{transform:translateX(14px);background:var(--on-accent)}
+.manual-toggle input:focus-visible + .sw{outline:2px solid var(--accent);outline-offset:2px}
+.manual-toggle span:last-child{display:flex;flex-direction:column;line-height:1.2} .manual-toggle small{font-size:12px;color:var(--muted)}
+
+/* the stage nav adds a row: the stage area shrinks by its height */
+.main{height:calc(100vh - var(--top-h) - var(--nav-h));min-height:520px}
+
+/* ---------------------------------------------------------- which card shows when */
+body[data-stage="binding"] #card-start,
+body[data-stage="pose"] #card-start,
+body[data-stage="binding"] #card-pose,body[data-stage="pharmacology"] #card-pose,body[data-stage="manual"] #card-pose,
+body[data-stage="pose"] #card-leads,body[data-stage="pharmacology"] #card-leads,body[data-stage="manual"] #card-leads,
+body[data-stage="pose"] #card-why,body[data-stage="pose"] #card-overlays,
+body[data-stage="pose"] .timeline{display:none}
+body[data-stage="pose"] .stage-col{gap:0}
+body[data-stage="pose"] #t-settings,body[data-stage="pharmacology"] #t-settings,body[data-stage="manual"] #t-settings{display:none}
+.manual-mount{margin:0 16px 24px}
+.manual-mount[hidden]{display:none !important}
+
+/* ----------------------------------------------------------------------- cards */
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500}
+.text.sel{font-family:inherit;font-size:14px;color:var(--fg);cursor:pointer;padding:5px 8px}
+.target-meta{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:-2px 0 10px}
+.target-meta .pdb{color:var(--accent);font-weight:600}
+.target-meta .note{flex-basis:100%;font-style:italic}
+.seed-smiles{font-size:12px;margin:-4px 0 10px;word-break:break-all} .seed-smiles code{font-family:var(--mono);color:var(--fg)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.schip{font-size:12px;font-weight:500;padding:0 6px;border-radius:3px;border:1px solid var(--line);color:var(--muted);background:var(--panel);white-space:nowrap}
+.schip.pred{color:var(--accent);border-color:var(--accent)}
+.schip.pre{color:var(--fg)}
+.schip.mock{background:var(--note-bg);border-color:var(--note-line);color:var(--fg)}
+.schip.replay{color:var(--muted)}
+.btn.big{padding:6px 18px;font-size:14px;min-height:34px}
+.skel-block{height:150px;border-radius:4px;background:var(--soft);border:1px solid var(--line)}
+.card .pred-tag{font-size:12px;font-weight:500;vertical-align:middle;margin-left:6px;padding:0 6px;border-radius:3px;border:1px solid var(--accent);color:var(--accent);text-transform:lowercase}
+
+/* once a run exists the target card shrinks so the chart / leads are visible at 720p */
+body[data-run="1"] #card-target .target-meta,body[data-run="1"] #card-target .seed-smiles,body[data-run="1"] #card-target .settings{display:none}
+body[data-run="1"] #card-target .field{margin-bottom:6px}
+body[data-run="1"] #card-target h2{margin-bottom:6px}
+body[data-run="1"] #card-target .row.end{margin-top:6px}
+body[data-run="1"] #card-target .btn.big{padding:4px 14px}
+
+/* ----------------------------------------------------------------- leads + chart */
+.aff-chart{width:100%;height:auto;display:block;margin-bottom:8px}
+.aff-chart .grid{stroke:var(--line);stroke-width:1}
+.aff-chart .ax{fill:var(--muted);font-size:11px}
+.aff-chart .seedline{stroke:var(--muted);stroke-dasharray:4 4;stroke-width:1}
+.aff-chart .seedlbl{font-style:italic}
+.aff-chart .aff-line{fill:none;stroke:var(--s1);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.aff-chart .dot{fill:var(--panel);stroke:var(--s1);stroke-width:2}
+.aff-chart .dot.last{fill:var(--s1)}
+.aff-chart .best{fill:var(--s1);font-size:12px;font-weight:600}
+.lead-wrap{overflow-x:auto}
+.leads-table{width:100%;border-collapse:collapse;font-size:13px}
+.leads-table th{text-align:left;font-size:12px;font-weight:500;color:var(--muted);background:var(--soft);padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.leads-table td{padding:6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.leads-table td.smi{font-family:var(--mono);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.leads-table td.aff{text-align:right;font-weight:600;white-space:nowrap}
+.leads-table td.aff small{font-weight:500;margin-left:4px} .leads-table small.up{color:var(--s1)} .leads-table small.dn{color:var(--s8)}
+.leads-table tr.lead{cursor:pointer}
+.leads-table tr.lead:hover{background:var(--soft)}
+.leads-table tr.lead.sel{background:var(--accent-soft);outline:1px solid var(--accent);outline-offset:-1px}
+.leads-table tr.seedrow td{color:var(--muted)}
+.lead-actions{margin-top:12px;flex-wrap:wrap;justify-content:flex-end}
+
+/* ------------------------------------------------------------------ pose card */
+.posecard .kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
+.posecard .kv span:first-child{color:var(--muted)} .posecard .kv b{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.posecard .kv code{font-family:var(--mono);font-size:12px;word-break:break-all;text-align:right}
+.posecard .plain{font-size:13px;color:var(--muted);margin:10px 0 4px}
+.posecard .note{font-size:12px;color:var(--fg);border:1px solid var(--note-line);background:var(--note-bg);border-radius:3px;padding:2px 8px;margin:6px 0}
+.check-row{margin-top:6px} .check-row .row{margin-top:10px;flex-wrap:wrap}
+
+/* ----------------------------------------------------------- stage HUD overlays (flat, on the dark stage) */
+.stage-hud.badge{right:14px;bottom:34px;padding:8px 12px;border-radius:4px;background:#1b2026;border:1px solid #6aa5e6;display:flex;align-items:baseline;gap:8px;pointer-events:none}
+.stage-hud.badge b{font-size:20px;font-weight:600} .stage-hud.badge .k{font-size:12px;color:#a3adb8} .stage-hud.badge .d{font-weight:600}
+.stage-hud.badge small{color:#a3adb8;font-size:12px}
+.stage-hud.badge.fine{border-color:#6aa5e6} .stage-hud.badge.fine .d{color:#6aa5e6}
+.stage-hud.badge.caution{border-color:#e0a94a} .stage-hud.badge.caution .d{color:#e0a94a}
+.stage-hud.badge.unfav{border-color:#e09a62} .stage-hud.badge.unfav .d{color:#e09a62}
+.stage-hud.tiles{right:14px;top:12px;display:grid;grid-template-columns:repeat(3,auto);gap:8px;max-width:min(640px,62%);text-align:left}
+.tile{background:#1b2026;border:1px solid #3a434d;border-radius:4px;padding:8px 12px}
+.tile .k{font-size:12px;color:#a3adb8}
+.tile .v{font-size:24px;font-weight:600;line-height:1.15;color:#e6e9ec;font-variant-numeric:tabular-nums}
+.tile .s{font-size:12px;color:#6aa5e6}
+.tile.alt{border-color:#6aa5e6}
+.tile-note{grid-column:1 / -1;font-size:12px;color:#a3adb8;background:#1b2026;border:1px solid #3a434d;border-radius:4px;padding:4px 8px}
+.stage-hud.center{left:50%;top:12px;transform:translateX(-50%);pointer-events:none;z-index:5}
+.prog-card{display:flex;align-items:center;gap:10px;padding:4px 12px;border-radius:4px;background:#1b2026;border:1px solid #3a434d;min-width:0}
+.prog-card:not(.failed) .pbar{width:56px}
+.prog-card:not(.failed) .pbar span{display:none}
+.prog-card:not(.failed) .prog-txt .muted{display:none}
+.prog-card:not(.failed) .prog-txt b{font-size:13px;font-weight:500}
+.prog-card.failed{border-color:#e09a62;display:block;max-width:420px}
+.prog-txt{color:#e6e9ec} .prog-txt b{font-size:14px;font-weight:600} .prog-txt .muted{font:12px var(--mono);color:#a3adb8;max-width:260px;word-break:break-all}
+/* progress bar (flat): the width carries the percentage */
+.pbar{width:96px;flex:none;display:flex;flex-direction:column;gap:3px;color:#e6e9ec;font-size:13px;font-weight:600}
+.pbar i{display:block;height:6px;border:1px solid #3a434d;border-radius:2px;background:#252b32;position:relative;overflow:hidden}
+.pbar i b{position:absolute;left:0;top:0;bottom:0;background:#6aa5e6}
+.stage-skeleton{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;background:#14181c;opacity:.92;pointer-events:none;z-index:2}
+.sk-ring{display:none}
+.sk-text{color:#a3adb8;font-size:14px}
+
+/* ----------------------------------------------------------------------- help */
+.help-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px}
+.help-card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 20px;max-width:560px;width:100%}
+.help-card h2{margin:0 0 12px} .help-card table{width:100%;border-collapse:collapse} .help-card td{padding:5px 4px;border-top:1px solid var(--line)} .help-card td:first-child{white-space:nowrap;width:1%;padding-right:16px}
+kbd{font:500 12px var(--mono);padding:0 5px;border-radius:3px;border:1px solid var(--line);background:var(--soft)}
+
+/* ------------------------------------------------------------------ responsive */
+@media (max-width:1000px){
+  .main{height:auto}
+  .stages{position:static;flex-wrap:wrap;gap:8px;padding:8px 12px}
+  .step .lbl small{display:none}
+  .stage-hud.tiles{grid-template-columns:repeat(3,1fr);max-width:calc(100% - 24px);right:12px;left:12px;top:8px}
+  .tile{padding:4px 8px} .tile .v{font-size:16px} .tile .k{font-size:12px} .tile .s{display:none}
+  .tile-note{display:none}
+  .stage-hud.badge{right:10px;bottom:24px;padding:4px 8px} .stage-hud.badge b{font-size:15px}
+  .prog-card{min-width:0;padding:8px 12px;gap:10px}
+}
+@media (max-width:560px){
+  .steps{flex:1 1 100%}
+  .step:not(.on) .lbl,.step:not(.on) .tick{display:none}
+  .step .link{flex:0 0 8px}
+  .manual-toggle{margin-left:auto}
+  .manual-toggle small{display:none}
+  .banner{font-size:12px}
+}

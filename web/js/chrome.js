@@ -4,7 +4,7 @@ import { DISCLAIMER } from "./legal_text.js";
 import { api, describeError } from "./api.js";
 
 const NAV = [
-  ["app.html", "Projects"], ["model.html", "Models"], ["docking.html", "Docking prep"], ["account.html", "Account"],
+  ["app.html", "Projects"], ["model.html", "Models"], ["docking.html", "Docking prep"], ["lead/index.html", "Lead Studio (Beta)"], ["account.html", "Account"],
 ];
 
 export function el(tag, attrs = {}, ...kids) {

@@ -1,0 +1,194 @@
+/* Metis Lead Studio: viewer-core styles. Shares the Metis v1 design tokens (metis_v0/web/css/app.css): plain, dense, scientific.
+   Flat: no decorative effects, no pill badges. The 3D stage is always dark (flat), so atom colours read the same in both themes. */
+@font-face{font-family:"IBM Plex Sans";font-weight:400;font-style:normal;font-display:swap;src:url("../../fonts/plex-sans-400.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-weight:500;font-style:normal;font-display:swap;src:url("../../fonts/plex-sans-500.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-weight:600;font-style:normal;font-display:swap;src:url("../../fonts/plex-sans-600.woff2") format("woff2")}
+
+:root{
+  --bg:#f6f7f8; --panel:#ffffff; --line:#c9cfd6; --soft:#eceff2; --fg:#1b2127; --muted:#505b67;
+  --accent:#1f5fa8; --accent-soft:#e3edf8; --on-accent:#ffffff;
+  --note-bg:#fbf0d9; --note-line:#8a5a00; --err:#a3301c;
+  --s1:#1f5fa8; --s2:#7a5ea8; --s3:#2f7f78; --s4:#8a6d1f; --s5:#a1475c; --s6:#566270; --s7:#3d7a3d; --s8:#a15a1f;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14181c; --panel:#1b2026; --line:#3a434d; --soft:#252b32; --fg:#e6e9ec; --muted:#a3adb8;
+  --accent:#6aa5e6; --accent-soft:#1f2f42; --on-accent:#0b1520;
+  --note-bg:#33291a; --note-line:#e0a94a; --err:#ee8470;
+  --s1:#6aa5e6; --s2:#b49be0; --s3:#5cc2b8; --s4:#d6b658; --s5:#e58aa1; --s6:#9aa7b4; --s7:#7fc27f; --s8:#e09a62; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14181c; --panel:#1b2026; --line:#3a434d; --soft:#252b32; --fg:#e6e9ec; --muted:#a3adb8;
+  --accent:#6aa5e6; --accent-soft:#1f2f42; --on-accent:#0b1520;
+  --note-bg:#33291a; --note-line:#e0a94a; --err:#ee8470;
+  --s1:#6aa5e6; --s2:#b49be0; --s3:#5cc2b8; --s4:#d6b658; --s5:#e58aa1; --s6:#9aa7b4; --s7:#7fc27f; --s8:#e09a62; color-scheme:dark}
+
+/* Studio aliases onto the Metis tokens. Property changes are NOT coloured with verdict colours: the sign and arrow glyph carry the direction,
+   --fav / --unfav only pick two series colours (blue / orange) so a favourable and an unfavourable move stay distinguishable. */
+:root{
+  --panel2:var(--soft); --accent-fg:var(--on-accent);
+  --fav:var(--s1); --unfav:var(--s8); --neutral:var(--muted); --warn:var(--note-line);
+  --stage-a:#14181c; --stage-b:#14181c; --stage-line:#3a434d;
+}
+/* the 3D stage and everything drawn on it stay dark in both themes (the dark Metis tokens, scoped) */
+.stage-wrap,.sv-view,.map-wrap{
+  --bg:#14181c; --panel:#1b2026; --line:#3a434d; --soft:#252b32; --fg:#e6e9ec; --muted:#a3adb8;
+  --accent:#6aa5e6; --accent-soft:#1f2f42; --on-accent:#0b1520; --note-bg:#33291a; --note-line:#e0a94a; --err:#ee8470;
+  --s1:#6aa5e6; --s2:#b49be0; --s3:#5cc2b8; --s4:#d6b658; --s5:#e58aa1; --s6:#9aa7b4; --s7:#7fc27f; --s8:#e09a62;
+  --panel2:#252b32; --accent-fg:#0b1520; --fav:#6aa5e6; --unfav:#e09a62; --neutral:#a3adb8; --warn:#e0a94a; color-scheme:dark;
+  color:var(--fg);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font:14px/1.45 var(--sans);overflow-wrap:anywhere}
+button,input,select,textarea{font:inherit;color:inherit}
+h1{font-size:20px;margin:0 0 4px;font-weight:600} h2{font-size:15px;margin:0 0 4px;font-weight:600} h3{font-size:13px;margin:12px 0 6px;font-weight:600}
+p{margin:0 0 8px} a{color:var(--accent)}
+.muted{color:var(--muted)}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{min-height:100vh;display:flex;flex-direction:column}
+
+/* ------------------------------------------------------------------ app bar (Metis .appbar) */
+.topbar{display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--soft);flex-wrap:wrap;position:sticky;top:0;z-index:20;min-height:var(--top-h,45px)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:.02em;color:var(--fg);text-decoration:none}
+.logo{width:22px;height:22px;display:block;flex:none;background:var(--fg);-webkit-mask:url("../../assets/benzene.svg") center/contain no-repeat;mask:url("../../assets/benzene.svg") center/contain no-repeat}
+.crumb{color:var(--muted)}
+.status{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.spacer{flex:1}
+/* source / mode labels: small flat bordered labels, not pills */
+.source-badge,.mode-chip{font-size:12px;font-weight:500;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--muted);background:var(--panel);white-space:nowrap}
+.source-badge.mock,.mode-chip.fixtures{background:var(--note-bg);border-color:var(--note-line);color:var(--fg)}
+.source-badge.live,.mode-chip.live{border-color:var(--accent);color:var(--accent)}
+.source-badge.replay,.mode-chip.replay,.source-badge.preview{color:var(--muted)}
+
+.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:5px 12px;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-block;min-height:30px}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent}
+.btn.small{padding:1px 8px;font-size:12px;min-height:24px}
+
+/* --------------------------------------------------------------------- main */
+.main{display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,31vw,520px);gap:12px;padding:12px 16px;height:calc(100vh - var(--top-h,45px));min-height:640px}
+.stage-col{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
+.stage-wrap{position:relative;flex:1;min-height:360px;border-radius:4px;overflow:hidden;border:1px solid var(--line);background:#14181c}
+.stage{position:absolute;inset:0}
+.stage-fx{position:absolute;inset:0;pointer-events:none}
+.stage-hud{position:absolute;color:#e6e9ec;pointer-events:none}
+.stage-hud.tl{left:14px;top:12px;max-width:70%}
+.stage-hud.tr{right:14px;top:12px;text-align:right}
+.stage-hud.bl{left:14px;bottom:10px;font-size:12px;color:#a3adb8}
+.stage-hud.br{right:12px;bottom:10px;font:500 12px var(--mono);color:#a3adb8}
+.hud-edit{font-size:20px;font-weight:600;line-height:1.2}
+.hud-sub{font-size:12px;color:#a3adb8;margin-top:2px;font-family:var(--mono);word-break:break-all}
+.stage-empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;color:#a3adb8;gap:6px;pointer-events:none}
+.stage-empty .big{font-size:20px;font-weight:600;color:#e6e9ec}
+.stage-empty .small{font-size:14px}
+.legend-bar{width:220px;height:10px;border-radius:2px;margin:6px 0 3px auto;border:1px solid #3a434d;display:flex;overflow:hidden}
+.legend-bar i{flex:1;display:block}
+.legend-lbl{display:flex;justify-content:space-between;width:220px;margin-left:auto;font-size:12px;color:#a3adb8}
+.legend-ttl{font-size:12px;font-weight:600}
+
+/* ----------------------------------------------------------------- timeline */
+.timeline{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 12px 10px}
+.tl-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.icon-btn{width:32px;height:30px;border-radius:4px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:13px;display:grid;place-items:center;color:var(--fg)}
+.icon-btn:hover{border-color:var(--accent)}
+.icon-btn.play{width:40px;background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:4px 10px;cursor:pointer;font-weight:500;font-size:13px;color:var(--muted);min-height:28px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent-soft);color:var(--fg)}
+.seg.wide{display:flex} .seg.wide button{flex:1}
+.tl-info{margin-left:auto;font-weight:500;color:var(--fg);display:flex;gap:8px;align-items:center;white-space:nowrap}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.tl-track{position:relative;height:40px;margin-top:8px;border-radius:3px;background:var(--soft);border:1px solid var(--line);cursor:ew-resize;touch-action:none;overflow:hidden}
+.tl-segs{position:absolute;inset:0}
+.tl-seg{position:absolute;top:0;bottom:0;border-right:1px solid var(--line);overflow:hidden;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:500;white-space:nowrap;color:var(--muted)}
+.tl-seg .morph{position:absolute;left:0;top:0;bottom:0;background:var(--accent-soft);border-right:2px solid var(--accent)}
+.tl-seg.seed .morph{display:none}
+.tl-seg.rejected .morph{background:var(--soft);border-right-color:var(--line)}
+.tl-seg span{position:relative;text-overflow:ellipsis;overflow:hidden;color:var(--fg)}
+.tl-head{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);transform:translateX(-1px);pointer-events:none}
+
+/* -------------------------------------------------------------------- sidebar */
+.side{display:flex;flex-direction:column;gap:12px;overflow-y:auto;min-height:0;padding-right:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px}
+.card h2{margin:0 0 8px;font-size:15px;font-weight:600}
+.row{display:flex;gap:8px;align-items:center} .row.end{justify-content:flex-end;margin-top:12px}
+.text{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 8px;min-width:0;font-family:var(--mono);font-size:12px}
+.text.num{font-family:inherit;font-size:14px}
+.drop{margin-top:10px;border:1px dashed var(--line);border-radius:4px;padding:12px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.msg{margin-top:10px;padding:6px 10px;border-radius:4px;border:1px solid var(--err);color:var(--err);background:var(--panel);word-break:break-word}
+.msg.info{border-color:var(--line);color:var(--fg);background:var(--soft)}
+.valid{margin-top:10px;font-size:13px;color:var(--muted)}
+.valid b{color:var(--fg)}
+.valid code{font-family:var(--mono);font-size:12px;word-break:break-all;color:var(--fg)}
+.settings{margin-top:10px;color:var(--muted)} .settings summary{cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.grid2 label{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.lock-note{margin-top:10px;font-size:12px;color:var(--fg);border:1px solid var(--note-line);background:var(--note-bg);border-radius:3px;padding:4px 8px}
+.card.start.collapsed > :not(h2){display:none}
+.card.start.collapsed h2{margin:0;cursor:pointer} .card.start.collapsed h2::after{content:" (click to edit)";color:var(--muted);font-weight:400}
+
+.check{display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+input[type=range]{accent-color:var(--accent);width:100%}
+.legend{margin-top:10px;font-size:12px;color:var(--muted)}
+.legend .bar{height:10px;border-radius:2px;border:1px solid var(--line);margin:4px 0;background:none}
+.legend .lbls{display:flex;justify-content:space-between}
+
+/* ------------------------------------------------------------------ why card */
+.why{border-left:3px solid var(--accent)}
+.why-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px}
+.label-tag{font-size:12px;font-weight:500;padding:0 6px;border-radius:3px;border:1px solid var(--line);color:var(--muted)}
+.label-tag.policy{color:var(--accent);border-color:var(--accent)}
+.label-tag.accepted{color:var(--fg);border-color:var(--fg)}
+.label-tag.rejected{color:var(--muted)}
+.edit-name{font-size:18px;line-height:1.2;font-weight:600;margin:4px 0 2px}
+.category{color:var(--muted);font-size:13px;margin-bottom:8px}
+.rationale{margin:0 0 10px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:12px;padding:0 6px;border-radius:3px;background:var(--soft);border:1px solid var(--line);color:var(--muted)}
+.score-line{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.score-line .big{font-size:20px;font-weight:600}
+.bar{height:6px;border-radius:2px;background:var(--soft);overflow:hidden;border:1px solid var(--line);margin-bottom:10px}
+.bar > i{display:block;height:100%;background:var(--accent)}
+table.deltas{width:100%;border-collapse:collapse;font-size:13px}
+table.deltas td{padding:4px;border-top:1px solid var(--line)}
+table.deltas td.k{color:var(--muted)} table.deltas td.v{text-align:right;font-variant-numeric:tabular-nums}
+table.deltas td.d{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;width:1%}
+.d.fav{color:var(--fav)} .d.unfav{color:var(--unfav)} .d.neutral{color:var(--muted)}
+.alerts{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.alerts .lbl{font-size:12px;color:var(--muted);margin-right:2px}
+.chip{font-size:12px;font-weight:500;padding:0 6px;border-radius:3px;border:1px solid var(--line);color:var(--muted);display:inline-block;white-space:nowrap}
+.chip.removed{color:var(--fg);border-color:var(--s1);text-decoration:line-through}
+.chip.added{color:var(--fg);border-color:var(--s8)}
+.chip.remain{color:var(--fg);border-color:var(--note-line);background:var(--note-bg)}
+.approx{margin-top:8px;font-size:12px;color:var(--muted);font-style:italic}
+
+/* --------------------------------------------------------------- wave-2 mounts */
+.analysis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:12px;padding:0 16px 24px}
+.analysis:not(:has(.mount:not(:empty))){display:none}
+.mount:empty{display:none}
+
+@media (max-width:1000px){
+  .main{grid-template-columns:minmax(0,1fr);height:auto}
+  .stage-wrap{min-height:55vh}
+  .side{overflow:visible}
+  .topbar{height:auto;position:static}
+  .analysis{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ------------------------------------------------------------------ Metis integration: Beta label, note, footer */
+.beta-tag{border:1px solid var(--note-line);color:var(--note-line);background:var(--note-bg);border-radius:3px;padding:0 6px;font-size:12px;font-weight:600}
+.beta-note{margin:0;padding:6px 16px;font-size:12px;background:var(--note-bg);color:var(--fg);border-bottom:1px solid var(--note-line)}
+#back-metis{text-decoration:none;color:var(--fg)}
+.site-foot{border-top:1px solid var(--line);padding:10px 16px;color:var(--muted);font-size:12px}
+.topbar h1.product{margin:0;font-size:inherit;font-weight:inherit}

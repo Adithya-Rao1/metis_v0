@@ -168,3 +168,127 @@ class MockApi:
 def install(page, api: MockApi):
     page.route("**/api/**", api.handler)
     page.api = api
+
+
+# ======================================================================================================================
+# Lead Studio (web/lead/): a stand-in for the routes the backend agent implements under /lead (the contract in
+# docs/agent_prompts/96_lead_studio_web.md). Shapes are those of studio/schema.py; run events come from a trimmed real recording
+# (tests/web/lead_fixtures/binding_run.json). LAYOUT/BEHAVIOUR DATA FOR TESTS: never shipped, never claimed as a model result.
+# ======================================================================================================================
+LEAD_FX = __import__("pathlib").Path(__file__).parent / "lead_fixtures"
+LEAD_PATH = re.compile(r".*/lead/(api|library|profiles)(/|\?|$).*")
+HOSTILE = '<img src=x onerror="window.__pwn=1"><b id="pwn">'
+_TEXT_KEYS = {"name", "rationale", "headline", "family", "note", "category", "edit_id", "reason", "error", "message", "title"}
+_SMILES_KEYS = {"smiles", "parent_smiles", "seed_smiles", "final_smiles", "canonical_smiles"}
+
+
+def _hostile(obj, key=None):
+    """Recursively replace display strings with markup (SMILES keep their text and get a markup suffix, consistently, so lookups still match)."""
+    if isinstance(obj, dict):
+        return {k: _hostile(v, k) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_hostile(v, key) for v in obj]
+    if isinstance(obj, str):
+        if key in _SMILES_KEYS:
+            return obj + HOSTILE
+        if key in _TEXT_KEYS or key == "tags":
+            return HOSTILE + obj
+    return obj
+
+
+class LeadMockApi:
+    """Install on a page AFTER the Metis MockApi (later routes win): `install_lead(page, lead)`. Session comes from the Metis MockApi (/api/auth/me)."""
+
+    def __init__(self, hostile=False, fail_health=False, events_delay_first=False):
+        self.hostile, self.fail_health = hostile, fail_health
+        self.calls: list[tuple[str, str, object]] = []
+        self.runs: dict[str, dict] = {}
+        self.status_overrides: dict[tuple[str, str], tuple[int, object]] = {}   # (method, path regex) -> (status, body)
+        self.targets = json.loads((LEAD_FX / "targets.json").read_text())
+        self.events = json.loads((LEAD_FX / "binding_run.json").read_text())
+        self.library: list[dict] = []
+        self.profiles: list[dict] = []
+        if hostile:
+            self.targets = _hostile(self.targets)
+            self.events = _hostile(self.events)
+
+    # ---- helpers ----
+    @staticmethod
+    def _sse(events) -> str:
+        return "".join(f"event: {e['type']}\ndata: {json.dumps(e)}\n\n" for e in events)
+
+    def validate(self, body):
+        smi = ((body or {}).get("smiles") or "").replace(HOSTILE, "") or None   # the client sends back what it was given
+        mol = Chem.MolFromSmiles(smi) if smi else None
+        if mol is None:
+            err = f"Could not parse {smi!r}" if smi else "empty"
+            return 200, {"ok": False, "error": (HOSTILE + err) if self.hostile else err}
+        canon = Chem.MolToSmiles(mol)
+        seed = self.events[0]["payload"]
+        return 200, {"ok": True, "canonical_smiles": canon + (HOSTILE if self.hostile else ""), "heavy_atoms": mol.GetNumHeavyAtoms(),
+                     "molblock": molblock(canon), "score": seed["seed_score"], "error": None}
+
+    # ---- routing ----
+    def handler(self, route):
+        req = route.request
+        path = re.sub(r"^.*?/lead", "", req.url.split("?")[0])
+        method = req.method
+        try:
+            body = req.post_data_json
+        except Exception:
+            body = None
+        self.calls.append((method, path, body))
+        for (m, rx), (status, payload) in self.status_overrides.items():
+            if m == method and re.search(rx, path):
+                return route.fulfill(status=status, body=json.dumps(payload), headers={"content-type": "application/json"})
+        status, payload, headers = self.dispatch(method, path, body)
+        if isinstance(payload, (str, bytes)):
+            return route.fulfill(status=status, body=payload, headers=headers)
+        return route.fulfill(status=status, body=json.dumps(payload) if payload is not None else "", headers={"content-type": "application/json", **headers})
+
+    def dispatch(self, method, path, body):
+        if path == "/api/health":
+            return (200, {"ok": True, "stub": False}, {}) if not self.fail_health else (503, {"detail": "down"}, {})
+        if path == "/api/targets":
+            return 200, self.targets, {}
+        if m := re.fullmatch(r"/api/targets/([\w-]+)", path):
+            hit = [t for t in self.targets if t["id"] == m.group(1)]
+            return (200, hit[0], {}) if hit else (404, {"detail": "not found"}, {})
+        if path.startswith("/api/data/"):
+            return 200, (LEAD_FX / "fixture1.pdb").read_text(), {"content-type": "chemical/x-pdb"}
+        if path == "/api/presets":
+            return 200, [], {}
+        if path == "/api/molecules/validate":
+            return self.validate(body) + ({},)
+        if path == "/api/runs" and method == "POST":
+            rid = f"lead-run-{len(self.runs) + 1}"
+            self.runs[rid] = body
+            return 200, {"run_id": rid}, {}
+        if m := re.fullmatch(r"/api/runs/([\w-]+)/events", path):
+            evs = [{**e, "run_id": m.group(1)} for e in self.events]
+            return 200, self._sse(evs), {"content-type": "text/event-stream", "cache-control": "no-cache"}
+        if m := re.fullmatch(r"/api/runs/([\w-]+)", path):
+            if method == "DELETE":
+                return 204, None, {}
+            return 200, {"run_id": m.group(1), "status": "done"}, {}
+        if path == "/api/manual/applicable":
+            name = (HOSTILE if self.hostile else "") + "Swap C for N"
+            return 200, {"edits": [{"edit_id": "atom_swap_c_n", "name": name, "category": "atom", "site": [0], "rationale": name, "tags": ["polarity"]}]}, {}
+        if path == "/api/manual/sessions" and method == "POST":
+            return 200, {"session_id": "sess-1", "seed_smiles": (body or {}).get("seed_smiles", ""), "target_id": (body or {}).get("target_id"), "steps": []}, {}
+        if path == "/library/runs":
+            if method == "POST":
+                self.library.append({"id": f"lib-{len(self.library) + 1}", "title": (body or {}).get("title") or "run", "stage": "binding", "created_at": "2026-01-01T00:00:00Z"})
+                return 201, {"id": self.library[-1]["id"]}, {}
+            return 200, {"runs": self.library}, {}
+        if path == "/library/manual":
+            return 200, {"sessions": []}, {}
+        if path == "/profiles":
+            return 200, {"profiles": self.profiles}, {}
+        return 404, {"detail": "not found"}, {}
+
+
+def install_lead(page, lead: LeadMockApi):
+    """Route /lead/{api,library,profiles}/** to `lead`. Call after `install` (Metis MockApi) so these routes take precedence over `**/api/**`."""
+    page.route(LEAD_PATH, lead.handler)
+    page.lead = lead

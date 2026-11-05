@@ -32,3 +32,13 @@ The forms use `method="post"` with a placeholder `action`, so credentials can ne
 
 `tests/web` (static checks, browser tests against a mock API) and `tests/e2e` (real stack). Test screenshots are written to
 `tests/web/screenshots/`, outside the served root.
+
+## Lead Studio (Beta), `lead/`
+
+`lead/index.html` is the Lead Optimization Studio front-end, served under `/lead/` on the same site and session. It has no sign-in of its own:
+`lead/js/net.js` wraps the Metis client (`js/api.js`, which takes an optional `base`), so it shares the session cookie, the CSRF header,
+the sign-in redirect (`auth.html?next=lead/index.html`) and the terms re-acceptance redirect. Its API is `/lead/api/*`, `/lead/library/*`
+and `/lead/profiles/*`; the run event stream is a same-origin `EventSource`. It reuses `../vendor/3Dmol-min.js`, `../fonts/` and
+`../assets/benzene.svg` (no second copies). Markup built from template strings sets computed styles with `data-style="..."`, which
+`lead/js/dynstyle.js` applies through the CSSOM, so no inline style is needed under the strict CSP (`_headers` has `/lead/*` entries).
+Tests: `tests/web/test_lead.py` against `LeadMockApi` in `tests/web/mockapi.py`.
