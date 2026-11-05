@@ -91,7 +91,7 @@ def test_bridge_ignores_unknown_commands_and_foreign_senders(make_hpage):
     # an unknown command and a malformed message get no answer
     heard = pg.evaluate("""() => new Promise((res) => {
         const f = document.getElementById('ketcher'); const out = [];
-        addEventListener('message', (e) => { if (e.source === f.contentWindow) out.push(e.data); });
+        addEventListener('message', (e) => { if (e.source === f.contentWindow && !(e.data && e.data.ready)) out.push(e.data); }); // the frame's own one-time ready signal is not an answer
         for (const m of [{ metis_draw: 1, id: 5, cmd: 'eval', arg: 'alert(1)' }, { metis_draw: 1, id: 'x', cmd: 'getSmiles' }, { id: 6, cmd: 'getSmiles' }, 'getSmiles', null, { metis_draw: 1, id: 7, cmd: '__proto__' }])
           f.contentWindow.postMessage(m, '*');
         setTimeout(() => res(out), 2000);
