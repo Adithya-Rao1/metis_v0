@@ -137,8 +137,8 @@ def _validation_message(exc: ValidationError) -> str:
     )
 
 
-@lru_cache
 def get_db_settings() -> DbSettings:
+    """Not cached: read once at process start by the processes that use it (nothing else calls it)."""
     try:
         return DbSettings()
     except ValidationError as exc:

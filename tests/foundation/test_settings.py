@@ -93,39 +93,28 @@ def test_secret_key_minimum_is_64_bytes_with_a_clear_error(monkeypatch):
 def test_db_settings_need_only_the_database_url_even_in_production(monkeypatch):
     from backend.core.settings import DbSettings, SettingsError, get_db_settings
 
-    env = {"METIS_ENV": "production", "METIS_DATABASE_URL": GOOD["METIS_DATABASE_URL"]}
-    for k, v in env.items():
-        monkeypatch.setenv(k, v)
-    get_db_settings.cache_clear()
-    try:
-        s = get_db_settings()
-        assert isinstance(s, DbSettings) and s.db_pool_size == 5 and s.db_statement_timeout_ms == 30000
-        with pytest.raises(ValidationError):
-            Settings(_env_file=None)  # the full settings still refuse the same environment
-        assert "pw9f3k2" not in repr(s)
-        for bad in ("postgresql://postgres:pw@db/metis", "postgresql://metis_owner:pw@db/metis"):
-            monkeypatch.setenv("METIS_DATABASE_URL", bad)
-            get_db_settings.cache_clear()
-            with pytest.raises(SettingsError, match="superuser or schema owner") as e:
-                get_db_settings()
-            assert ":pw@" not in str(e.value)
-        monkeypatch.delenv("METIS_DATABASE_URL")
-        get_db_settings.cache_clear()
-        with pytest.raises(SettingsError, match="METIS_DATABASE_URL is missing"):
+    monkeypatch.setenv("METIS_ENV", "production")
+    monkeypatch.setenv("METIS_DATABASE_URL", GOOD["METIS_DATABASE_URL"])
+    s = get_db_settings()
+    assert isinstance(s, DbSettings) and s.db_pool_size == 5 and s.db_statement_timeout_ms == 30000
+    assert "pw9f3k2" not in repr(s)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # the full settings still refuse the same environment
+    for bad in ("postgresql://postgres:pw@db/metis", "postgresql://metis_owner:pw@db/metis"):
+        monkeypatch.setenv("METIS_DATABASE_URL", bad)
+        with pytest.raises(SettingsError, match="superuser or schema owner") as e:
             get_db_settings()
-    finally:
-        get_db_settings.cache_clear()
+        assert ":pw@" not in str(e.value)
+    monkeypatch.delenv("METIS_DATABASE_URL")
+    with pytest.raises(SettingsError, match="METIS_DATABASE_URL is missing"):
+        get_db_settings()
 
 
 def test_db_settings_are_optional_outside_production(monkeypatch):
     from backend.core.settings import get_db_settings
 
     monkeypatch.setenv("METIS_ENV", "test")
-    get_db_settings.cache_clear()
-    try:
-        assert get_db_settings().database_url is None
-    finally:
-        get_db_settings.cache_clear()
+    assert get_db_settings().database_url is None
 
 
 def test_the_demo_key_generator_meets_the_minimum():
