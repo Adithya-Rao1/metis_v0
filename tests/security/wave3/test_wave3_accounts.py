@@ -501,6 +501,12 @@ def test_every_route_but_the_public_list_is_401_without_a_session_including_the_
             assert resp.status_code == 401, (m, path0, resp.status_code)
     for new in (("POST", "/auth/change-password"), ("GET", "/auth/terms/status"), ("POST", "/auth/terms/accept"), ("POST", "/terms/accept"), ("GET", "/account"), ("GET", "/jobs/{job_id}")):
         assert new in seen, new
+    # Metis Lead Studio (Beta): the three /lead prefixes are part of the sweep above, none of them is public
+    for new in (("GET", "/lead/api/health"), ("POST", "/lead/api/runs"), ("GET", "/lead/api/runs/{run_id}/events"), ("DELETE", "/lead/api/runs/{run_id}"),
+                ("POST", "/lead/api/molecules/validate"), ("POST", "/lead/api/poses"), ("POST", "/lead/api/manual/preview"), ("GET", "/lead/api/data/{path}"),
+                ("GET", "/lead/library/runs"), ("POST", "/lead/library/manual"), ("GET", "/lead/profiles"), ("PUT", "/lead/profiles/{pid}")):
+        assert new in seen and new not in PUBLIC, new
+    assert not {r for r in PUBLIC if r[1].startswith("/lead")}
     assert PUBLIC <= seen | {("GET", "/models/{name}")}
 
 

@@ -7,7 +7,8 @@ from fastapi import FastAPI
 
 from backend.accounts.hardening import install as install_hardening
 
-ROUTERS = ("backend.accounts", "backend.projects", "backend.dockprep")
+# "leadstudio.server" = Lead Studio (Beta): router with the /lead prefix, Metis session required.
+ROUTERS = ("backend.accounts", "backend.projects", "backend.dockprep", "leadstudio.server")
 
 
 def create_app() -> FastAPI:

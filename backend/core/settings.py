@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     object_store_secret_key: SecretStr | None = None
     object_store_bucket: str = "metis"
 
+    # Lead Studio (Beta): the one non-loopback DynamicBind origin the service may call (a private GPU host).
+    # Empty = loopback only. Never taken from a request. See docs/OPERATIONS.md.
+    lead_dock_url: str | None = None
+
     db_pool_size: int = 5
     db_statement_timeout_ms: int = 30000
 
