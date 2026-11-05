@@ -62,6 +62,7 @@ function render(m) {
   rep.replaceChildren(
     el("div", { class: "rgrid" },
       el("div", { class: "rcard" }, el("span", { class: "t", text: "Endpoint and version" }), el("span", { class: "n", text: m.endpoint }), el("span", { class: "legend", text: `version ${m.version} | ${m.kind}${m.units ? " | " + m.units : ""}` })),
+      typeof m.higher_is_better === "boolean" ? el("div", { class: "rcard", "data-testid": "direction" }, el("span", { class: "t", text: "Better when the value is" }), el("span", { class: "n", text: m.higher_is_better ? "higher" : "lower" }), el("span", { class: "legend", text: "Used as the default direction when ranking; you can change it per project." })) : null,
       el("div", { class: "rcard", "data-testid": "split" }, el("span", { class: "t", text: "Split used for evaluation" }), el("span", { class: "n", text: m.split_type })),
       el("div", { class: "rcard", "data-testid": "default-range" }, el("span", { class: "t", text: "Default ranking range (training data min to max)" }), el("span", { class: "n mono", text: `${fmt(m.default_range[0])} to ${fmt(m.default_range[1])}` }))),
     el("h2", { id: "datasets", text: "Training datasets and licences" }),

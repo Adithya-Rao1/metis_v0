@@ -1,6 +1,6 @@
 // Docking preparation: POST /dockprep/proteins, /dockprep/sites, /dockprep/ligands. Stateless on the server; downloads are built here.
 import { el, qs, renderChrome, say, stateBox } from "./chrome.js";
-import { api, authed, b64ToBlob, bytesToB64, depictionUrl, describeError, get, post, requireSession, saveBlob } from "./api.js";
+import { api, authed, b64ToBlob, bytesToB64, depictionUrl, describeError, get, post, requireSession, saveBlob, smilesPicture } from "./api.js";
 import { SharedViewer } from "./viewer.js";
 import { num } from "./format.js";
 
@@ -43,6 +43,16 @@ function show2d() {
   if (!projectDetail || !id) return;
   $("lig2d").replaceChildren(el("img", { class: "mol", src: depictionUrl(projectDetail.id, id), alt: "2D structure of the selected ligand" }));
 }
+// A typed SMILES gets its picture when the server has the depiction route (project compounds above already do).
+$("lig-smiles").addEventListener("change", async () => {
+  const smi = $("lig-smiles").value.trim(), host = $("lig2d");
+  if (!smi) { show2d(); return; }
+  let url = null;
+  try { url = await authed(() => smilesPicture(smi)); } catch (e) { url = null; }
+  if ($("lig-smiles").value.trim() !== smi) return;      // edited while the picture was loading
+  if (url) host.replaceChildren(el("img", { class: "mol", src: url, alt: "2D structure of the typed SMILES" }));
+  else host.replaceChildren();
+});
 const ligandSmiles = () => {
   const typed = $("lig-smiles").value.trim();
   if (typed) return typed;

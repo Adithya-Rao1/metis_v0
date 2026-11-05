@@ -97,4 +97,12 @@ export function confirmDialog({ title, body, okLabel = "Delete", typed = null, e
   });
 }
 
+// A modal asking for one line of text (rename). Resolves with the trimmed text, or null when cancelled.
+export async function askName({ title, label, value = "", okLabel = "Save", max = 200 }) {
+  const input = el("input", { id: "cd-name", value, maxlength: String(max), autocomplete: "off" });
+  const ok = await confirmDialog({ title, body: "Names are shown only to you.", okLabel, extra: el("div", { class: "field" }, el("label", { for: "cd-name", text: label }), input) });
+  const v = input.value.trim();
+  return ok && v ? v : null;
+}
+
 export const fmtDate = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10); };

@@ -81,6 +81,7 @@ function filenameOf(resp) {
 export const get = (path, opts) => api("GET", path, opts);
 export const post = (path, json, opts) => api("POST", path, { ...opts, json });
 export const put = (path, json, opts) => api("PUT", path, { ...opts, json });
+export const patch = (path, json, opts) => api("PATCH", path, { ...opts, json });
 export const del = (path, json, opts) => api("DELETE", path, { ...opts, json });
 
 // ---- plain-language messages -------------------------------------------------------------------------------------
@@ -93,6 +94,7 @@ const CODES = {
   terms_acceptance_required: "You must accept the Terms of Service, Privacy Policy and Disclaimer.",
   terms_version_not_current: "The terms changed while this page was open. Reload and accept the current version.",
   terms_reacceptance_required: "The terms changed. Accept the current version to continue.",
+  terms_reaccept_required: "The terms changed. Accept the current version to continue.",
   password_incorrect: "That password is not correct.",
   not_authenticated: "You are signed out.",
 };
@@ -171,8 +173,27 @@ export async function requireSession() {
 export async function authed(fn) {
   try { return await fn(); } catch (e) {
     if (e instanceof ApiError && e.status === 401) { redirectToSignIn(); return new Promise(() => {}); }
-    if (e instanceof ApiError && e.status === 403 && e.code === "terms_reacceptance_required") { redirectToSignIn("terms"); return new Promise(() => {}); }
+    if (e instanceof ApiError && e.status === 403 && TERMS_CODES.has(e.code)) { redirectToSignIn("terms"); return new Promise(() => {}); }
     throw e;
+  }
+}
+
+// The server answers 403 with one of these on ANY authenticated route (GETs included) until the current terms are accepted.
+const TERMS_CODES = new Set(["terms_reaccept_required", "terms_reacceptance_required"]);
+
+// 2D picture for a SMILES that is not stored in a project (docking-prep ligand, nearest training compounds): POST /dockprep/depiction
+// {smiles} -> image/svg+xml. Resolves with a blob: URL, or null when the server has no such route (404/405/501) or cannot draw it.
+// A missing route is remembered so the page does not keep asking.
+let depictionRouteMissing = false;
+export async function smilesPicture(smiles) {
+  if (depictionRouteMissing || !smiles) return null;
+  try {
+    const svg = await api("POST", "/dockprep/depiction", { json: { smiles: String(smiles) }, text: true });
+    return typeof svg === "string" && svg.includes("<svg") ? URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })) : null;
+  } catch (e) {
+    if (e instanceof ApiError && [404, 405, 501].includes(e.status)) depictionRouteMissing = true;
+    if (e instanceof ApiError && e.status === 401) throw e;
+    return null;
   }
 }
 
