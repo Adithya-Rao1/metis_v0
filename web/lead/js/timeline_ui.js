@@ -65,6 +65,8 @@ export function mountTimelineUI(timeline, { onFilter }) {
     playBtn.innerHTML = timeline.playing ? "&#10074;&#10074;" : "&#9654;";
     playBtn.setAttribute("aria-label", timeline.playing ? "Pause" : "Play");
     const n = Math.max(timeline.keyframes.length - 1, 0);
+    track.setAttribute("aria-valuemin", "0"); track.setAttribute("aria-valuemax", String(n));
+    track.setAttribute("aria-valuenow", String(Math.max(s.index, 0)));
     const waiting = timeline.live && timeline.t >= timeline.duration - 5;
     info.innerHTML = (timeline.live ? `<span class="live-dot"></span>` : "") +
       (s.index < 0 ? "No run yet" : s.keyframe.kind === "seed" ? `Seed · ${n} edit${n === 1 ? "" : "s"}${timeline.live ? " so far" : ""}` : `Edit ${s.index} of ${n}${waiting ? " · waiting for next" : ""}`);

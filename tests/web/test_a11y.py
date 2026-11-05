@@ -81,7 +81,7 @@ def test_lead_studio_phone_width_has_no_horizontal_scroll(make_page):
 
 # ---------------------------------------------------------------- real axe-core (second check next to the in-house audit)
 # Reported to the integrator, not editable here (web/lead): the timeline scrubber has role=slider without aria-valuenow.
-KNOWN_LEAD = {("aria-required-attr", "#tl-track")}
+KNOWN_LEAD = set()  # no known exemptions: the timeline slider now carries aria-valuenow
 
 
 def clean(pg, also_in_house=False, known=frozenset()):
@@ -134,7 +134,6 @@ def test_axe_core_on_lead_studio(make_page, scheme):
         clean(pg, known=KNOWN_LEAD)
 
 
-@pytest.mark.xfail(strict=True, reason="web/lead/index.html: #tl-track has role=slider but no aria-valuenow (axe aria-required-attr, critical). Integrator to fix.")
 def test_axe_core_lead_studio_timeline_slider_is_complete(make_page):
     pg = _lead(make_page, 1280, "dark")
     clean(pg)
