@@ -212,9 +212,14 @@ def test_verify_and_reset_links_consume_tokens_and_leave_the_url(make_page):
     api.overrides[("POST", "/auth/reset")] = (200, {"status": "password_reset"}, {})
     pg = make_page(1280, 800, api=api)
     pg.goto(pg.base + "/auth.html?verify=" + "t" * 40)
-    pg.wait_for_function("() => document.getElementById('verify-msg').textContent.includes('is verified')")
+    pg.wait_for_selector("#vf-pass")
     assert "verify=" not in pg.url
-    assert [c for c in api.calls if c[1] == "/auth/verify"][0][2] == {"token": "t" * 40}
+    assert not [c for c in api.calls if c[1] == "/auth/verify"]  # nothing is spent until the owner types the password
+    pg.fill("#vf-pass", "the password I chose")
+    pg.click("#verify-submit")
+    pg.wait_for_function("() => document.getElementById('verify-msg').textContent.includes('is verified')")
+    assert [c for c in api.calls if c[1] == "/auth/verify"][0][2] == {"token": "t" * 40, "password": "the password I chose"}
+    assert pg.input_value("#vf-pass") == ""
     pg.goto(pg.base + "/auth.html?reset=" + "r" * 40)
     pg.fill("#rp-pass", "a brand new passphrase")
     pg.click("#reset button[type=submit]")
@@ -222,8 +227,26 @@ def test_verify_and_reset_links_consume_tokens_and_leave_the_url(make_page):
     assert [c for c in api.calls if c[1] == "/auth/reset"][0][2] == {"token": "r" * 40, "password": "a brand new passphrase"}
     api.overrides[("POST", "/auth/verify")] = (400, {"detail": "invalid_or_expired_token"}, {})
     pg.goto(pg.base + "/auth.html?verify=" + "t" * 40)
+    pg.fill("#vf-pass", "the password I chose")
+    pg.click("#verify-submit")
     pg.wait_for_function("() => document.getElementById('verify-msg').textContent.includes('expired')")
     assert pg.locator("#verify-resend").count() == 1
+
+
+def test_verify_page_requires_a_password_and_keeps_the_form_on_a_weak_one(make_page):
+    from mockapi import MockApi
+    api = MockApi(signed_in=False)
+    pg = make_page(1280, 800, api=api)
+    pg.goto(pg.base + "/auth.html?verify=" + "t" * 40)
+    pg.click("#verify-submit")  # empty: no request
+    assert "Enter your password" in pg.inner_text("#verify-msg")
+    assert not [c for c in api.calls if c[1] == "/auth/verify"]
+    api.overrides[("POST", "/auth/verify")] = (422, {"detail": "Password is too easy to guess"}, {})
+    pg.fill("#vf-pass", "password1234")
+    pg.click("#verify-submit")
+    pg.wait_for_function("() => document.getElementById('verify-msg').dataset.kind === 'error'")
+    assert pg.locator("#verify-submit").is_enabled() and pg.locator("#verify-resend").count() == 0  # token stays valid: retry allowed
+    assert pg.locator("#vf-pass").get_attribute("type") == "password"
 
 
 def test_changed_terms_must_be_reaccepted(make_page):

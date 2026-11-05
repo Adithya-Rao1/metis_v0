@@ -21,3 +21,4 @@
 | ESM-2 embeddings (used by DynamicBind) | check upstream licence | pending | GPU box only |
 | IBM Plex Sans / Mono fonts (web/fonts) | SIL OFL 1.1 per upstream | pending verification | confirm the OFL text ships with the fonts |
 | pdb2pqr / propka / Open Babel / Meeko (dockprep) | BSD-3 / LGPL-2.1 / GPL-2.0 / LGPL-2.1 per upstream | pending | GPL/LGPL tools: used as separate programs or libraries, not modified; owner/lawyer to confirm before launch |
+| axe-core 4.10.2 (tests/web/vendor/axe/) | MPL-2.0 | cleared, TEST-ONLY | Vendored unmodified (`axe.min.js`, sha256 in the folder README, npm integrity verified) with its LICENSE and third-party notices; MPL-2.0 is file-level copyleft and we do not modify the file, so vendoring is permitted. Injected by Playwright tests only; never served from `web/` and never shipped. |

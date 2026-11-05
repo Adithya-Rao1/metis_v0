@@ -193,3 +193,8 @@ fieldset.bare{border:0;padding:0;margin:0}fieldset.bare.mt8{margin-top:8px}
 .meas-form .num{width:70px}
 progress{width:200px;max-width:100%;accent-color:var(--accent)}
 #auth-banner[hidden]{display:none}
+.notes{margin-top:16px;border-top:1px solid var(--line);padding-top:8px}
+.notes-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.note-row{border:1px solid var(--line);border-radius:4px;padding:8px 10px;background:var(--panel);min-width:0}
+.note-text{margin:0 0 6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.note-input{min-height:72px;font:inherit;max-width:640px}

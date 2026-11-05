@@ -67,7 +67,8 @@ Every data region has loading, empty and error states (`stateBox` in `chrome.js`
 - Routes assumed from the Wave 4 backend contract (mock: `tests/web/mockapi.py`): `GET /auth/me` returns `email`; `PATCH /projects/{id}` `{name}`; `DELETE /projects/{id}/compounds/{cid}`;
   `DELETE /projects/{id}/measurements/{mid}`; `POST /dockprep/depiction` `{smiles}` -> `image/svg+xml` (used for docking-prep ligands and nearest training compounds; absent route = no picture, no error);
   model card `higher_is_better` (boolean, optional: default ranking direction and a row on the model page); 403 `terms_reaccept_required` (also accepted: `terms_reacceptance_required`) on any route, GET included.
-  There is no notes UI, so no note delete control.
+  Notes: `compound.html` lists, adds, edits and deletes the project's notes (`GET/POST /projects/{id}/notes`, `PATCH/DELETE /projects/{id}/notes/{nid}`; owner only, 404 otherwise, 5000 characters, 200 per project). Notes belong to the project (the `note` table has no compound column) and are rendered with textContent only; delete asks for confirmation.
+  `auth.html?verify=` shows a "Confirm your password" field and sends `{token, password}` to `POST /auth/verify` (decision 0005, F-122); nothing is spent until the password is submitted.
 
 ## Tests
 

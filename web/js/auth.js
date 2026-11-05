@@ -107,19 +107,32 @@ function startReset(token) {
   });
 }
 
-// ---- verify (token from the emailed link) ----
-async function startVerify(token) {
-  showPanel("p-verify", "Verifying your email");
-  try {
-    await post("/auth/verify", { token });
-    $("verify-msg").textContent = "Your email is verified. You can log in now.";
-    $("auth-h").textContent = "Email verified";
-  } catch (e) {
-    $("verify-msg").textContent = describeError(e).message;
-    $("auth-h").textContent = "Email not verified";
-    $("verify-msg").after(el("a", { class: "btn", href: "#resend", id: "verify-resend", text: "Send a new verification email",
-      onclick: (ev) => { ev.preventDefault(); showPanel("p-resend", "Verify your email"); } }));
-  }
+// ---- verify (token from the emailed link; the password typed here replaces any registered earlier, see decision 0005) ----
+function startVerify(token) {
+  showPanel("p-verify", "Verify your email");
+  const form = $("verify"), msg = $("verify-msg");
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const password = form.elements.password.value;
+    if (!password) { say(msg, "Enter your password to finish verifying your email.", "error"); form.elements.password.focus(); return; }
+    let failed = null;
+    const ok = await submitting(form, msg, async () => {
+      try { await post("/auth/verify", { token, password }); } catch (err) { failed = err; throw err; }
+    });
+    if (ok) {
+      form.elements.password.value = "";
+      form.querySelector('button[type="submit"]').disabled = true;
+      say(msg, "Your email is verified. You can log in now.", "ok");
+      $("auth-h").textContent = "Email verified";
+      msg.after(el("a", { class: "btn", href: "auth.html", id: "verify-login", text: "Go to log in" }));
+    } else if (failed && failed.status === 400 && !$("verify-resend")) {
+      $("auth-h").textContent = "Email not verified";
+      form.querySelector('button[type="submit"]').disabled = true;
+      msg.after(el("a", { class: "btn", href: "#resend", id: "verify-resend", text: "Send a new verification email",
+        onclick: (ev) => { ev.preventDefault(); showPanel("p-resend", "Verify your email"); } }));
+    }
+  };
+  $("vf-pass").focus();
 }
 
 // ---- re-accept changed terms ----

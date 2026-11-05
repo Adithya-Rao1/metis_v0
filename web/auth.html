@@ -72,7 +72,12 @@
   </section>
   <section id="p-verify" class="pt12" hidden aria-labelledby="verify-h">
     <h2 id="verify-h">Email verification</h2>
-    <p id="verify-msg" role="status" aria-live="polite">Verifying...</p>
+    <form id="verify" method="post" action="#js-required" novalidate>
+      <div class="field"><label for="vf-pass">Confirm your password</label><input id="vf-pass" name="password" type="password" autocomplete="current-password" minlength="12" required>
+        <span class="legend">Type the password you chose when you signed up. It becomes the password of this account, so nobody who registered this address earlier keeps theirs.</span></div>
+      <button class="btn primary" id="verify-submit" type="submit">Verify email</button>
+      <p id="verify-msg" class="legend mt8" role="status" aria-live="polite">Enter your password to finish verifying your email.</p>
+    </form>
     <p class="legend"><a href="auth.html">Go to log in</a></p>
   </section>
   <section id="p-terms" class="pt12" hidden aria-labelledby="terms-h">

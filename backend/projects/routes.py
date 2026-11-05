@@ -24,6 +24,14 @@ ProjectName = Annotated[
 ]
 Endpoint = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]{1,64}$")]
 MAX_PROJECTS_PER_USER = 200
+# Notes belong to a project (the `note` table has no compound column). Free text: newlines and tabs are fine, other
+# control characters are not. The table allows 20000 characters; the API is stricter. Bodies are never logged or audited.
+MAX_NOTE_CHARS = 5000
+MAX_NOTES_PER_PROJECT = 200
+NoteBody = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=MAX_NOTE_CHARS, strip_whitespace=True, pattern=r"^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+$"),
+]
 
 
 class ProjectCreate(Strict):
@@ -32,6 +40,10 @@ class ProjectCreate(Strict):
 
 class ProjectRename(Strict):
     name: ProjectName
+
+
+class NoteIn(Strict):
+    body: NoteBody
 
 
 class MeasurementCreate(Strict):
@@ -220,7 +232,7 @@ def delete_measurement(
 
 @router.delete("/projects/{project_id}/notes/{note_id}", status_code=204)
 def delete_note(project_id: uuid.UUID, note_id: uuid.UUID, sc: Scope = Depends(scope)) -> Response:
-    """Delete one note of this project. Owner only; 404 otherwise. (Notes have no create route yet: see the spec.)"""
+    """Delete one note of this project. Owner only; 404 otherwise."""
     with sc.session() as s:
         require_project(s, sc.user.id, project_id)
         res = s.execute(
@@ -231,6 +243,76 @@ def delete_note(project_id: uuid.UUID, note_id: uuid.UUID, sc: Scope = Depends(s
             raise not_found()
         _audit(s, sc.user.id, "note_delete", f"note:{note_id}")
     return Response(status_code=204)
+
+
+def _note(r) -> dict:
+    return {"id": r["id"], "body": r["body"], "created_at": r["created_at"]}
+
+
+@router.get("/projects/{project_id}/notes")
+def list_notes(project_id: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
+    """The caller's notes on this project, oldest first. Owner only; 404 for anyone else's project."""
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        rows = (
+            s.execute(
+                text(
+                    "SELECT id, body, created_at FROM note WHERE project_id = :pid AND owner_id = :uid "
+                    "ORDER BY created_at, id LIMIT :lim"
+                ),
+                {"pid": project_id, "uid": sc.user.id, "lim": MAX_NOTES_PER_PROJECT},
+            )
+            .mappings()
+            .all()
+        )
+    return {"notes": [_note(r) for r in rows], "max_notes": MAX_NOTES_PER_PROJECT, "max_chars": MAX_NOTE_CHARS}
+
+
+@router.post("/projects/{project_id}/notes", status_code=201)
+def create_note(project_id: uuid.UUID, body: NoteIn, sc: Scope = Depends(scope)) -> dict:
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        n = s.execute(
+            text("SELECT count(*) FROM note WHERE project_id = :pid AND owner_id = :uid"),
+            {"pid": project_id, "uid": sc.user.id},
+        ).scalar_one()
+        if n >= MAX_NOTES_PER_PROJECT:
+            raise HTTPException(status_code=409, detail="note limit reached")
+        row = (
+            s.execute(
+                text(
+                    "INSERT INTO note (owner_id, project_id, body) VALUES (:uid, :pid, :body) "
+                    "RETURNING id, body, created_at"
+                ),
+                {"uid": sc.user.id, "pid": project_id, "body": body.body},
+            )
+            .mappings()
+            .one()
+        )
+        _audit(s, sc.user.id, "note_create", f"note:{row['id']}")
+    return _note(row)
+
+
+@router.patch("/projects/{project_id}/notes/{note_id}")
+def update_note(project_id: uuid.UUID, note_id: uuid.UUID, body: NoteIn, sc: Scope = Depends(scope)) -> dict:
+    """Replace the text of one note. Owner only; 404 otherwise (same answer for a missing and a foreign note)."""
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        row = (
+            s.execute(
+                text(
+                    "UPDATE note SET body = :body WHERE id = :nid AND project_id = :pid AND owner_id = :uid "
+                    "RETURNING id, body, created_at"
+                ),
+                {"body": body.body, "nid": note_id, "pid": project_id, "uid": sc.user.id},
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise not_found()
+        _audit(s, sc.user.id, "note_update", f"note:{note_id}")
+    return _note(row)
 
 
 @router.post("/projects/{project_id}/measurements", status_code=201)

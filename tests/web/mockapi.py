@@ -69,6 +69,7 @@ class MockApi:
         self.config = ranked
         self.calls: list[tuple[str, str, object]] = []
         self.overrides: dict[tuple[str, str], tuple[int, object, dict]] = {}   # (method, path regex) -> (status, body, headers)
+        self.notes: list[dict] = []                  # project notes (stateful: POST/PATCH/DELETE change this list)
         self.consents = {"train_models": False, "share_dataset": False, "analytics": False, "contact": False}
 
     # ---- data ----
@@ -145,6 +146,28 @@ class MockApi:
                 return 422, {"detail": "name required"}, {}
             self.project_name = name.strip()
             return 200, {"id": PID, "name": self.project_name, "created_at": "2026-01-01T00:00:00Z"}, {}
+        if path == f"/projects/{PID}/notes" and method == "GET":
+            return 200, {"notes": self.notes, "max_notes": 200, "max_chars": 5000}, {}
+        if path == f"/projects/{PID}/notes" and method == "POST":
+            b = (body or {}).get("body")
+            if not isinstance(b, str) or not b.strip() or len(b) > 5000:
+                return 422, {"detail": "invalid note"}, {}
+            n = {"id": f"cccccccc-0000-4000-8000-{len(self.notes) + 1:012d}", "body": b.strip(), "created_at": "2026-01-02T00:00:00Z"}
+            self.notes.append(n)
+            return 201, n, {}
+        if m := re.fullmatch(rf"/projects/{PID}/notes/([^/]+)", path):
+            hit = next((n for n in self.notes if n["id"] == m.group(1)), None)
+            if hit is None:
+                return 404, {"detail": "not found"}, {}
+            if method == "PATCH":
+                b = (body or {}).get("body")
+                if not isinstance(b, str) or not b.strip():
+                    return 422, {"detail": "invalid note"}, {}
+                hit["body"] = b.strip()
+                return 200, hit, {}
+            if method == "DELETE":
+                self.notes.remove(hit)
+                return 204, None, {}
         if m := re.fullmatch(rf"/projects/{PID}/compounds/([^/]+)", path):
             if method == "DELETE":
                 self.deleted_compounds.add(m.group(1))

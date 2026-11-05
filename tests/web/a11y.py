@@ -1,5 +1,5 @@
-"""An in-repo accessibility audit for the serious/critical WCAG rules axe-core reports most often (axe-core itself is not vendored
-and the sandbox is offline). Runs inside the page; returns a list of {rule, impact, target}. Rules covered: document-title, html-has-lang,
+"""Accessibility audits. `audit` is the in-repo check for the serious/critical WCAG rules axe-core reports most often (kept as a second
+check); `axe_audit` below runs the real, vendored axe-core. Runs inside the page; returns a list of {rule, impact, target}. Rules covered: document-title, html-has-lang,
 image-alt, button-name, link-name, label (form fields), select-name, input-image-alt, frame-title, duplicate-id(-aria), aria-valid-attr-value
 (idrefs exist), aria-roles, aria-required-children (tablist/list), aria-hidden-focus, tabindex (> 0), scrollable-region-focusable,
 nested-interactive, role-img-alt, color-contrast (text over a solid background; text over images/canvases is skipped as axe does)."""
@@ -97,3 +97,22 @@ AUDIT_JS = r"""
 
 def audit(page):
     return page.evaluate(AUDIT_JS)
+
+
+# ---- real axe-core (test-only, vendored unmodified; see tests/web/vendor/axe/README.md) ----
+from pathlib import Path  # noqa: E402
+
+AXE_JS = Path(__file__).resolve().parent / "vendor" / "axe" / "axe.min.js"
+AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"]
+# Pixels axe cannot judge (a WebGL canvas, text over images) are reported as "incomplete", not as violations; we only fail on violations.
+
+
+def axe_audit(page, impacts=("serious", "critical")):
+    """Run the real axe-core on the page as it is now. Returns [{rule, impact, target, nodes}] for violations of the given impacts."""
+    if not page.evaluate("typeof window.axe !== 'undefined'"):
+        page.evaluate(AXE_JS.read_text(encoding="utf-8"))  # evaluate, not a <script> tag: the pages carry a strict CSP
+    res = page.evaluate("""async (tags) => {
+        const r = await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] });
+        return r.violations.map(v => ({ rule: v.id, impact: v.impact, nodes: v.nodes.length, target: v.nodes.slice(0, 3).map(n => n.target.join(' ')), help: v.help }));
+    }""", AXE_TAGS)
+    return [v for v in res if v["impact"] in impacts]

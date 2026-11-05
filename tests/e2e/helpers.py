@@ -25,6 +25,8 @@ def sign_up(pg, stack, email, password=PW):
     )
     token = stack.token("verify", email)
     pg.goto(f"{pg.base}/auth.html?verify={token}")
+    pg.fill("#vf-pass", password)
+    pg.click("#verify-submit")
     pg.wait_for_function("() => document.getElementById('verify-msg').textContent.includes('verified')")
     return token
 

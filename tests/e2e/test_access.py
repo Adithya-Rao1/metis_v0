@@ -334,6 +334,8 @@ def test_verification_resend_and_password_reset_flow(make_page, stack):
     )
     assert len([1 for k, e, _ in stack.mailer.outbox if k == "verify" and e == email]) == n + 1
     pg.goto(f"{pg.base}/auth.html?verify={stack.token('verify', email)}")
+    pg.fill("#vf-pass", PW)
+    pg.click("#verify-submit")
     pg.wait_for_function("() => document.getElementById('verify-msg').textContent.includes('is verified')")
     # forgot -> emailed link -> new password -> old password no longer works
     pg.goto(pg.base + "/auth.html?again=1#forgot")

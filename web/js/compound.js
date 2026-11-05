@@ -3,6 +3,7 @@ import { el, qs, qsId, renderChrome, showError, showLoading, stateBox } from "./
 import { authed, depictionUrl, describeError, get, post, requireSession, smilesPicture } from "./api.js";
 import { SharedViewer, CONFORMER_LABEL } from "./viewer.js";
 import { fmtInt, fmtVal } from "./format.js";
+import { mountNotes } from "./notes.js";
 
 const $ = (id) => document.getElementById(id);
 const user = await requireSession();
@@ -32,6 +33,7 @@ async function load() {
   try { card = (await get(`/models/${encodeURIComponent(ep)}`)); } catch (e) { card = null; }
   page.replaceChildren();
   $("panel-frame").hidden = false;
+  mountNotes($("notes"), pid);
   const p = detail.prediction;
   const cname = comp.label || `Compound ${project.compounds.indexOf(comp) + 1}`;
   $("h").textContent = `Uncertainty panel (${cname}, ${ep})`;
