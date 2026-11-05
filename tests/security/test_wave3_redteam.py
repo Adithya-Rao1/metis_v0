@@ -294,7 +294,6 @@ class TestMaintenanceRunner:
             if p.poll() is None:
                 p.kill()
 
-    @defect("F-128", "LOW", "docs/OPERATIONS.md says the runner needs only METIS_DATABASE_URL and 'METIS_SECRET_KEY is not needed', but make_engine() calls get_settings(), whose production validator requires the secret key, Redis URL and the three object-store variables; the runner exits 2 ('cannot start') in a container given only the documented variables (the same mismatch for any new worker process)")
     def test_runner_starts_in_production_with_only_the_documented_variables(self, runner_env, monkeypatch):
         from backend.core.settings import get_settings
         from backend.maintenance import runner
@@ -448,7 +447,6 @@ class TestOperationsDocMatchesCode:
             engine.dispose()
 
 
-@defect("F-129", "MEDIUM", "docs/OPERATIONS.md section 6 tells the operator to find due backup purges with `SELECT id, backups_purge_due FROM deletion_request WHERE backups_purged_at IS NULL AND backups_purge_due < now()` 'as the owner or metis_readonly', but deletion_request has FORCE row level security with the policy owner_id = current_user_id() and metis_readonly is NOBYPASSRLS with no identity: it sees ZERO rows, so an operator following the runbook with the read-only role concludes nothing is due and the 30-day backup purge (a manual step) is silently never done")
 def test_the_runbook_review_query_returns_the_pending_requests_for_the_readonly_role(pg, su):
     su.execute("insert into deletion_request (owner_id, scope, backups_purge_due) values (gen_random_uuid(), 'account', now() - interval '1 day')")
     try:
@@ -459,7 +457,6 @@ def test_the_runbook_review_query_returns_the_pending_requests_for_the_readonly_
     assert len(rows) == 1
 
 
-@defect("F-134", "LOW", "the rate-limit windows are free configuration (METIS_ACCOUNTS_RL_<ROUTE>_<SCOPE>=(limit, seconds), no upper bound) but rate_limit_purge() deletes every bucket older than 2 hours: a window longer than 2 h (for example a daily registration cap) is silently reset by the purge, so the configured limit is weaker than it says; the migration comment 'longer than every configured window (max 1 hour)' is not enforced by the config")
 def test_rate_limit_windows_longer_than_the_purge_floor_are_rejected():
     from pydantic import ValidationError
 

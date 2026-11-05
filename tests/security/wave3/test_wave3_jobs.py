@@ -156,7 +156,6 @@ def test_rows_left_by_a_dead_process_are_failed_not_counted_and_never_lock_the_o
     assert got is not None
 
 
-@defect("F-127", "LOW", "the per-user quota is read from job rows, and those rows are deleted by ON DELETE CASCADE when the project is deleted while its jobs are still queued/running in the thread pool: create jobs, delete the project, create more, and the user has more running/queued jobs than the quota allows (each ends at its first insert, but it still occupies a worker and runs one inference)")
 def test_quota_cannot_be_reset_by_deleting_the_project_while_jobs_are_running(mk3, queues):
     app = mk3()
     c, uid, p1 = user_with_project(app)
@@ -177,7 +176,6 @@ def test_quota_cannot_be_reset_by_deleting_the_project_while_jobs_are_running(mk
 
 
 # ------------------------------------------------------------------------------------ second API process
-@defect("F-126", "MEDIUM", "any second queue object on the same database (a second uvicorn worker, or the old container during a rolling restart) fails the owner's LIVE jobs as 'interrupted by restart' the first time the owner polls through it, because 'live' is defined as 'tracked by this process'; the first process then still finishes the work and overwrites the row, so the state flip-flops. docs/OPERATIONS.md states the single-process assumption but nothing enforces it (no advisory lock, no lease)")
 def test_a_second_api_process_must_not_fail_jobs_the_first_is_still_running(mk3, queues):
     app = mk3()
     c, uid, pid = user_with_project(app)

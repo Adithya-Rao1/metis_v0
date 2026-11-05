@@ -44,7 +44,7 @@ def main() -> int:
     import os
     import secrets
 
-    key_file = work / "secret_key"
+    key_file = work / "secret_key"  # secrets.token_urlsafe(64) = 86 chars, above the 64-byte production minimum
     if not key_file.exists():
         key_file.write_text(secrets.token_urlsafe(64))
         key_file.chmod(0o600)

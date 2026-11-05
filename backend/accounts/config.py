@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from backend.core.settings import get_settings
@@ -15,6 +15,10 @@ COOKIE_CSRF = "metis_csrf"
 CSRF_HEADER = "X-CSRF-Token"
 JWT_ALG = "HS256"
 JWT_ISSUER = "metis"
+# rate_limit_purge() (migration 0004) deletes buckets older than 2 hours. A longer window would be
+# silently reset by the purge, so a configured window must not exceed that floor (F-134). Raising it
+# needs a migration first.
+RATE_LIMIT_PURGE_FLOOR_S = 7200
 
 
 class AccountsConfig(BaseSettings):
@@ -41,7 +45,23 @@ class AccountsConfig(BaseSettings):
     rl_forgot_email: tuple[int, int] = (3, 3600)
     rl_reset_ip: tuple[int, int] = (20, 900)
     rl_change_password_user: tuple[int, int] = (5, 900)
+    rl_terms_accept_user: tuple[int, int] = (10, 900)
     reset_ttl_s: int = Field(default=3600, ge=60, le=86400)
+
+    @model_validator(mode="after")
+    def _windows_fit_the_purge_floor(self) -> AccountsConfig:
+        for name in type(self).model_fields:
+            if not name.startswith("rl_"):
+                continue
+            limit, window = getattr(self, name)
+            if limit < 1:
+                raise ValueError(f"{name}: the limit must be at least 1")
+            if not 1 <= window <= RATE_LIMIT_PURGE_FLOOR_S:
+                raise ValueError(
+                    f"{name}: the window must be 1..{RATE_LIMIT_PURGE_FLOOR_S} seconds "
+                    "(rate_limit_purge() deletes buckets older than 2 hours)"
+                )
+        return self
 
 
 def _derive(label: bytes) -> bytes:

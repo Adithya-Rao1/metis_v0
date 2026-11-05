@@ -6,12 +6,14 @@ restart. RESULTS are persisted by the job function to the prediction table; each
 to its job (`prediction.job_id`), which is how a finished job's `prediction_ids` are recovered after a restart.
 Without a factory (unit tests of the queue itself) state is memory-only, as before.
 
-Restart behaviour: a process that dies leaves its rows `queued`/`running`. The app role cannot see other users'
-rows, so there is no global sweep; instead, whenever an owner touches the queue (`submit` or a `get` that is not
-served from memory) that owner's `queued`/`running` rows that this process is not tracking are marked `failed`
-with the reason `interrupted by restart`. This assumes ONE API process owns the queue (see docs/OPERATIONS.md);
-a second process would have its live jobs reaped by the first. SCHEMA-REQUEST for a global startup sweep: see
-the Wave 3 backend handoff.
+Ownership and restart behaviour (migration 0006, F-126): every queue object has a random `worker_id`, stamps it on
+the rows it creates and refreshes their `heartbeat_at` every `heartbeat_s` while it still tracks unfinished jobs. A
+process that dies leaves its rows `queued`/`running` with a heartbeat that stops advancing. The app role cannot see
+other users' rows, so there is no global sweep; whenever an owner touches the queue (`submit` or a `get` that is not
+served from memory) that owner's `queued`/`running` rows are marked `failed` (`interrupted by restart`) only if this
+process does not track them AND their heartbeat is older than `stale_s` (or they carry no worker or heartbeat, which
+only rows from before the migration do). A second API process (second worker, rolling restart) therefore never fails
+a live job, and a job's final write only lands on a row that is still queued/running and still belongs to this worker.
 
 Never put structures or SMILES in job rows or logs: errors are stored as fixed codes (exception class names only).
 
@@ -25,6 +27,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
+import weakref
 from collections import OrderedDict
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -42,6 +45,8 @@ log = logging.getLogger("metis.jobs")
 State = Literal["queued", "running", "done", "failed"]
 MAX_TRACKED = 500
 MAX_ACTIVE_PER_USER = 10
+HEARTBEAT_S = 15.0  # how often a live queue refreshes the rows it runs
+STALE_S = 60.0  # a row whose heartbeat is older than this has no live owner process (four missed beats)
 
 # error_code values (the column holds fixed codes only, <= 64 chars) and the plain text the API shows.
 ERR_INTERRUPTED = "interrupted_by_restart"
@@ -108,13 +113,73 @@ def _error_text(code: Optional[str]) -> Optional[str]:
     return _ERR_TEXT.get(code, "job failed")
 
 
+def _heartbeat_loop(
+    ref: weakref.ReferenceType[InProcessJobQueue], stop: threading.Event, interval: float
+) -> None:
+    """Daemon thread body. Holds only a weak reference so an abandoned queue (and this thread) can be collected."""
+    while not stop.wait(interval):
+        q = ref()
+        if q is None:
+            return
+        try:
+            q._beat_once()
+        except Exception as exc:  # noqa: BLE001 - the heartbeat must never die
+            log.warning("job heartbeat failed (%s)", type(exc).__name__)
+        del q
+
+
 class InProcessJobQueue:
-    def __init__(self, max_workers: int = 2, factory: Optional[sessionmaker[Session]] = None) -> None:
+    def __init__(
+        self,
+        max_workers: int = 2,
+        factory: Optional[sessionmaker[Session]] = None,
+        heartbeat_s: float = HEARTBEAT_S,
+        stale_s: float = STALE_S,
+    ) -> None:
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="metis-job")
         self._jobs: OrderedDict[uuid.UUID, JobRecord] = OrderedDict()
         self._futures: dict[uuid.UUID, object] = {}
         self._lock = threading.Lock()
         self._factory = factory
+        self.worker_id = uuid.uuid4()
+        self._heartbeat_s = heartbeat_s
+        self._stale_s = stale_s
+        self._stop = threading.Event()
+        self._beat: Optional[threading.Thread] = None
+
+    # ------------------------------------------------------------------ heartbeat
+    def _start_heartbeat(self) -> None:
+        """Caller holds the lock. Start (once) the daemon thread that keeps this process's unfinished rows alive."""
+        if self._factory is None or (self._beat is not None and self._beat.is_alive()):
+            return
+        self._beat = threading.Thread(
+            target=_heartbeat_loop,
+            args=(weakref.ref(self), self._stop, self._heartbeat_s),
+            daemon=True,
+            name="metis-job-beat",
+        )
+        self._beat.start()
+
+    def _beat_once(self) -> None:
+        """Refresh the heartbeat of every unfinished job this process tracks (one short transaction per owner)."""
+        with self._lock:
+            by_owner: dict[uuid.UUID, list[uuid.UUID]] = {}
+            for jid, r in self._jobs.items():
+                if r.state in ("queued", "running"):
+                    by_owner.setdefault(r.owner_id, []).append(jid)
+        for owner_id, ids in by_owner.items():
+            self._write(
+                owner_id,
+                "UPDATE job SET heartbeat_at = now() WHERE owner_id = :u AND worker_id = :w "
+                "AND state IN ('queued','running') AND id = ANY(CAST(:ids AS uuid[]))",
+                {"u": owner_id, "w": self.worker_id, "ids": ids},
+            )
+
+    def _memory_active(self, owner_id: uuid.UUID) -> int:
+        """Caller holds the lock. This owner's queued/running jobs that this process still tracks."""
+        return sum(
+            1 for j in self._jobs.values() if j.owner_id == owner_id and j.state in ("queued", "running")
+        )
 
     # ------------------------------------------------------------------ durable bookkeeping
     def _write(self, owner_id: uuid.UUID, sql: str, params: dict) -> None:
@@ -128,15 +193,28 @@ class InProcessJobQueue:
             log.warning("job bookkeeping write failed (%s)", type(exc).__name__)
 
     def _reap(self, s: Session, owner_id: uuid.UUID) -> None:
-        """Caller holds the lock. Fail this owner's queued/running rows that no thread of THIS process is tracking."""
+        """Caller holds the lock. Fail this owner's queued/running rows that this process does not track AND whose owner
+        process is gone: no worker or heartbeat recorded (rows from before migration 0006), or a heartbeat older than the
+        stale limit. A job that another live process runs keeps a fresh heartbeat and is left alone."""
         live = [
             j for j, r in self._jobs.items() if r.owner_id == owner_id and r.state in ("queued", "running")
         ]
         stmt = text(
             "UPDATE job SET state = 'failed', error_code = :code, finished_at = now() "
-            "WHERE owner_id = :u AND state IN ('queued','running') AND NOT (id = ANY(CAST(:live AS uuid[])))"
+            "WHERE owner_id = :u AND state IN ('queued','running') AND NOT (id = ANY(CAST(:live AS uuid[]))) "
+            "AND (worker_id IS NULL OR heartbeat_at IS NULL OR worker_id = :w "
+            "     OR heartbeat_at < now() - make_interval(secs => :stale))"
         )
-        s.execute(stmt, {"code": ERR_INTERRUPTED, "u": owner_id, "live": live})
+        s.execute(
+            stmt,
+            {
+                "code": ERR_INTERRUPTED,
+                "u": owner_id,
+                "live": live,
+                "w": self.worker_id,
+                "stale": self._stale_s,
+            },
+        )
 
     def submit(
         self,
@@ -153,35 +231,31 @@ class InProcessJobQueue:
                 with request_session(self._factory, owner_id) as s:
                     self._reap(s, owner_id)
                     if max_active is not None:
-                        active = s.execute(
+                        db_active = s.execute(
                             text(
                                 "SELECT count(*) FROM job WHERE owner_id = :u AND state IN ('queued','running')"
                             ),
                             {"u": owner_id},
                         ).scalar_one()
-                        if active >= max_active:
+                        # Counted by owner from both sources: deleting a project cascades its job rows away while
+                        # their threads still run, so the rows alone would under-count (F-127).
+                        if max(db_active, self._memory_active(owner_id)) >= max_active:
                             raise QuotaExceeded()
                     s.execute(
                         text(
-                            "INSERT INTO job (id, owner_id, project_id, kind, estimated_seconds) "
-                            "VALUES (:id, :u, :p, 'predict', :est)"
+                            "INSERT INTO job (id, owner_id, project_id, kind, estimated_seconds, worker_id, heartbeat_at) "
+                            "VALUES (:id, :u, :p, 'predict', :est, :w, now())"
                         ),
                         {
                             "id": rec.id,
                             "u": owner_id,
                             "p": project_id,
                             "est": max(0.0, float(estimate_seconds)),
+                            "w": self.worker_id,
                         },
                     )
-            elif (
-                max_active is not None
-                and sum(
-                    1
-                    for j in self._jobs.values()
-                    if j.owner_id == owner_id and j.state in ("queued", "running")
-                )
-                >= max_active
-            ):
+                self._start_heartbeat()
+            elif max_active is not None and self._memory_active(owner_id) >= max_active:
                 raise QuotaExceeded()
             self._jobs[rec.id] = rec
             self._evict()
@@ -192,8 +266,9 @@ class InProcessJobQueue:
             rec.state = "running"
             self._write(
                 owner_id,
-                "UPDATE job SET state = 'running', started_at = now() WHERE id = :id AND owner_id = :u",
-                {"id": rec.id, "u": owner_id},
+                "UPDATE job SET state = 'running', started_at = now(), heartbeat_at = now() "
+                "WHERE id = :id AND owner_id = :u AND worker_id = :w AND state IN ('queued','running')",
+                {"id": rec.id, "u": owner_id, "w": self.worker_id},
             )
             try:
 
@@ -217,16 +292,23 @@ class InProcessJobQueue:
                 rec.state = "done"
                 self._write(
                     owner_id,
-                    "UPDATE job SET state = 'succeeded', progress = 1, finished_at = now() WHERE id = :id AND owner_id = :u",
-                    {"id": rec.id, "u": owner_id},
+                    "UPDATE job SET state = 'succeeded', progress = 1, finished_at = now() "
+                    "WHERE id = :id AND owner_id = :u AND worker_id = :w AND state IN ('queued','running')",
+                    {"id": rec.id, "u": owner_id, "w": self.worker_id},
                 )
             except Exception as exc:  # noqa: BLE001 - class name only: messages may carry structure content
                 rec.state = "failed"
                 rec.error = f"job failed ({type(exc).__name__})"
                 self._write(
                     owner_id,
-                    "UPDATE job SET state = 'failed', error_code = :code, finished_at = now() WHERE id = :id AND owner_id = :u",
-                    {"id": rec.id, "u": owner_id, "code": (_ERR_FAILED_PREFIX + type(exc).__name__)[:64]},
+                    "UPDATE job SET state = 'failed', error_code = :code, finished_at = now() "
+                    "WHERE id = :id AND owner_id = :u AND worker_id = :w AND state IN ('queued','running')",
+                    {
+                        "id": rec.id,
+                        "u": owner_id,
+                        "w": self.worker_id,
+                        "code": (_ERR_FAILED_PREFIX + type(exc).__name__)[:64],
+                    },
                 )
 
         with self._lock:
@@ -311,6 +393,8 @@ class InProcessJobQueue:
     def shutdown(self, wait: bool = True) -> None:
         """Stop accepting work and (by default) let queued and running jobs finish."""
         self._pool.shutdown(wait=wait)
+        if wait:  # keep the heartbeat going for jobs that are still running when the caller does not wait
+            self._stop.set()
 
     def wait(self, job_id: uuid.UUID, timeout: float = 60.0) -> None:
         fut = self._futures.get(job_id)

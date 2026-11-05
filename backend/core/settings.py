@@ -26,6 +26,10 @@ REQUIRED_SECRETS = (
 )
 
 
+# HS512 needs a key at least as long as its 512-bit digest; we derive every key from METIS_SECRET_KEY.
+MIN_SECRET_KEY_BYTES = 64
+
+
 class SettingsError(ValueError):
     """Raised when production configuration is incomplete or unsafe."""
 
@@ -37,6 +41,32 @@ def _db_user_forbidden(url: str) -> bool:
         return True
     user = (u.username or str(u.query.get("user", ""))).lower()
     return user in FORBIDDEN_DB_USERS or "user" in u.query
+
+
+class DbSettings(BaseSettings):
+    """The database connection only. Processes that touch nothing but Postgres (the maintenance runner) load
+    this instead of `Settings`, so they need METIS_DATABASE_URL and nothing else (F-128). Same URL rule."""
+
+    model_config = SettingsConfigDict(env_prefix="METIS_", extra="ignore", hide_input_in_errors=True)
+
+    env: Literal["development", "test", "production"] = "development"
+    database_url: SecretStr | None = None
+    db_pool_size: int = 5
+    db_statement_timeout_ms: int = 30000
+
+    @model_validator(mode="after")
+    def _production_requires_database(self) -> DbSettings:
+        if self.env != "production":
+            return self
+        raw = self.database_url.get_secret_value() if self.database_url else ""
+        if not raw:
+            raise SettingsError("refusing to start in production: METIS_DATABASE_URL is missing")
+        if _db_user_forbidden(raw):
+            raise SettingsError(
+                "refusing to start in production: "
+                "METIS_DATABASE_URL must not use the postgres superuser or schema owner"
+            )
+        return self
 
 
 class Settings(BaseSettings):
@@ -75,8 +105,11 @@ class Settings(BaseSettings):
                 problems.append(f"METIS_{name.upper()} looks like a placeholder")
         if self.secret_key:
             key = self.secret_key.get_secret_value()
-            if len(key) < 32:
-                problems.append("METIS_SECRET_KEY must be at least 32 characters")
+            if len(key.encode()) < MIN_SECRET_KEY_BYTES:
+                problems.append(
+                    f"METIS_SECRET_KEY must be at least {MIN_SECRET_KEY_BYTES} bytes "
+                    '(generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))")'
+                )
             elif len(set(key)) < 4:
                 problems.append("METIS_SECRET_KEY is trivially guessable")
         if self.database_url and _db_user_forbidden(self.database_url.get_secret_value()):
@@ -93,8 +126,20 @@ def get_settings() -> Settings:
         return Settings()
     except ValidationError as exc:
         # Names/messages only; pydantic's default rendering can echo raw METIS_* input values.
-        msgs = "; ".join(
-            f"{'.'.join(str(p) for p in e['loc']) or 'settings'}: {e['msg']}"
-            for e in exc.errors(include_input=False, include_url=False, include_context=False)
-        )
+        msgs = _validation_message(exc)
         raise SettingsError(msgs) from None
+
+
+def _validation_message(exc: ValidationError) -> str:
+    return "; ".join(
+        f"{'.'.join(str(p) for p in e['loc']) or 'settings'}: {e['msg']}"
+        for e in exc.errors(include_input=False, include_url=False, include_context=False)
+    )
+
+
+@lru_cache
+def get_db_settings() -> DbSettings:
+    try:
+        return DbSettings()
+    except ValidationError as exc:
+        raise SettingsError(_validation_message(exc)) from None

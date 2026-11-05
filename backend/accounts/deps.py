@@ -169,13 +169,16 @@ def terms_current(factory: sessionmaker[Session], uid: uuid.UUID, required: str)
 
 
 def current_user(request: Request) -> UserCtx:
-    """FastAPI dependency for every authenticated route.
+    """FastAPI dependency for every authenticated domain route (projects, compounds, predictions, ranking, exports,
+    dockprep, Lead Studio, consents, data export).
 
-    Mutating methods additionally require a valid CSRF double-submit and the current terms version
-    (403 `terms_reacceptance_required` until re-accepted).
+    Every method requires the current terms version (403 `terms_reacceptance_required` until re-accepted), reads
+    included (F-123). Mutating methods additionally require a valid CSRF double-submit. The routes a user needs in order
+    to accept, leave or delete (`/auth/*`, `/account`, `/terms/accept`, `DELETE /account/data`) use `current_user_no_terms`
+    or `authed_session` instead.
     """
     sess = authed_session(request)
     required = get_config(request).terms_version
-    if request.method not in SAFE_METHODS and not terms_current(get_factory(request), sess.user.id, required):
+    if not terms_current(get_factory(request), sess.user.id, required):
         raise HTTPException(403, "terms_reacceptance_required")
     return sess.user

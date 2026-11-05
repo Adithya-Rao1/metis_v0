@@ -13,7 +13,7 @@ Required in production (`METIS_ENV=production`; startup refuses on a missing, pl
 | --- | --- | --- |
 | `METIS_ENV` | all | `production` enables the required-secrets check. The image sets it by default. |
 | `METIS_DATABASE_URL` | app, maintenance | Must connect as the least-privilege login role (a member of `metis_app`), never the owner or `postgres`. |
-| `METIS_SECRET_KEY` | accounts | At least 32 characters, not trivially repetitive. JWT, CSRF and rate-limit pepper keys are derived from it; **rotating it signs everyone out and resets CSRF tokens**. |
+| `METIS_SECRET_KEY` | accounts | At least **64 bytes** (HS512-sized), not trivially repetitive; startup refuses a shorter one with `METIS_SECRET_KEY must be at least 64 bytes`. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. JWT, CSRF and rate-limit pepper keys are derived from it; **rotating it signs everyone out and resets CSRF tokens**. |
 | `METIS_REDIS_URL` | settings | Required by the settings check. **[unverified]** No backend code path uses Redis today; do not rely on it for sessions or rate limits (both are in Postgres). |
 | `METIS_OBJECT_STORE_ENDPOINT`, `METIS_OBJECT_STORE_ACCESS_KEY`, `METIS_OBJECT_STORE_SECRET_KEY` | settings | Required by the settings check. |
 
@@ -21,13 +21,13 @@ Optional tunables:
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `METIS_TERMS_VERSION` | `2026-01` | The terms/privacy/disclaimer version users must have accepted. Changing it forces re-acceptance (mutating routes answer 403 `terms_reacceptance_required`; login and `/auth/me` report `terms_reaccept_required`). |
+| `METIS_TERMS_VERSION` | `2026-01` | The terms/privacy/disclaimer version users must have accepted. Changing it forces re-acceptance (every authenticated domain route, reads included, answers 403 `terms_reacceptance_required`; only `/auth/*`, `GET /account`, the terms endpoints, logout and account deletion stay reachable; login and `/auth/me` report `terms_reaccept_required`). |
 | `METIS_ACCOUNTS_TRUST_PROXY` | `false` | See section 2. |
 | `METIS_ACCOUNTS_COOKIE_SECURE` | `true` | Leave `true`. Only set `false` for plain-HTTP local development. |
 | `METIS_ACCOUNTS_SESSION_TTL_S` | `3600` | Session lifetime in seconds (minimum 60). There is no sliding refresh. |
 | `METIS_ACCOUNTS_BCRYPT_COST` | `12` | 4 to 16. |
 | `METIS_ACCOUNTS_VERIFY_TTL_HOURS`, `METIS_ACCOUNTS_RESET_TTL_S` | `24`, `3600` | Token lifetimes. |
-| `METIS_ACCOUNTS_RL_<ROUTE>_<SCOPE>` | see `backend/accounts/config.py` | Rate limits as `(limit, window_seconds)`; includes `RL_CHANGE_PASSWORD_USER`. |
+| `METIS_ACCOUNTS_RL_<ROUTE>_<SCOPE>` | see `backend/accounts/config.py` | Rate limits as `(limit, window_seconds)`; includes `RL_CHANGE_PASSWORD_USER` and `RL_TERMS_ACCEPT_USER`. **The window must be 1 to 7200 seconds** (and the limit at least 1): `rate_limit_purge()` deletes buckets older than 2 hours, so a longer window would silently reset. Startup refuses a configuration outside that range. |
 | `METIS_LOG_LEVEL`, `METIS_DB_POOL_SIZE`, `METIS_DB_STATEMENT_TIMEOUT_MS` | `INFO`, `5`, `30000` | |
 | `METIS_OBJECT_STORE_BUCKET` | `metis` | |
 | `METIS_DOCKPREP_FETCH`, `METIS_PDB2PQR`, `METIS_FPOCKET` | unset | Docking-prep feature switches and tool paths (not owned by this runbook). |
@@ -40,6 +40,16 @@ never the address or token) and a test double. A production deployment has no wa
 reset mail until a real `Mailer` is injected (`app.state.mailer`). Until then new users cannot verify their
 address and so cannot sign in. This is the largest operational gap in accounts.
 
+Requirements for the real mailer (F-131). `/auth/forgot` and `/auth/resend-verification` hand the mail to
+`backend.accounts.mailer.deliver()`, which runs any mailer that does not set `instant = True` on a small worker pool and
+swallows (and logs by class name) its errors, so the response time and status are the same whether or not the address has
+an account. This is tested with a mailer that blocks for 0.25 s and one that raises. What the real mailer must still
+guarantee: `send_*` must not raise or block the interpreter indefinitely (set a socket timeout; the pool has 4
+threads), and it must not be marked `instant`. `/auth/register` sends inline on purpose (both its branches send, so its
+timing is uniform); a mailer outage there still answers 500 for every address alike. A residual difference of a few
+milliseconds remains (an account lookup plus a token insert for registered addresses). If that ever matters, pad the
+response to a fixed minimum duration in the route.
+
 ## 2. Cookies, CSRF and proxy assumptions
 
 - Session cookie `metis_session`: `HttpOnly`, `Secure` (unless overridden), `SameSite=Lax`, path `/`, lifetime
@@ -49,7 +59,8 @@ address and so cannot sign in. This is the largest operational gap in accounts.
   session `jti` (or `anon` before login), valid for the session lifetime. Every non-GET/HEAD/OPTIONS request is
   checked, including pre-login ones. Fetch `/auth/csrf` first. The web client must send the header on every
   mutation, and must use the new `csrf_token` returned by login and by `POST /auth/change-password`.
-- Password change or reset invalidates all other sessions through the `pwv` claim. Logout and password change also
+- Response headers set by the API (`ResponseHeadersMiddleware`): `Cache-Control: no-store` on every response to a request that carries the session cookie and on `/auth`, `/account`, `/consents`, `/projects`, `/jobs`, `/predictions`, `/dockprep` and `/lead` (a route that sets its own `Cache-Control` keeps it; the static web files are served by the web host, not this app), and `Strict-Transport-Security: max-age=63072000; includeSubDomains` (no `preload`) whenever the request arrived over TLS: scheme `https`, or, only with `METIS_ACCOUNTS_TRUST_PROXY=true`, a last `X-Forwarded-Proto` hop of `https`. The static site's own HSTS lives in `web/_headers`.
+- Password change or reset invalidates all other sessions through the `pwv` claim. A completed reset or a password change also retires every other outstanding reset token (a second `forgot` does not retire the first, by design). Logout and password change also
   write the replaced `jti` to `session_revocation`.
 - `METIS_ACCOUNTS_TRUST_PROXY=false` (default): the rate limiter uses the socket peer address. Set `true` only
   when the app is reachable exclusively through your own reverse proxy that **appends** the real client IP as the
@@ -87,7 +98,7 @@ in this repository.
 
 - One-shot: exit 0 on success, 1 if any step failed (the other steps still run), 2 if it cannot start.
 - Loop mode: `python -m backend.maintenance --loop 3600` (interval at least 60 s); a SIGTERM stops it cleanly.
-- Run it with the same environment as the app (`METIS_DATABASE_URL`, `METIS_SECRET_KEY` is not needed). It needs no
+- Needs only `METIS_DATABASE_URL` (and optionally `METIS_ENV`, `METIS_DB_*`): it loads `DbSettings`, not the full settings, so the secret key, Redis URL and object-store variables are **not** required. In production the same URL rule applies as for the app (never the owner or `postgres`). It needs no
   extra database privilege: the app role may execute the three functions and nothing else.
 - Schedule: hourly is enough. Rate-limit buckets are also purged opportunistically on 1 percent of requests, but
   the other two tables only shrink when this runner runs. Alert on a non-zero exit or on the absence of the log
@@ -98,11 +109,17 @@ in this repository.
 ## 5. Jobs
 
 Prediction jobs execute in the API process (`InProcessJobQueue`) and are recorded in the `job` table, so
-`GET /jobs/{id}` survives a restart. A job left `queued`/`running` by a dead process is marked `failed`
-("interrupted by restart") the next time its owner submits a job or reads it. This assumes **one API process
-owns the queue**: run a single uvicorn worker per database, or move to a separate worker process first. With
-several workers each one would fail the others' live jobs. Job rows and logs never hold structures; failures store
-the exception class name only.
+`GET /jobs/{id}` survives a restart. Since migration 0006 (F-126) each queue object has a random `worker_id`, stamps it
+on its rows and refreshes `heartbeat_at` every 15 s while it still runs unfinished jobs. A row left `queued`/`running`
+by a dead process is failed ("interrupted by restart") the next time its owner submits a job or reads it, **only if its
+heartbeat is older than 60 s** (or it has no worker, i.e. it predates the migration). A second API process or the old
+container of a rolling restart therefore never fails a job the first one still runs, and a finished job's final write
+only lands on a row that is still `queued`/`running` and carries that worker's id (a reaped row stays failed). After a
+crash, expect up to 60 s before the dead rows stop counting against the owner's quota of 10 active jobs. The quota is
+`max(rows in the database, jobs this process still tracks)`, so deleting a project (which cascades its job rows away)
+cannot reset it while the jobs are still running in this process. The thread pool and the in-memory job records are
+per process; run one uvicorn worker per database unless sticky routing keeps a job's polling on its process (Lead Studio
+state is also per process, section 7). Job rows and logs never hold structures; failures store the exception class name only.
 
 ## 6. Account deletion
 
@@ -115,8 +132,17 @@ predictions, notes, consents, terms, sessions, jobs). The cookies are cleared.
 | Live rows removed | yes (cascade, immediate) | |
 | `deletion_request` recorded with `backups_purge_due = now() + 30 days` | yes | |
 | Backups containing the user's data expire | | **yes**: backups must be rotated or purged within 30 days |
-| `rows_purged_at` / `backups_purged_at` bookkeeping | | **yes**: the app role has no UPDATE on `deletion_request`; the operator sets these after the purge |
-| Review of due requests | | **yes**: `SELECT id, backups_purge_due FROM deletion_request WHERE backups_purged_at IS NULL AND backups_purge_due < now()` as the owner or `metis_readonly` |
+| `backups_purged_at` bookkeeping | | **yes**: the app role has no UPDATE on `deletion_request`; the operator calls `SELECT deletion_mark_purged('<id>')` after purging that request's backups |
+| Review of due requests | | **yes**: `SELECT * FROM deletion_due_for_purge()` (id, scope, requested_at, backups_purge_due; oldest first) |
+
+`deletion_request` has forced row-level security keyed on the owner, so a plain `SELECT` as an operator role sees no rows
+(F-129). Two SECURITY DEFINER functions (migration 0006, owned by the NOLOGIN role `metis_retention`) replace it:
+`deletion_due_for_purge()` is executable by `metis_readonly` and `metis_operator`, `deletion_mark_purged(id)` only by
+`metis_operator` (a NOLOGIN group role: `GRANT metis_operator TO <the operator's login>` in deploy tooling). The mark
+function refuses a request that is not yet due or already recorded (returns `false`) and writes an audit row with the
+request id only. As a second path, `metis_readonly` may also `SELECT` the due, unpurged rows of `deletion_request`
+directly (policy `deletion_due_readonly`), which returns the same rows as the function but not the others. The
+`rows_purged_at` column is not used: live rows are deleted in the same transaction as the request.
 
 The `audit_log` keeps the user id (no email) after deletion; there is no retention job for it. **[unverified]**
 Backup tooling and retention in production are outside this repository.
@@ -135,6 +161,7 @@ Backup tooling and retention in production are outside this repository.
 | `STUDIO_RUN_TIMEOUT` | 90 | Seconds, cooperative. |
 | `STUDIO_RUNS_PER_MIN`, `STUDIO_VALIDATES_PER_MIN` | 6, 30 | Per-user limits in the shared database limiter. |
 | `STUDIO_HEARTBEAT`, `STUDIO_MOCK_DELAY`, `STUDIO_REPLAY_DELAY` | 15, 0.4, 0.25 | SSE pacing. |
+| `STUDIO_ORPHAN_GRACE` | 30 | Seconds. A live or mock run that no event stream reads for this long is cancelled (closed tab, dropped connection); a reconnecting `EventSource` re-attaches within the grace period and keeps the run. The per-user stream slot is released when the response ends however it ends. `0` disables the cancel. |
 | `STUDIO_STRUCTURES_DIR`, `STUDIO_POSES_DIR` | bundled data | Override data directories. |
 
 Caveats: run and live manual-session state is in memory of one process, so run a single worker (or sticky routing) for these routes. The PLAPT binding stage is not shipped (`binding_module` is absent); binding-stage runs answer 503 and the pharmacology stage works. The DQN policy needs optional torch and a checkpoint; without them the uniform policy is used.

@@ -32,6 +32,7 @@ from backend.accounts.deps import (
     rate_limit,
     terms_current,
 )
+from backend.accounts.mailer import deliver
 from backend.core.db import request_session
 from backend.schemas.contracts import (
     ENSEMBLE_SIZES,
@@ -102,6 +103,8 @@ class ResetIn(_Body):
 
 class VerifyIn(_Body):
     token: str = Field(min_length=10, max_length=200)
+    # The person holding the mailbox may type their password here; it then replaces whatever was registered (F-122).
+    password: str | None = Field(default=None, max_length=security.MAX_PASSWORD)
 
 
 class ConsentIn(_Body):
@@ -195,27 +198,42 @@ def register(body: RegisterIn, request: Request) -> dict:
         created = False  # email already registered: same response, no signal to the caller
     if created:
         mailer.send_verification(body.email, token)
-    elif not _resend_verification(factory, cfg, mailer, body.email):
+    elif not _resend_verification(factory, cfg, mailer, body.email, new_hash=pw_hash, inline=True):
         mailer.send_already_registered(body.email)
     return {"status": "verification_sent"}
 
 
-def _resend_verification(factory: Any, cfg: AccountsConfig, mailer: Any, email: str) -> bool:
+def _resend_verification(
+    factory: Any,
+    cfg: AccountsConfig,
+    mailer: Any,
+    email: str,
+    new_hash: str | None = None,
+    inline: bool = False,
+) -> bool:
     """If `email` belongs to an UNVERIFIED account, mint a fresh token and mail it to that address.
 
-    The stored password hash is never touched, so a stranger who registers someone else's address cannot
-    change what the real owner's row looks like; the mail only ever goes to the address owner.
+    The mail only ever goes to the address owner. When `new_hash` is given (a repeated registration of a still
+    unverified address) it REPLACES the stored hash and retires the earlier verification links: the newest registration
+    wins, so a password chosen by whoever registered first does not survive the owner's own sign-up (F-122, decision
+    0005). A verified account is never touched. `inline` sends the mail on this thread (register); otherwise it leaves
+    the request path (resend), see backend.accounts.mailer.deliver.
     """
     with request_session(factory, None) as s:
         row = s.execute(text("SELECT * FROM auth_lookup(:e)"), {"e": email}).one_or_none()
         if row is None or row.email_verified:
             return False
+        if new_hash is not None:
+            s.execute(text("SELECT auth_replace_unverified(:u, :h)"), {"u": row.id, "h": new_hash})
         token = security.new_token()
         s.execute(
             text("SELECT auth_issue_token(:u, 'verify_email', :t, make_interval(hours => :h))"),
             {"u": row.id, "t": security.token_hash(token), "h": cfg.verify_ttl_hours},
         )
-    mailer.send_verification(email, token)
+    if inline:
+        mailer.send_verification(email, token)
+    else:
+        deliver(mailer, "send_verification", email, token)
     return True
 
 
@@ -247,7 +265,9 @@ def forgot_password(body: EmailIn, request: Request) -> dict:
             )
             send = True
     if send:
-        mailer.send_reset(email, token)
+        deliver(
+            mailer, "send_reset", email, token
+        )  # off the request path: timing/status must not reveal the account
     return {"status": "reset_sent"}
 
 
@@ -280,12 +300,23 @@ def reset_password(body: ResetIn, request: Request) -> dict:
 def verify(body: VerifyIn, request: Request) -> dict:
     cfg, factory = get_config(request), get_factory(request)
     rate_limit(factory, security.rl_key("ip", "verify", client_ip(request, cfg)), *cfg.rl_verify_ip)
+    pw_hash = None
+    if body.password is not None:  # checked before the token is spent
+        problem = security.password_problem(body.password, "")
+        if problem:
+            raise HTTPException(422, problem)
+        pw_hash = security.hash_password(body.password, cfg.bcrypt_cost)
     with request_session(factory, None) as s:
         uid = s.execute(
-            text("SELECT auth_consume_token(:t, 'verify_email')"), {"t": security.token_hash(body.token)}
+            text("SELECT auth_verify_email(:t, :h)"), {"t": security.token_hash(body.token), "h": pw_hash}
         ).scalar_one()
         if uid is None:
             raise HTTPException(400, "invalid_or_expired_token")
+        if body.password is not None:
+            s.execute(text("SELECT set_config('metis.user_id', :u, true)"), {"u": str(uid)})
+            email = s.execute(text("SELECT email_lower FROM app_user WHERE id = :u"), {"u": uid}).scalar_one()
+            if security.password_problem(body.password, email):  # rolls back: the token stays valid
+                raise HTTPException(422, "Password is too easy to guess")
         s.execute(text("SELECT auth_upgrade_edu(:u)"), {"u": uid})
     return {"status": "verified"}
 
@@ -357,6 +388,9 @@ def change_password(
     with request_session(factory, uid) as s:
         s.execute(text("UPDATE app_user SET password_hash = :h WHERE id = :u"), {"h": new_hash, "u": uid})
         s.execute(
+            text("SELECT auth_retire_reset_tokens(:u)"), {"u": uid}
+        )  # outstanding reset mails die (F-125)
+        s.execute(
             text(
                 "INSERT INTO session_revocation (jti, owner_id, expires_at) VALUES (:j, :u, to_timestamp(:e)) "
                 "ON CONFLICT (jti) DO NOTHING"
@@ -395,9 +429,13 @@ def logout(request: Request, response: Response) -> dict:
 
 @router.get("/auth/me")
 def me(user: Annotated[UserCtx, Depends(current_user_no_terms)], request: Request) -> dict:
-    ok = terms_current(get_factory(request), user.id, get_config(request).terms_version)
+    factory = get_factory(request)
+    ok = terms_current(factory, user.id, get_config(request).terms_version)
+    with request_session(factory, user.id) as s:
+        email = s.execute(text("SELECT email_lower FROM app_user WHERE id = :u"), {"u": user.id}).scalar_one()
     return {
         "id": str(user.id),
+        "email": email,
         "tier": user.tier,
         "email_verified": user.email_verified,
         "terms_current": ok,
@@ -427,15 +465,26 @@ def terms_status(user: Annotated[UserCtx, Depends(current_user_no_terms)], reque
 def accept_terms(
     body: TermsIn, user: Annotated[UserCtx, Depends(current_user_no_terms)], request: Request
 ) -> dict:
-    if body.version != get_config(request).terms_version:
+    cfg, factory = get_config(request), get_factory(request)
+    rate_limit(factory, security.rl_key("user", "terms_accept", str(user.id)), *cfg.rl_terms_accept_user)
+    if body.version != cfg.terms_version:
         raise HTTPException(400, "terms_version_not_current")
-    with request_session(get_factory(request), user.id) as s:
-        for doc in ("terms", "privacy", "disclaimer"):
+    with request_session(factory, user.id) as s:
+        have = {
+            r.document: r.version
+            for r in s.execute(
+                text("SELECT document, version FROM terms_current WHERE owner_id = :u"), {"u": user.id}
+            ).all()
+        }
+        # terms_acceptance is append-only: a repeated accept of a version the user already holds adds nothing (F-124).
+        missing = [doc for doc in TERMS_DOCS if have.get(doc) != body.version]
+        for doc in missing:
             s.execute(
                 text("INSERT INTO terms_acceptance (owner_id, document, version) VALUES (:u, :d, :v)"),
                 {"u": user.id, "d": doc, "v": body.version},
             )
-        _audit(s, user.id, "terms_reaccept", f"app_user:{user.id}")
+        if missing:
+            _audit(s, user.id, "terms_reaccept", f"app_user:{user.id}")
     return {"status": "accepted", "version": body.version}
 
 

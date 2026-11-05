@@ -144,7 +144,7 @@ def _good_prod(**over):
     kw = dict(
         env="production",
         database_url="postgresql+psycopg://metis_app_login:Zk3pQ9vLw@db:5432/metis",
-        secret_key="k" * 16 + "9Qz" * 6,
+        secret_key="k" * 16 + "9Qz" * 20,
         redis_url="redis://:Zk3pQ9vLw@r:6379/0",
         object_store_endpoint="https://s3.eu-west-1.amazonaws.com",
         object_store_access_key="AKIAZ9ZQ",

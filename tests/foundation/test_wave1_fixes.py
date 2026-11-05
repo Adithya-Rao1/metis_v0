@@ -254,7 +254,7 @@ def test_f10_f11_f12_extra_settings_checks():
     good = dict(
         env="production",
         database_url="postgresql+psycopg://metis_app_login:Zk3pQ9vLw@db:5432/metis",
-        secret_key="k" * 16 + "9Qz" * 6,
+        secret_key="k" * 16 + "9Qz" * 20,
         redis_url="redis://:Zk3pQ9vLw@r:6379/0",
         object_store_endpoint="https://s3.eu-west-1.amazonaws.com",
         object_store_access_key="AKIAZ9ZQ",
@@ -265,7 +265,8 @@ def test_f10_f11_f12_extra_settings_checks():
         {"database_url": "postgresql://metis_owner:pw9Zq@db/metis"},
         {"database_url": "postgresql://%70ostgres:pw9Zq@db/metis"},
         {"database_url": "postgresql://db/metis?user=postgres&password=pw9Zq"},
-        {"secret_key": "a" * 32},
+        {"secret_key": "a" * 64},
+        {"secret_key": "k" * 16 + "9Qz" * 15},  # 61 bytes: under the 64-byte minimum
     ):
         with pytest.raises(ValueError):
             Settings(**{**good, **over})
