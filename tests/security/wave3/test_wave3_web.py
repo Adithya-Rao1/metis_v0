@@ -25,6 +25,7 @@ PROJECT = f"app.html?p={PID}"
 COMPOUND = f"compound.html?p={PID}&c=cccccccc-0000-4000-8000-000000000003&e=logd"
 ALL_PAGES = ["index.html", "auth.html", "app.html", PROJECT, f"add.html?p={PID}", COMPOUND, "model.html?e=logd", "docking.html", "account.html", f"report.html?p={PID}", "legal/terms.html"]
 KETCHER = "/vendor/ketcher/"
+DRAW_FRAME = {"/draw/frame.html", "/draw/bridge.js"}      # sandboxed host page of the vendored editor (F-121); checked in tests/web/test_draw.py + test_headers.py
 
 
 def defect(fid, sev, msg):
@@ -78,7 +79,7 @@ def test_only_vendor_ketcher_may_use_unsafe_inline_and_nothing_uses_unsafe_eval(
         d = _directives(csp)
         flat = " ".join(sum(d.values(), []))
         assert "'unsafe-eval'" not in flat, path
-        if path.startswith(KETCHER):
+        if path.startswith(KETCHER) or path in DRAW_FRAME:
             continue
         assert "'unsafe-inline'" not in flat, f"{path} relaxes the policy"
         assert d["script-src"] == ["'self'", "'wasm-unsafe-eval'"], path
@@ -103,7 +104,6 @@ def test_ketcher_exception_is_exactly_style_inline_and_nothing_else():
         assert d["font-src"] == ["'self'", "data:"]
 
 
-@defect("F-132", "LOW", "web/_headers sets nosniff, no-referrer, Permissions-Policy and COOP but no Strict-Transport-Security, although every cookie is Secure and the site is only meant to be served over HTTPS; unless the host adds HSTS by itself, a first plain-HTTP visit can be downgraded/stripped")
 def test_hsts_is_set_for_every_path():
     rules = parse_headers_file(WEB / "_headers")
     h = headers_for("/index.html", rules)
@@ -154,18 +154,18 @@ def test_ketcher_runs_under_its_csp_with_no_network_and_no_storage(hpage):
     pg.goto(f"{pg.base}/add.html?p={PID}")
     pg.wait_for_selector("#add-frame:not([hidden])")
     pg.click("#t-draw")
-    pg.wait_for_function("() => { const f = document.getElementById('ketcher'); return !!(f.contentWindow && f.contentWindow.ketcher); }", timeout=90000)
-    smi = pg.evaluate("document.getElementById('ketcher').contentWindow.ketcher.getSmiles()")
+    pg.wait_for_function("() => document.getElementById('ketcher').contentWindow !== null")
+    fr = next(f for f in pg.frames if "draw/frame.html" in f.url)
+    fr.wait_for_function("() => !!window.ketcher", timeout=90000)       # the sandboxed frame; the page itself cannot see into it
+    smi = fr.evaluate("window.ketcher.getSmiles()")
     assert isinstance(smi, str)
     ext = [r for r in pg.requests if not r.startswith(pg.base) and not r.startswith(("data:", "blob:"))]
     assert not ext, ext
     assert [e for e in pg.errors if re.search(r"Content Security Policy|Refused to", e)] == []
-    keys = pg.evaluate("Object.keys(document.getElementById('ketcher').contentWindow.localStorage).concat(Object.keys(document.getElementById('ketcher').contentWindow.sessionStorage))")
-    assert all(k.startswith("ketcher") for k in keys), keys          # editor settings only (it shares the app origin's storage: see F-121)
+    assert pg.evaluate("Object.keys(localStorage).concat(Object.keys(sessionStorage))") == []     # nothing from the editor reaches the app origin's storage (F-121)
     assert pg.evaluate("document.cookie.split(';').map(c => c.trim().split('=')[0]).filter(Boolean)") == ["metis_csrf"]
 
 
-@defect("F-121", "LOW", "the Ketcher iframe is same-origin and unsandboxed (add.html reads iframe.contentWindow.ketcher), so a compromised vendored bundle runs with the parent's full origin: it can call parent.fetch with the session cookie and CSRF token, read the readable CSRF cookie and navigate the top window; its own connect-src 'none' does not bind the parent's realm")
 def test_ketcher_is_isolated_from_the_app_origin():
     html = (WEB / "add.html").read_text()
     tag = re.search(r"<iframe[^>]*id=\"ketcher\"[^>]*>", html).group(0)

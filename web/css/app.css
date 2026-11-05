@@ -62,6 +62,8 @@ table{border-collapse:collapse;width:100%;font-size:13px}
 caption{text-align:left;padding:6px 10px;font-size:12px;color:var(--muted)}
 th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
 th{font-weight:500;color:var(--muted);background:var(--soft);font-size:12px}
+table.subtable{width:auto;font-size:12px;margin:2px 0}
+table.subtable th,table.subtable td{padding:3px 8px}
 th small{display:block;font-weight:400}
 th a{color:inherit}
 td.nowrap,th{white-space:nowrap}

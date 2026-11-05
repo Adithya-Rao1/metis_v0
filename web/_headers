@@ -4,9 +4,14 @@
 # attached per path and the paths below do not overlap. /vendor/ketcher/* (the bundled structure editor, EPAM Ketcher
 # 3.18.0) gets its own policy because its React UI sets inline style attributes; it is loaded only in a same-origin iframe
 # and cannot reach the API with credentials beyond what any same-origin page can (it makes no network requests).
+# Ketcher runs ONLY inside draw/frame.html, which add.html embeds as <iframe sandbox="allow-scripts"> (no allow-same-origin): the editor gets an
+# opaque origin, so it cannot read the page's cookies, DOM or storage, call /api with credentials, or navigate the top window. The frame
+# page also carries the CSP `sandbox allow-scripts` directive, so opening it directly gives the same isolation. It talks to the page only
+# through the postMessage bridge in draw/bridge.js and draw/client.js (origin and source checked on both sides).
 # 3Dmol.js (vendor/) contains one eval( call site and creates blob workers; see README.md before tightening script-src further.
 # connect-src 'self' covers the API: it is served on the same origin under /api.
 /*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=()
@@ -38,6 +43,8 @@
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 /css/*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+/draw/client.js
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 /vendor/3Dmol-min.js
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 /assets/*
@@ -61,3 +68,9 @@
 
 /vendor/ketcher/*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'
+
+# The sandboxed Ketcher host page and its bridge script (the only Metis code that runs next to the vendored bundle).
+/draw/frame.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'none'; sandbox allow-scripts
+/draw/bridge.js
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'none'; sandbox allow-scripts

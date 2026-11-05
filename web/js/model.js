@@ -32,13 +32,23 @@ async function load() {
 const fmt = (v) => (typeof v === "number" ? (Number.isInteger(v) ? String(v) : v.toPrecision(4)) : typeof v === "boolean" ? (v ? "yes" : "no") : v == null ? "n/a" : String(v));
 const safeUrl = (u) => { try { const x = new URL(u); return x.protocol === "https:" || x.protocol === "http:" ? x.href : null; } catch (e) { return null; } };
 
-// Flatten nested JSON (benchmark metrics) into [path, value] rows, preserving every key.
+const isRecord = (v) => v && typeof v === "object" && !Array.isArray(v);
+// An array of objects (reliability bins, coverage by similarity bin) becomes a small table: one row per element, one column per key.
+// Cells are text only (textContent), so nothing from the card can become markup.
+function miniTable(path, rows) {
+  const keys = [...new Set(rows.flatMap((r) => (isRecord(r) ? Object.keys(r) : [])))];
+  return el("table", { class: "subtable" }, el("caption", { class: "legend", text: `${path.replace(/_/g, " ")} (${rows.length} rows)` }),
+    el("thead", {}, el("tr", {}, keys.map((k) => el("th", { scope: "col", text: k.replace(/_/g, " ") })))),
+    el("tbody", {}, rows.map((r) => el("tr", {}, keys.map((k) => el("td", { class: "mono", text: r[k] != null && typeof r[k] === "object" ? JSON.stringify(r[k]) : fmt(r[k]) }))))));
+}
+// Flatten nested JSON (benchmark metrics) into [path, value] rows, preserving every key. Value is text, or a table node for arrays of objects.
 function flatten(obj, prefix = "") {
   const out = [];
   for (const [k, v] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) out.push(...flatten(v, path));
-    else out.push([path, Array.isArray(v) ? v.map(fmt).join(", ") : fmt(v)]);
+    if (isRecord(v)) out.push(...flatten(v, path));
+    else if (Array.isArray(v) && v.length && v.every(isRecord)) out.push([path, miniTable(path, v)]);
+    else out.push([path, Array.isArray(v) ? v.map((x) => (isRecord(x) ? JSON.stringify(x) : fmt(x))).join(", ") : fmt(v)]);
   }
   return out;
 }

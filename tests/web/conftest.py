@@ -7,6 +7,7 @@ import functools
 import glob
 import http.server
 import os
+import sys
 import threading
 from pathlib import Path
 
@@ -80,6 +81,46 @@ def make_page(browser, base_url):
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
         page.errors = errors
         page.base = base_url
+        return page
+
+    yield _make
+    for c in ctxs:
+        c.close()
+
+
+# ---- a site that applies web/_headers (so the browser enforces the real CSP and the iframe sandbox) ----
+sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+
+
+@pytest.fixture(scope="session")
+def hsite():
+    """web/ served with web/_headers applied; /api answers 404 unless a test intercepts it (tests/e2e/onesite.py)."""
+    from fastapi import FastAPI
+    from onesite import LiveServer, Site
+
+    srv = LiveServer(Site(FastAPI(docs_url=None, openapi_url=None), WEB)).start()
+    yield srv
+    srv.stop()
+
+
+@pytest.fixture()
+def make_hpage(browser, hsite):
+    ctxs = []
+
+    def _make(width=1440, height=900, api="default", **kw):
+        ctx = browser.new_context(viewport={"width": width, "height": height}, **kw)
+        ctxs.append(ctx)
+        ctx.add_cookies([{"name": "metis_csrf", "value": "testtoken", "url": hsite.url}])
+        page = ctx.new_page()
+        if api == "default":
+            api = MockApi()
+        if api is not None:
+            install_mock(page, api)
+        page.errors, page.requests = [], []
+        page.on("pageerror", lambda e: page.errors.append(str(e)))
+        page.on("console", lambda m: page.errors.append(m.text) if m.type == "error" else None)
+        page.on("request", lambda r: page.requests.append(r.url))
+        page.base = hsite.url
         return page
 
     yield _make
