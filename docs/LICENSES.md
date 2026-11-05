@@ -16,3 +16,8 @@
 | SA score data and code (`leadstudio/sa`, from RDKit Contrib / Ertl and Schuffenhauer) | BSD-3-Clause | cleared | fragment-score file is sha256-pinned on load |
 | GraphDQN code copied into `leadstudio/` | MIT (owner's own repository) | cleared | copied, not linked; `binding_module` (PLAPT) is NOT shipped |
 | torch (optional, Lead Studio DQN policy) | BSD-3 | not installed | not in requirements; without it the policy is uniform |
+| PLAPT (`binding_module`, Bindwell, MIT per its LICENSE.txt) with ProtBert (Rostlab) and ChemBERTa (seyonec) weights | code MIT; weight licences not yet checked | pending | used only on the GPU box (imported from the GraphDQN checkout), NOT shipped in this repo; check the Hugging Face model cards before any public launch |
+| DynamicBind (code and v2 checkpoint) | check upstream licence | pending | runs on the GPU box only; not in this repo |
+| ESM-2 embeddings (used by DynamicBind) | check upstream licence | pending | GPU box only |
+| IBM Plex Sans / Mono fonts (web/fonts) | SIL OFL 1.1 per upstream | pending verification | confirm the OFL text ships with the fonts |
+| pdb2pqr / propka / Open Babel / Meeko (dockprep) | BSD-3 / LGPL-2.1 / GPL-2.0 / LGPL-2.1 per upstream | pending | GPL/LGPL tools: used as separate programs or libraries, not modified; owner/lawyer to confirm before launch |

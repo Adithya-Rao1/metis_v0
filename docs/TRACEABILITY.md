@@ -16,3 +16,6 @@ Status: `schema` = covered by Wave 0 tests; `todo` = later wave. Spec: https://c
 | Uncertainty methods, calibration, attribution | 5 | ml/ | conformal coverage tests | todo (Wave 2) |
 | Docking prep (Vina, GNINA) | 7 | backend/dockprep | 1M17 tests | todo (Wave 2) |
 | Exports PDF/SDF/CSV with disclaimer | 6 | backend/exports | content tests | todo (Wave 2) |
+
+## Status note (Wave 4, 2026-11-05)
+Rows above marked "schema" or "todo" were written in Waves 0-1 and are out of date: the features are built and covered by the suites under tests/ (accounts, api, db, dockprep, ml, security, web, e2e, leadstudio). Open conformance gaps: models are SYNTHETIC sample models until real training and benchmarks (G1, G2) are done; fragment attribution is unvalidated (G3); home-page 1M17 view and per-location 2D/3D are covered by tests/web but this table has not been re-keyed row by row. Re-keying every row to a named test is a Wave 4 close-out task before G4.

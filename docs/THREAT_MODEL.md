@@ -16,6 +16,9 @@ Classes of threat and mitigations. Specific findings from reviews are kept priva
 | Secrets in the public repo | .gitignore, gitleaks, secret scanning + push protection, placeholders only |
 | Supply chain | Pinned deps, pip-audit, container scan, SBOM |
 | Denial of service by large jobs | 10-compound cap, per-user quotas, statement timeouts, queue limits |
+| Lead Studio (Beta) misuse: another user's runs, poses or saved sessions; path traversal to files; SSRF through the docking URL; runaway jobs | Every `/lead/*` route needs the Metis session, CSRF on writes and the terms gate; run state keyed by user id; saved runs, manual sessions and profiles in forced-RLS tables (migration 0005); structure files served from a whitelist; docking URL only from settings (loopback or explicit allow-list); per-user run caps, rate limits, size caps and timeouts |
+| Third-party code in the browser (Ketcher editor) | Vendored with pinned hashes, strict per-path CSP, no third-party requests; isolation of the editor from the app origin is tracked in BACKLOG (F-121) |
+| Model outputs mistaken for measurements | Required fields (interval, N, coverage, method note) on every prediction; models labelled sample/synthetic until benchmarks are published (G2) |
 
 Out of scope for v1: SSO, enterprise tenancy, HIPAA/regulated data. The service is not for patient data.
 Before launch: external security review, restore and deletion drills (gate G4).
