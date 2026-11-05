@@ -49,6 +49,7 @@ class Settings:
     runs_per_minute: int = 6  # per user, enforced by the shared database limiter
     validates_per_minute: int = 30
     heartbeat: float = 15.0
+    orphan_grace: float = 30.0  # a live/mock run nobody listens to for this long is cancelled (client gone)
     mock_delay: float = 0.4  # pacing of the mock replay (seconds / event)
     replay_delay: float = 0.25  # pacing of cache replays
     cache_size: int = 64
@@ -71,6 +72,7 @@ class Settings:
             runs_per_minute=_env("STUDIO_RUNS_PER_MIN", d.runs_per_minute, int),
             validates_per_minute=_env("STUDIO_VALIDATES_PER_MIN", d.validates_per_minute, int),
             heartbeat=_env("STUDIO_HEARTBEAT", d.heartbeat),
+            orphan_grace=max(0.0, _env("STUDIO_ORPHAN_GRACE", d.orphan_grace)),
             mock_delay=_env("STUDIO_MOCK_DELAY", d.mock_delay),
             replay_delay=_env("STUDIO_REPLAY_DELAY", d.replay_delay),
             force_mock=os.environ.get("STUDIO_FORCE_MOCK", "") not in ("", "0", "false"),
@@ -123,6 +125,8 @@ class Run:
     created: float = field(default_factory=time.monotonic)
     lock: threading.Lock = field(default_factory=threading.Lock)
     timer: threading.Timer | None = None
+    streams: int = 0  # open SSE connections reading this run
+    orphan: threading.Timer | None = None  # armed while nobody reads the run (see RunManager.detach)
 
     def push(self, type_: str, payload: dict) -> bool:
         with self.lock:
@@ -150,6 +154,8 @@ class Run:
             self.finished, self.status = True, status
             if self.timer:
                 self.timer.cancel()
+            if self.orphan:
+                self.orphan.cancel()
             return True
 
 
@@ -214,6 +220,7 @@ class RunManager:
             )
             self._register(run)
         self.pool.submit(self._execute, run)
+        self._arm_orphan(run)  # released again if the client never opens (or leaves) the event stream
         return run
 
     def _retry_after(self, active: list[Run]) -> int:
@@ -247,6 +254,41 @@ class RunManager:
         return run.finish("cancelled", "Run cancelled", recoverable=True)
 
     # ------------------------------------------------------------ streams
+    def _arm_orphan(self, run: Run) -> None:
+        """Cancel the run if no event stream reads it for `orphan_grace` seconds, so a closed tab or a dropped
+        connection does not leave an engine run burning CPU for its whole time limit. A reconnecting EventSource
+        (Last-Event-ID) re-attaches within the grace period and keeps the run."""
+        if run.source == "replay" or self.s.orphan_grace <= 0:
+            return
+        with run.lock:
+            if run.finished or run.streams > 0:
+                return
+            if run.orphan:
+                run.orphan.cancel()
+            run.orphan = threading.Timer(self.s.orphan_grace, self._orphan_expired, args=(run,))
+            run.orphan.daemon = True
+            run.orphan.start()
+
+    def _orphan_expired(self, run: Run) -> None:
+        with run.lock:
+            listening = run.streams > 0
+        if not listening and run.finish(
+            "cancelled", "Run cancelled: no client was listening", recoverable=True
+        ):
+            log.info("run %s cancelled: client gone", run.run_id[:6])
+
+    def attach(self, run: Run) -> None:
+        with run.lock:
+            run.streams += 1
+            if run.orphan:
+                run.orphan.cancel()
+                run.orphan = None
+
+    def detach(self, run: Run) -> None:
+        with run.lock:
+            run.streams = max(0, run.streams - 1)
+        self._arm_orphan(run)
+
     def open_stream(self, owner: uuid.UUID) -> bool:
         with self.lock:
             n = self._streams.get(owner, 0)

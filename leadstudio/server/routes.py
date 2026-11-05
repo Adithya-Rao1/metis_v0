@@ -19,6 +19,7 @@ import secrets
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
@@ -213,6 +214,20 @@ def cancel_run(
     return {"cancelled": st.mgr.cancel(run)}
 
 
+class _ReleasingStream(StreamingResponse):
+    """StreamingResponse that calls `release` when the ASGI call ends, even if the body generator never started."""
+
+    def __init__(self, content: Any, release: Callable[[], None], **kw: Any) -> None:
+        super().__init__(content, **kw)
+        self._release = release
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._release()
+
+
 @api.get("/runs/{run_id}/events")
 async def run_events(
     request: Request,
@@ -225,6 +240,18 @@ async def run_events(
         raise HTTPException(404, "unknown run")
     if not st.mgr.open_stream(user.id):
         raise Rejected(429, "Too many open event streams", 5)
+    st.mgr.attach(run)
+    released = False
+
+    def release() -> None:
+        """Give back the per-user stream slot and the run's reader count exactly once, however the response ends
+        (finished, client disconnect, cancellation, or never started: the generator's own finally would not run)."""
+        nonlocal released
+        if not released:
+            released = True
+            st.mgr.close_stream(user.id)
+            st.mgr.detach(run)
+
     last = request.headers.get("last-event-id")
     start = int(last) + 1 if last and last.isdigit() and len(last) < 9 else 0
     heartbeat = st.settings.heartbeat
@@ -234,6 +261,8 @@ async def run_events(
         try:
             yield "retry: 3000\n\n"
             while True:
+                if await request.is_disconnected():
+                    return
                 if i < len(run.events):
                     ev = run.events[i]
                     if run.pace and i > start:
@@ -243,17 +272,16 @@ async def run_events(
                     continue
                 if run.finished:
                     return
-                if await request.is_disconnected():
-                    return
                 if time.monotonic() - idle >= heartbeat:
                     yield ": heartbeat\n\n"
                     idle = time.monotonic()
                 await asyncio.sleep(0.1)
         finally:
-            st.mgr.close_stream(user.id)
+            release()
 
-    return StreamingResponse(
+    return _ReleasingStream(
         stream(),
+        release,
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
