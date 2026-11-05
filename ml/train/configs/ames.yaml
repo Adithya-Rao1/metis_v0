@@ -3,6 +3,7 @@ endpoint: ames
 version: v1
 kind: classification
 datasets: [AMES]
+higher_is_better: false   # default ranking direction (null/absent = the user chooses)
 backend: chemprop
 split: scaffold            # scaffold or butina; random splits are not offered
 split_frac: [0.7, 0.15, 0.15]

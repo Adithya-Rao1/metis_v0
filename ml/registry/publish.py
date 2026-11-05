@@ -133,6 +133,7 @@ def build_card(
         version=meta["version"],
         kind=kind,
         units=meta.get("units"),
+        higher_is_better=meta.get("higher_is_better"),
         datasets=datasets,
         limitations=limitations or cards.LIMITATIONS[kind],
         split_type=meta["split"],

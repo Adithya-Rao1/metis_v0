@@ -40,6 +40,9 @@ def load_config(path: Path | str) -> dict:
         raise ValueError(f"config missing {missing}")
     if not cfg["datasets"] or not all(isinstance(d, str) for d in cfg["datasets"]):
         raise ValueError("config.datasets must be a non-empty list of dataset ids")
+    hib = cfg.get("higher_is_better")
+    if hib is not None and not isinstance(hib, bool):
+        raise ValueError("higher_is_better must be true, false or absent")
     if cfg.get("split", "scaffold") not in ALLOWED_SPLITS:
         raise ValueError(f"split must be one of {ALLOWED_SPLITS}; random splits are not offered")
     return cfg
@@ -140,6 +143,7 @@ def run_training(
         ],
         "dataset_of_row": ds_of,
         "units": entries[0].units,
+        "higher_is_better": cfg.get("higher_is_better"),
         "default_range": [float(y[tr].min()), float(y[tr].max())],
         "code_commit": B.code_commit(),
         "weights_sha256": B.weights_sha256(root / "members"),

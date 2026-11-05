@@ -33,6 +33,9 @@ class ModelCard(BaseModel):
     version: str
     kind: Literal["regression", "classification"]
     units: Optional[str] = None
+    # Default direction for ranking (True: a higher value is better; False: lower is better). None = the endpoint has no
+    # agreed default and the user chooses. Set by the trainer config, copied by the publisher, shown by the model card.
+    higher_is_better: Optional[bool] = None
     datasets: list[dict] = Field(min_length=1)  # name, url, license, size, split
     limitations: str = Field(min_length=1)
     split_type: str

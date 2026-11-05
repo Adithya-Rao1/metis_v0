@@ -56,6 +56,10 @@ class LigandReq(_Base):
     all_conformers_sdf: bool = False
 
 
+class DepictReq(_Base):
+    smiles: str = Field(min_length=1, max_length=2000)
+
+
 class _StructReq(_Base):
     pdb_id: str | None = Field(default=None, max_length=8)
     file_b64: str | None = Field(default=None, max_length=MAX_BODY_BYTES)
@@ -158,6 +162,38 @@ async def post_ligands(request: Request, bundle: Literal["zip"] | None = None, u
         return _respond(res, bundle)
     except DockprepError as e:
         raise _handle(e) from None
+
+
+_SVG_HEADERS = {
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+    "X-Content-Type-Options": "nosniff",
+}
+
+
+def _depict_svg(smiles: str) -> str:
+    """2D depiction of one SMILES, drawn in the structure sandbox (same worker as the project depictions)."""
+    from backend.compounds import sandbox
+
+    try:
+        out = sandbox.run({"op": "depict", "smiles": smiles, "highlight": []})
+    except sandbox.WorkerBusy:
+        raise DockprepError("busy", "Structure processing is busy; try again shortly.", 503) from None
+    except sandbox.WorkerError:
+        raise DockprepError("depict_failed", "Structure processing failed or timed out.", 503) from None
+    if not out.get("ok"):
+        raise DockprepError("bad_smiles", "This SMILES could not be read.", 422)  # never echo the input
+    return str(out["svg"])
+
+
+@router.post("/ligands/depiction")
+async def post_ligand_depiction(request: Request, user=Depends(current_user)):
+    """SVG of the ligand SMILES the user typed (stateless; the SMILES travels in the body, never in a URL or a log)."""
+    try:
+        req = await _read_model(request, DepictReq)
+        svg = await anyio.to_thread.run_sync(_depict_svg, req.smiles)
+    except DockprepError as e:
+        raise _handle(e) from None
+    return Response(content=svg, media_type="image/svg+xml", headers=_SVG_HEADERS)
 
 
 @router.post("/proteins")

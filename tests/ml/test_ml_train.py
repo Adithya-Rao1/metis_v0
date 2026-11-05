@@ -117,3 +117,21 @@ def test_chemprop_adapter_imports_and_trains_tiny(tmp_path):
     assert p.shape == (4,) and np.isfinite(p).all()
     mem.save(tmp_path / "m.ckpt")
     assert np.allclose(ChempropMember.load(tmp_path / "m.ckpt").predict(m[:4]), p, atol=1e-5)
+
+
+def test_higher_is_better_config_key_is_bool_or_absent_and_shipped_configs_obey(tmp_path):
+    import yaml
+
+    base = {"endpoint": "e", "version": "v1", "kind": "regression", "datasets": ["D"], "backend": "sklearn"}
+    for good in (None, True, False):
+        p = tmp_path / "ok.yaml"
+        p.write_text(yaml.safe_dump({**base, "higher_is_better": good}))
+        assert TE.load_config(p)["higher_is_better"] is good
+    for bad in ("yes", 1, 0, "true", []):
+        p = tmp_path / "bad.yaml"
+        p.write_text(yaml.safe_dump({**base, "higher_is_better": bad}))
+        with pytest.raises(ValueError, match="higher_is_better"):
+            TE.load_config(p)
+    for f in sorted((Path(TE.__file__).parent / "configs").glob("*.yaml")):
+        v = TE.load_config(f).get("higher_is_better")
+        assert v is None or isinstance(v, bool), f.name

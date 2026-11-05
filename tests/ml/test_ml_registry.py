@@ -15,9 +15,9 @@ from ml.train.member import SklearnMember
 FAST = {"n_estimators": 6}
 
 
-def _train(root, manifest, mols, y, kind, ds, endpoint):
+def _train(root, manifest, mols, y, kind, ds, endpoint, higher_is_better=None):
     cfg = {"endpoint": endpoint, "version": "v1", "datasets": [ds], "kind": kind, "backend": "sklearn",
-           "member_params": FAST, "seed": 1, "n_members": 20}
+           "member_params": FAST, "seed": 1, "n_members": 20, "higher_is_better": higher_is_better}
     b = TE.run_training(cfg, manifest_path=manifest, loader=lambda c: [(s, float(v), ds) for s, v in zip(mols, y)],
                         artifacts_root=root / "artifacts")
     rep = run_benchmark(mols, y, kind, split_method="scaffold", member_cls=SklearnMember, member_params=FAST, endpoint=endpoint,
@@ -29,11 +29,23 @@ def _train(root, manifest, mols, y, kind, ds, endpoint):
 def pub(tmp_path_factory, cleared_manifest, mols, yreg, ycls):
     root = tmp_path_factory.mktemp("reg")
     out = {"root": root}
-    for kind, ds, ep, y in (("regression", "SynthReg", "synreg", yreg), ("classification", "SynthCls", "syncls", ycls)):
-        b, rep = _train(root, cleared_manifest, mols, y, kind, ds, ep)
+    for kind, ds, ep, y, hib in (
+        ("regression", "SynthReg", "synreg", yreg, True),
+        ("classification", "SynthCls", "syncls", ycls, None),
+    ):
+        b, rep = _train(root, cleared_manifest, mols, y, kind, ds, ep, hib)
         card = publish(b, rep, registry_root=root, manifest_path=cleared_manifest)
         out[ep] = (b, rep, card)
     return out
+
+
+def test_higher_is_better_flows_from_config_to_published_card_and_registry(pub):
+    """Wave 4: the trainer config sets the default ranking direction, the publisher copies it, the registry serves it;
+    absent means 'no default, the user chooses' (None), never a guessed direction."""
+    reg = FileModelRegistry(pub["root"])
+    assert pub["synreg"][2].higher_is_better is True and reg.model_card("synreg").higher_is_better is True
+    assert pub["syncls"][2].higher_is_better is None and reg.model_card("syncls").higher_is_better is None
+    assert next(c for c in reg.list_models() if c.endpoint == "synreg").model_dump()["higher_is_better"] is True
 
 
 def test_untrained_stub_raises_clear_errors():

@@ -8,6 +8,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import StringConstraints
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from backend.jobs.deps import Scope, get_registry, not_found, require_compound, require_project, scope
 from backend.ranking.engine import RankingError
@@ -26,6 +27,10 @@ MAX_PROJECTS_PER_USER = 200
 
 
 class ProjectCreate(Strict):
+    name: ProjectName
+
+
+class ProjectRename(Strict):
     name: ProjectName
 
 
@@ -136,6 +141,28 @@ def get_project(project_id: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
     }
 
 
+@router.patch("/projects/{project_id}")
+def rename_project(project_id: uuid.UUID, body: ProjectRename, sc: Scope = Depends(scope)) -> dict:
+    """Rename a project (owner only; 404 for anyone else's)."""
+    with sc.session() as s:
+        row = (
+            s.execute(
+                text(
+                    "UPDATE project SET name = :name WHERE id = :pid AND owner_id = :uid "
+                    "RETURNING id, name, created_at, "
+                    "(SELECT count(*) FROM compound c WHERE c.project_id = project.id AND c.owner_id = project.owner_id) AS n"
+                ),
+                {"name": body.name, "pid": project_id, "uid": sc.user.id},
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise not_found()
+        _audit(s, sc.user.id, "project_rename", f"project:{project_id}")
+    return {"id": row["id"], "name": row["name"], "created_at": row["created_at"], "compound_count": row["n"]}
+
+
 @router.delete("/projects/{project_id}", status_code=204)
 def delete_project(project_id: uuid.UUID, sc: Scope = Depends(scope)) -> Response:
     with sc.session() as s:
@@ -145,6 +172,64 @@ def delete_project(project_id: uuid.UUID, sc: Scope = Depends(scope)) -> Respons
         )
         if res.rowcount == 0:
             raise not_found()
+    return Response(status_code=204)
+
+
+def _audit(s: Session, uid: uuid.UUID, action: str, resource: str) -> None:
+    """Ids only, never names, structures or values (the audit table is append-only)."""
+    s.execute(
+        text("INSERT INTO audit_log (actor_id, action, resource) VALUES (:u, :a, :r)"),
+        {"u": uid, "a": action, "r": resource},
+    )
+
+
+@router.delete("/projects/{project_id}/compounds/{compound_id}", status_code=204)
+def delete_compound(project_id: uuid.UUID, compound_id: uuid.UUID, sc: Scope = Depends(scope)) -> Response:
+    """Delete one compound with its predictions and measurements (cascade). Owner only; 404 otherwise."""
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        res = s.execute(
+            text("DELETE FROM compound WHERE id = :cid AND project_id = :pid AND owner_id = :uid"),
+            {"cid": compound_id, "pid": project_id, "uid": sc.user.id},
+        )
+        if res.rowcount == 0:
+            raise not_found()
+        _audit(s, sc.user.id, "compound_delete", f"compound:{compound_id}")
+    return Response(status_code=204)
+
+
+@router.delete("/projects/{project_id}/measurements/{measurement_id}", status_code=204)
+def delete_measurement(
+    project_id: uuid.UUID, measurement_id: uuid.UUID, sc: Scope = Depends(scope)
+) -> Response:
+    """Delete one measurement of a compound in this project. Owner only; 404 otherwise."""
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        res = s.execute(
+            text(
+                "DELETE FROM measurement m USING compound c WHERE m.id = :mid AND m.owner_id = :uid "
+                "AND c.id = m.compound_id AND c.owner_id = m.owner_id AND c.project_id = :pid"
+            ),
+            {"mid": measurement_id, "pid": project_id, "uid": sc.user.id},
+        )
+        if res.rowcount == 0:
+            raise not_found()
+        _audit(s, sc.user.id, "measurement_delete", f"measurement:{measurement_id}")
+    return Response(status_code=204)
+
+
+@router.delete("/projects/{project_id}/notes/{note_id}", status_code=204)
+def delete_note(project_id: uuid.UUID, note_id: uuid.UUID, sc: Scope = Depends(scope)) -> Response:
+    """Delete one note of this project. Owner only; 404 otherwise. (Notes have no create route yet: see the spec.)"""
+    with sc.session() as s:
+        require_project(s, sc.user.id, project_id)
+        res = s.execute(
+            text("DELETE FROM note WHERE id = :nid AND project_id = :pid AND owner_id = :uid"),
+            {"nid": note_id, "pid": project_id, "uid": sc.user.id},
+        )
+        if res.rowcount == 0:
+            raise not_found()
+        _audit(s, sc.user.id, "note_delete", f"note:{note_id}")
     return Response(status_code=204)
 
 
