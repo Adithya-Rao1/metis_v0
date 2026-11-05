@@ -35,7 +35,7 @@ jobs:
         run: |
           METIS_MIGRATION_URL="$METIS_TEST_PG_URI" python -m backend.core.migrate
           METIS_MIGRATION_URL="$METIS_TEST_PG_URI" python -m backend.core.migrate
-      - run: python -m pytest -q --ignore=tests/web --ignore=tests/security/web
+      - run: python -m pytest -q --ignore=tests/web --ignore=tests/security/web --ignore=tests/e2e
   web:
     runs-on: ubuntu-24.04
     steps:
@@ -44,7 +44,7 @@ jobs:
         with: {python-version: "3.12", cache: pip}
       - run: pip install -r requirements-dev.txt -r ml/requirements.txt playwright
       - run: python -m playwright install --with-deps chromium
-      - run: python -m pytest -q tests/web tests/security/web --deselect tests/web/test_screenshots.py
+      - run: python -m pytest -q tests/web tests/security/web tests/e2e --deselect tests/web/test_screenshots.py
   secrets-and-scan:
     runs-on: ubuntu-24.04
     steps:
