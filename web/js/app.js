@@ -1,6 +1,6 @@
 // Projects list and the project table with the ranking panel. All data comes from the API (see docs/WEB_WIRING.md).
-import { el, qsId, renderChrome, showEmpty, showError, showLoading, stateBox, say, confirmDialog, fmtDate } from "./chrome.js";
-import { authed, del, depictionUrl, describeError, get, post, put, requireSession } from "./api.js";
+import { el, qsId, renderChrome, showEmpty, showError, showLoading, stateBox, say, confirmDialog, askName, fmtDate } from "./chrome.js";
+import { authed, del, depictionUrl, describeError, get, patch, post, put, requireSession } from "./api.js";
 import { SharedViewer, CONFORMER_LABEL } from "./viewer.js";
 import { cellText, limitText, num } from "./format.js";
 
@@ -25,6 +25,11 @@ async function projectsList() {
         el("a", { href: `app.html?p=${p.id}`, class: "proj-link", text: p.name }),
         el("span", { class: "chip", text: `${p.compound_count} of 10 compounds` }),
         el("span", { class: "legend", text: `created ${fmtDate(p.created_at)}` }),
+        el("button", { class: "btn small", type: "button", "aria-label": `Rename project ${p.name}`, text: "Rename", onclick: async () => {
+          const name = await askName({ title: "Rename project", label: "Project name", value: p.name, okLabel: "Rename" });
+          if (!name || name === p.name) return;
+          try { await authed(() => patch(`/projects/${p.id}`, { name })); await load(); } catch (e) { showError(host, e, load); }
+        } }),
         el("button", { class: "btn small", type: "button", "aria-label": `Delete project ${p.name}`, text: "Delete", onclick: async () => {
           const ok = await confirmDialog({ title: "Delete project", body: `Delete "${p.name}" with all its compounds, predictions and measurements? This cannot be undone.`, okLabel: "Delete project" });
           if (!ok) return;
@@ -61,6 +66,18 @@ async function projectTable(projectId) {
   $("lnk-add").href = `add.html?p=${projectId}`;
   $("lnk-export").href = `report.html?p=${projectId}`;
   document.querySelector(".crumb").textContent = `Projects / ${project.name}`;
+  $("rename-project").addEventListener("click", async () => {
+    const name = await askName({ title: "Rename project", label: "Project name", value: project.name, okLabel: "Rename" });
+    if (!name || name === project.name) return;
+    try {
+      const res = await authed(() => patch(`/projects/${projectId}`, { name }));
+      project.name = (res && typeof res.name === "string" && res.name) || name;
+      $("pname").textContent = project.name;
+      document.title = `${project.name} | Metis`;
+      document.querySelector(".crumb").textContent = `Projects / ${project.name}`;
+      say($("rank-msg"), `Project renamed to "${project.name}".`, "ok");
+    } catch (e) { showError(pageState, e); }
+  });
   $("del-project").addEventListener("click", async () => {
     const ok = await confirmDialog({ title: "Delete project", body: `Delete "${project.name}" with all its compounds, predictions and measurements? This cannot be undone.`, okLabel: "Delete project" });
     if (!ok) return;
@@ -94,7 +111,7 @@ async function projectTable(projectId) {
   const saveCfg = saved.persisted ? saved.config : null;
   for (const e of eps) {
     const w = saveCfg?.weights.find((x) => x.endpoint === e), l = saveCfg?.limits.find((x) => x.endpoint === e);
-    cfg.rows[e] = { weight: w ? w.weight : 1, higher: w ? w.higher_is_better : true,
+    cfg.rows[e] = { weight: w ? w.weight : 1, higher: w ? w.higher_is_better : (typeof cards[e]?.higher_is_better === "boolean" ? cards[e].higher_is_better : true),
       tmin: w?.target_min ?? null, tmax: w?.target_max ?? null, lmin: l?.min ?? null, lmax: l?.max ?? null, unfav: !!l?.use_unfavorable_bound };
   }
   if (saveCfg) cfg.lam = saveCfg.lam;
@@ -221,7 +238,8 @@ async function projectTable(projectId) {
         el("img", { class: "mol", src: depictionUrl(projectId, c.id), alt: `2D structure of ${name(c)}` }),
         el("div", { class: "stackcol" },
           el("span", { class: "chip", text: name(c) }),
-          el("button", { class: "btn small", type: "button", "aria-label": `Show 3D structure of ${name(c)}`, onclick: () => showCompound(c.id, true), text: "3D" })))));
+          el("button", { class: "btn small", type: "button", "aria-label": `Show 3D structure of ${name(c)}`, onclick: () => showCompound(c.id, true), text: "3D" }),
+          el("button", { class: "btn small", type: "button", "data-delete-compound": c.id, "aria-label": `Delete ${name(c)}`, onclick: () => deleteCompound(c), text: "Delete" })))));
       for (const e of eps) {
         const entry = predOf(c, e);
         if (!entry) { tr.append(el("td", { "data-missing": e, class: "muted", text: "not predicted" })); continue; }
@@ -242,10 +260,23 @@ async function projectTable(projectId) {
     renderBreakdown();
   }
 
+  async function deleteCompound(c) {
+    const ok = await confirmDialog({ title: "Delete compound", body: `Delete ${name(c)} (${c.canonical_smiles}) with its predictions and measurements? This cannot be undone.`, okLabel: "Delete compound" });
+    if (!ok) return;
+    try { await authed(() => del(`/projects/${projectId}/compounds/${c.id}`)); location.reload(); } catch (e) { say($("rank-msg"), describeError(e).message, "error"); }
+  }
+  async function deleteMeasurement(c, m) {
+    const ok = await confirmDialog({ title: "Delete measurement", body: `Delete the measured ${m.endpoint} value ${m.value}${m.unit ? " " + m.unit : ""} for ${name(c)}? This cannot be undone.`, okLabel: "Delete measurement" });
+    if (!ok) return;
+    try { await authed(() => del(`/projects/${projectId}/measurements/${m.id}`)); location.reload(); } catch (e) { say($("rank-msg"), describeError(e).message, "error"); }
+  }
+
   function measuredCell(c) {
     const endpoints = Object.keys(cards);
     return el("td", {},
-      c.measurements.map((m) => el("div", { class: "legend mono", "data-measured": m.endpoint, text: `${m.endpoint}: ${m.value}${m.unit ? " " + m.unit : ""} (measured)` })),
+      c.measurements.map((m) => el("div", { class: "legend mono", "data-measured": m.endpoint },
+        `${m.endpoint}: ${m.value}${m.unit ? " " + m.unit : ""} (measured) `,
+        m.id ? el("button", { class: "btn small", type: "button", "data-delete-measurement": m.id, "aria-label": `Delete measured ${m.endpoint} value for ${name(c)}`, onclick: () => deleteMeasurement(c, m), text: "Delete" }) : null)),
       endpoints.length ? el("form", { class: "inline meas-form", method: "post", action: "#js-required", onsubmit: async (ev) => {
         ev.preventDefault();
         const f = ev.currentTarget, v = num(f.elements.value.value);

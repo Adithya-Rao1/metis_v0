@@ -252,7 +252,6 @@ def test_model_page_reports_calibration_and_noise_ceiling(api_page, synth_regist
         assert needle in texts["syncls"], needle
 
 
-@defect("F-120", "LOW", "model page prints the reliability bins and the similarity-bin coverage as '[object Object]' (flatten() joins arrays of objects with String()), so the numbers the spec asks for (reliability diagram data, coverage by similarity bin) are on the card but unreadable on the page")
 def test_model_page_renders_reliability_and_similarity_bins_as_numbers(api_page, synth_registry):
     reg, _ = synth_registry
     pg = api_page(api=CardApi([card_json(reg, e) for e in ("synreg", "syncls")]))

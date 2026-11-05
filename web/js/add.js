@@ -1,6 +1,7 @@
 // Add compounds (SMILES, molfile/SDF paste, CSV/SDF upload, Ketcher drawing) and run predictions for one project.
 import { el, qsId, renderChrome, say, showEmpty, showError, showLoading, stateBox } from "./chrome.js";
 import { authed, describeError, get, post, requireSession } from "./api.js";
+import { openDrawBridge } from "../draw/client.js";
 
 const $ = (id) => document.getElementById(id);
 const user = await requireSession();
@@ -77,15 +78,16 @@ async function start() {
     $("file-note").textContent = `${f.name} (${f.size} bytes) will be sent to the server as ${uploaded.format.toUpperCase()}; it is parsed there in a sandbox.`;
   });
 
-  // ---- draw (Ketcher, same-origin iframe) ----
+  // ---- draw (Ketcher in a sandboxed iframe, talked to only through draw/client.js) ----
+  let bridge = null;
   function initDraw() {
     const fr = $("ketcher");
-    if (!fr.getAttribute("src")) fr.setAttribute("src", fr.dataset.src);
+    if (bridge || fr.getAttribute("src")) return;
+    try { bridge = openDrawBridge(fr, fr.dataset.src); } catch (e) { say($("draw-note"), e.message, "error"); }
   }
   async function drawnSmiles() {
-    const k = $("ketcher").contentWindow && $("ketcher").contentWindow.ketcher;
-    if (!k) throw new Error("The structure editor is still loading. Wait a moment and try again.");
-    const smi = await k.getSmiles();
+    if (!bridge) throw new Error("The structure editor is not available.");
+    const smi = await bridge.getSmiles();
     if (!smi) throw new Error("Draw a structure first.");
     return smi;
   }

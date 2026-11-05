@@ -1,6 +1,6 @@
 // Uncertainty panel for one prediction: GET /predictions/{id}/uncertainty (PredictionDetail) plus the compound's depiction and conformer.
 import { el, qs, qsId, renderChrome, showError, showLoading, stateBox } from "./chrome.js";
-import { authed, depictionUrl, describeError, get, post, requireSession } from "./api.js";
+import { authed, depictionUrl, describeError, get, post, requireSession, smilesPicture } from "./api.js";
 import { SharedViewer, CONFORMER_LABEL } from "./viewer.js";
 import { fmtInt, fmtVal } from "./format.js";
 
@@ -67,7 +67,7 @@ async function load() {
   async function ensureConformer() {
     if (molblock) return molblock;
     try {
-      const conf = await get(`/projects/${pid}/compounds/${cid}/conformer`);
+      const conf = await authed(() => get(`/projects/${pid}/compounds/${cid}/conformer`));
       molblock = conf.molblock; return molblock;
     } catch (e) { cap.textContent = `3D view unavailable: ${describeError(e).message}`; return null; }
   }
@@ -90,6 +90,13 @@ async function load() {
   if (!detail.nearest_training.length) nb.replaceChildren(stateBox("empty", "No nearest training compounds were returned."));
   else nb.replaceChildren(...detail.nearest_training.map((n, i) => el("div", { "data-nearest": i, class: "legend mono",
     text: `Tanimoto ${Number(n.similarity).toFixed(2)} | measured label ${n.label} | ${n.smiles}` })));
+  // Pictures of the nearest training compounds, only if the server can draw an arbitrary SMILES (otherwise the text above stays as it is).
+  detail.nearest_training.forEach(async (n, i) => {
+    let url = null;
+    try { url = await smilesPicture(n.smiles); } catch (e) { return; }
+    const host = nb.querySelector(`[data-nearest="${i}"]`);
+    if (url && host) host.prepend(el("img", { class: "mol", src: url, alt: `2D structure of nearest training compound ${i + 1}` }));
+  });
   await show(null);
 
   // ---- re-run ----

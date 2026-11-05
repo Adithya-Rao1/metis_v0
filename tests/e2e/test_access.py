@@ -264,7 +264,16 @@ def test_csp_headers_are_applied_per_path_and_ketcher_is_the_only_relaxed_one(ma
         and "connect-src 'none'" in k
         and "'unsafe-eval'" not in k
     )
+    f = csp("/draw/frame.html")
+    assert (
+        "style-src 'self' 'unsafe-inline'" in f
+        and "sandbox allow-scripts" in f
+        and "connect-src 'none'" in f
+        and "'unsafe-eval'" not in f
+    )
+    assert "unsafe-inline" not in csp("/draw/client.js")
     r = pg.request.get(stack.url + "/app.html")
+    assert "max-age=31536000" in r.headers["strict-transport-security"] and "includeSubDomains" in r.headers["strict-transport-security"]
     assert r.headers["x-content-type-options"] == "nosniff" and r.headers["referrer-policy"] == "no-referrer"
     assert pg.request.get(stack.url + "/api/projects").status == 401
 
@@ -276,13 +285,17 @@ def test_draw_structure_with_ketcher_adds_a_compound(owner, stack):
     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
     pg.goto(f"{stack.url}/add.html?p={pid}")
     pg.click("#t-draw")
-    pg.wait_for_function(
-        "() => { const f = document.getElementById('ketcher'); return f.contentWindow && f.contentWindow.ketcher !== undefined; }",
-        timeout=60000,
-    )
-    frame = pg.frame_locator("#ketcher")
-    assert frame.locator("body").count() == 1
-    pg.evaluate("document.getElementById('ketcher').contentWindow.ketcher.setMolecule('CCCCCCO')")
+    # Ketcher runs in a sandboxed (opaque-origin) iframe: the page cannot touch its window, so draw inside the frame
+    # and let the page read the structure back through the postMessage bridge when "Add" is pressed.
+    pg.wait_for_function("() => document.getElementById('ketcher').contentWindow !== null", timeout=60000)
+    fr = None
+    for _ in range(120):
+        fr = next((f for f in pg.frames if "draw/frame.html" in f.url), None)
+        if fr is not None and fr.evaluate("() => !!window.ketcher"):
+            break
+        pg.wait_for_timeout(500)
+    assert fr is not None and fr.evaluate("() => !!window.ketcher")
+    fr.evaluate("window.ketcher.setMolecule('CCCCCCO')")
     pg.wait_for_timeout(500)
     pg.click("#add-submit")
     pg.wait_for_function(

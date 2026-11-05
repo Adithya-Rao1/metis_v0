@@ -149,3 +149,38 @@ def test_contrast_of_design_tokens():
                        ("on-accent", "accent"), ("err", "panel"), ("fg", "accent-soft")]:
             assert _ratio(t[fg], t[bg]) >= 4.5, (fg, bg, _ratio(t[fg], t[bg]))
     assert _ratio("#e6e9ec", "#14181c") >= 4.5 and _ratio("#0b1520", "#6aa5e6") >= 4.5 and _ratio("#a3adb8", "#14181c") >= 4.5
+
+
+def test_hsts_is_on_every_served_path_exactly_once():
+    """F-132: Strict-Transport-Security (max-age one year, includeSubDomains) reaches every file, with no duplicate value
+    from overlapping rules (hosts combine same-named headers), and the pre-existing headers are all still there."""
+    import sys
+    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    from onesite import headers_for, parse_headers_file
+
+    rules = parse_headers_file(WEB / "_headers")
+    files = ["/" + p.relative_to(WEB).as_posix() for p in sorted(WEB.rglob("*")) if p.is_file() and p.name != ".DS_Store"] + ["/", "/lead/", "/draw/frame.html"]
+    for path in files:
+        h = headers_for(path, rules)
+        assert h.get("Strict-Transport-Security") == "max-age=31536000; includeSubDomains", path
+        assert h.get("X-Content-Type-Options") == "nosniff" and h.get("Referrer-Policy") == "no-referrer", path
+        assert "camera=()" in h.get("Permissions-Policy", "") and h.get("Cross-Origin-Opener-Policy") == "same-origin", path
+    text = (WEB / "_headers").read_text()
+    assert text.count("Strict-Transport-Security") == 1 and "preload" not in text.split("Strict-Transport-Security")[1].splitlines()[0]
+    # every rule that names a path is covered by the catch-all, which is where the header lives
+    assert rules[0][0].match("/anything/at/all") and "Strict-Transport-Security" in rules[0][1]
+
+
+def test_sandboxed_ketcher_host_has_its_own_policy_and_the_pre_existing_ones_are_unchanged():
+    import sys
+    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    from onesite import headers_for, parse_headers_file
+
+    rules = parse_headers_file(WEB / "_headers")
+    for path in ("/draw/frame.html", "/draw/bridge.js"):
+        d = dict(p.strip().split(" ", 1) for p in headers_for(path, rules)["Content-Security-Policy"].split(";") if p.strip())
+        assert d["sandbox"] == "allow-scripts" and "allow-same-origin" not in d["sandbox"], path
+        assert d["connect-src"] == "'none'" and d["form-action"] == "'none'" and d["frame-ancestors"] == "'self'", path
+        assert d["script-src"] == "'self' 'wasm-unsafe-eval'" and "unsafe-eval'" not in d["script-src"].replace("wasm-unsafe-eval", ""), path
+    assert "sandbox" not in headers_for("/draw/client.js", rules)["Content-Security-Policy"]
+    assert "'unsafe-inline'" not in headers_for("/draw/client.js", rules)["Content-Security-Policy"]

@@ -15,8 +15,16 @@ headers from overlapping rules, so the paths do not overlap):
     font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none';
     frame-ancestors 'none'; form-action 'self'
 
-`connect-src 'self'` covers the API because it is served on the same origin. `/vendor/ketcher/*` (the structure editor, shown in a
-same-origin iframe) gets its own policy with `style-src 'self' 'unsafe-inline'`, `connect-src 'none'` and `frame-ancestors 'self'`.
+`connect-src 'self'` covers the API because it is served on the same origin. `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+is set once, on `/*`, together with the other global headers (nosniff, no-referrer, Permissions-Policy, COOP).
+
+The structure editor (Ketcher, vendored unmodified) runs ONLY inside `draw/frame.html`, which `add.html` embeds as
+`<iframe sandbox="allow-scripts">` with no `allow-same-origin`: the editor has an opaque origin, so it cannot read the page's cookies,
+DOM or storage, cannot call `/api` with credentials and cannot navigate the top window. The frame page carries its own policy
+(`style-src 'self' 'unsafe-inline'` because Ketcher sets inline style attributes, `connect-src 'none'`, `frame-ancestors 'self'`,
+`sandbox allow-scripts`). The page talks to it only through `draw/client.js` and `draw/bridge.js` (`getSmiles`, `setMolecule`;
+`event.source` and origin are checked on both sides). `bridge.js` also supplies in-memory `localStorage`/`sessionStorage` stand-ins,
+because a sandboxed document has none and Ketcher reads them at start-up. `/vendor/ketcher/*` files and their hashes are unchanged.
 `vendor/3Dmol-min.js` contains one `eval(` call site; if the viewer is found to need it under this policy, add `'unsafe-eval'` to
 `script-src` for those pages only and review. Also send HSTS at the TLS edge.
 

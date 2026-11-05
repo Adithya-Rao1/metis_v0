@@ -20,6 +20,7 @@ async function load() {
   try { state = await authed(() => get("/consents")); } catch (e) { return showError(page, e, load); }
   page.replaceChildren();
   $("acct-frame").hidden = false;
+  $("acct-email").textContent = user.email || "not available";
   $("acct-tier").textContent = `${user.tier}${user.email_verified ? ", email verified" : ""}`;
   $("acct-cap").textContent = `up to N = ${TIER_MAX_N[user.tier] ?? 10}`;
   const box = $("consents");

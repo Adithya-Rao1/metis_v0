@@ -18,12 +18,13 @@ from backend.schemas.contracts import Prediction, RankingConfig, UncertaintyBrea
 
 MV = uuid.UUID("11111111-1111-1111-1111-111111111111")
 PID = "aaaaaaaa-0000-4000-8000-000000000001"
-USER = {"id": "bbbbbbbb-0000-4000-8000-000000000001", "tier": "free", "email_verified": True, "terms_current": True}
+MEAS_ID = "ffffffff-0000-4000-8000-0000000000a1"
+USER = {"id": "bbbbbbbb-0000-4000-8000-000000000001", "email": "analyst@example.org", "tier": "free", "email_verified": True, "terms_current": True}
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="120" height="80"><rect width="120" height="80" fill="#fff"/><path d="M20 40 L50 20 L80 40 L50 60 Z" fill="none" stroke="#333"/></svg>'
 SMILES = ["CCO", "c1ccccc1O", "CC(=O)Nc1ccc(O)cc1", "CC(C)Cc1ccc(cc1)C(C)C(=O)O"]
 CARDS = {
-    "logd": dict(kind="regression", units="log units", default_range=(-2.0, 6.0), mw={"3": 1.2, "5": 1.0, "10": 0.9, "20": 0.8}),
-    "ames": dict(kind="classification", units=None, default_range=(0.0, 1.0), mw={}),
+    "logd": dict(kind="regression", units="log units", default_range=(-2.0, 6.0), mw={"3": 1.2, "5": 1.0, "10": 0.9, "20": 0.8}, hib=False),
+    "ames": dict(kind="classification", units=None, default_range=(0.0, 1.0), mw={}, hib=None),
 }
 
 
@@ -39,7 +40,8 @@ def card(ep: str) -> dict:
                 datasets=[{"name": "Mock dataset", "url": "https://example.org/mock", "license": "CC0 (mock)", "size": 1000, "split": "scaffold"}],
                 limitations="Mock model card used by browser layout tests only.", split_type="scaffold", benchmark={"rmse": {"model": 0.9, "baseline": 1.1}, "n_test": 120},
                 coverage_by_n={"3": 0.88, "5": 0.9, "10": 0.9, "20": 0.91}, runtime_by_n_seconds={"3": 0.5, "5": 1.0, "10": 2.0, "20": 4.0},
-                default_range=list(c["default_range"]), median_calibration_width_by_n=c["mw"], weights_sha256="0" * 64)
+                default_range=list(c["default_range"]), median_calibration_width_by_n=c["mw"], weights_sha256="0" * 64,
+                **({"higher_is_better": c["hib"]} if c.get("hib") is not None else {}))
 
 
 def prediction(ep: str, i: int, n: int = 5) -> dict:
@@ -56,8 +58,13 @@ def prediction(ep: str, i: int, n: int = 5) -> dict:
 
 
 class MockApi:
-    def __init__(self, models=True, projects=True, predicted=True, signed_in=True, tier="free", ranked=None):
+    def __init__(self, models=True, projects=True, predicted=True, signed_in=True, tier="free", ranked=None, measured=False, depiction_route=True):
         self.models, self.projects, self.predicted, self.signed_in = models, projects, predicted, signed_in
+        self.project_name = "Series A (mock)"
+        self.deleted_compounds: set[str] = set()
+        self.deleted_measurements: set[str] = set()
+        self.measured = measured                     # first compound carries one measurement (id ...0aa1)
+        self.depiction_route = depiction_route       # POST /dockprep/depiction answers an SVG; False: the route does not exist (404)
         self.user = {**USER, "tier": tier}
         self.config = ranked
         self.calls: list[tuple[str, str, object]] = []
@@ -73,7 +80,10 @@ class MockApi:
             if self.predicted:
                 for ep in CARDS:
                     preds.append({"id": f"dddddddd-0000-4000-8000-0000000000{i}{list(CARDS).index(ep)}", "label": "predicted", "prediction": prediction(ep, i)})
-            out.append({"id": cid, "smiles": s, "canonical_smiles": s, "label": f"cmpd {i + 1}", "created_at": "2026-01-01T00:00:00Z", "predictions": preds, "measurements": []})
+            ms = [{"id": MEAS_ID, "endpoint": "logd", "value": 1.5, "unit": "log units"}] if self.measured and i == 0 and MEAS_ID not in self.deleted_measurements else []
+            if cid in self.deleted_compounds:
+                continue
+            out.append({"id": cid, "smiles": s, "canonical_smiles": s, "label": f"cmpd {i + 1}", "created_at": "2026-01-01T00:00:00Z", "predictions": preds, "measurements": ms})
         return out
 
     def rank(self, cfg: dict):
@@ -126,9 +136,25 @@ class MockApi:
         if m := re.fullmatch(r"/models/([a-z0-9_]+)", path):
             return (200, card(m.group(1)), {}) if m.group(1) in CARDS else (404, {"detail": "not found"}, {})
         if path == "/projects" and method == "GET":
-            return 200, {"projects": ([{"id": PID, "name": "Series A (mock)", "created_at": "2026-01-01T00:00:00Z", "compound_count": 4}] if self.projects else [])}, {}
+            return 200, {"projects": ([{"id": PID, "name": self.project_name, "created_at": "2026-01-01T00:00:00Z", "compound_count": 4}] if self.projects else [])}, {}
         if path == f"/projects/{PID}" and method == "GET":
-            return 200, {"id": PID, "name": "Series A (mock)", "created_at": "2026-01-01T00:00:00Z", "max_compounds": 10, "compounds": self.compounds() if self.projects else []}, {}
+            return 200, {"id": PID, "name": self.project_name, "created_at": "2026-01-01T00:00:00Z", "max_compounds": 10, "compounds": self.compounds() if self.projects else []}, {}
+        if path == f"/projects/{PID}" and method == "PATCH":
+            name = (body or {}).get("name")
+            if not isinstance(name, str) or not name.strip():
+                return 422, {"detail": "name required"}, {}
+            self.project_name = name.strip()
+            return 200, {"id": PID, "name": self.project_name, "created_at": "2026-01-01T00:00:00Z"}, {}
+        if m := re.fullmatch(rf"/projects/{PID}/compounds/([^/]+)", path):
+            if method == "DELETE":
+                self.deleted_compounds.add(m.group(1))
+                return 204, None, {}
+        if m := re.fullmatch(rf"/projects/{PID}/measurements/([^/]+)", path):
+            if method == "DELETE":
+                self.deleted_measurements.add(m.group(1))
+                return 204, None, {}
+        if path == "/dockprep/depiction" and method == "POST":
+            return (200, SVG, {"content-type": "image/svg+xml"}) if self.depiction_route else (404, {"detail": "not found"}, {})
         if path == f"/projects/{PID}/ranking" and method == "GET":
             return 200, {"config": self.config, "persisted": self.config is not None}, {}
         if path == f"/projects/{PID}/ranking" and method == "PUT":
@@ -199,8 +225,9 @@ def _hostile(obj, key=None):
 class LeadMockApi:
     """Install on a page AFTER the Metis MockApi (later routes win): `install_lead(page, lead)`. Session comes from the Metis MockApi (/api/auth/me)."""
 
-    def __init__(self, hostile=False, fail_health=False, events_delay_first=False):
+    def __init__(self, hostile=False, fail_health=False, events_delay_first=False, pose_polls=0):
         self.hostile, self.fail_health = hostile, fail_health
+        self.pose_polls, self._pose_seen = pose_polls, 0     # a pose job reports "running" this many polls before it is done
         self.calls: list[tuple[str, str, object]] = []
         self.runs: dict[str, dict] = {}
         self.status_overrides: dict[tuple[str, str], tuple[int, object]] = {}   # (method, path regex) -> (status, body)
@@ -256,6 +283,16 @@ class LeadMockApi:
             return (200, hit[0], {}) if hit else (404, {"detail": "not found"}, {})
         if path.startswith("/api/data/"):
             return 200, (LEAD_FX / "fixture1.pdb").read_text(), {"content-type": "chemical/x-pdb"}
+        if path == "/api/poses" and method == "POST":
+            self._pose_seen = 0
+            return 200, {"job_id": "pose-1", "status": "queued"}, {}
+        if re.fullmatch(r"/api/poses/[\w-]+", path):
+            self._pose_seen += 1
+            if self._pose_seen <= self.pose_polls:
+                return 200, {"job_id": "pose-1", "status": "running", "progress": 0.3}, {}
+            smi = "CCO"
+            return 200, {"job_id": "pose-1", "status": "done", "progress": 1, "pose_confidence": 0.66, "affinity": -7.1, "note": "mock pose (test data)",
+                         "ligand_sdf": molblock(smi), "protein_pdb": (LEAD_FX / "fixture1.pdb").read_text(), "apo_pdb": (LEAD_FX / "fixture1.pdb").read_text()}, {}
         if path == "/api/presets":
             return 200, [], {}
         if path == "/api/molecules/validate":
