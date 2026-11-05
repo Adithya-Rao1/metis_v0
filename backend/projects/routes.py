@@ -30,7 +30,12 @@ MAX_NOTE_CHARS = 5000
 MAX_NOTES_PER_PROJECT = 200
 NoteBody = Annotated[
     str,
-    StringConstraints(min_length=1, max_length=MAX_NOTE_CHARS, strip_whitespace=True, pattern=r"^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+$"),
+    StringConstraints(
+        min_length=1,
+        max_length=MAX_NOTE_CHARS,
+        strip_whitespace=True,
+        pattern=r"^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+$",
+    ),
 ]
 
 
@@ -265,7 +270,11 @@ def list_notes(project_id: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
             .mappings()
             .all()
         )
-    return {"notes": [_note(r) for r in rows], "max_notes": MAX_NOTES_PER_PROJECT, "max_chars": MAX_NOTE_CHARS}
+    return {
+        "notes": [_note(r) for r in rows],
+        "max_notes": MAX_NOTES_PER_PROJECT,
+        "max_chars": MAX_NOTE_CHARS,
+    }
 
 
 @router.post("/projects/{project_id}/notes", status_code=201)
