@@ -3,7 +3,7 @@
 // Everything is same-origin under /lead (/lead/api/*, /lead/library/*, /lead/profiles/*). Nothing here touches the DOM.
 import { api, authed, ApiError, describeError, requireSession } from "../../js/api.js";
 
-export const BASE = "/lead";
+export const BASE = "/api/lead";
 export { requireSession };
 
 /**

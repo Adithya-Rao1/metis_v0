@@ -320,7 +320,7 @@ def test_lead_scripts_have_no_style_attributes_storage_or_stray_network_calls():
         assert not re.search(r"X-Requested-With", t), p.name
     # every Lead call goes under /lead through the Metis client
     net = (LEAD / "js" / "net.js").read_text()
-    assert 'BASE = "/lead"' in net and "../../js/api.js" in net
+    assert 'BASE = "/api/lead"' in net and "../../js/api.js" in net
     for p in LEAD.rglob("*.js"):
         for m in re.finditer(r"\blead\(\s*\"[A-Z]+\"\s*,\s*[\"'`]([^\"'`]*)", p.read_text()):
             assert m.group(1).startswith(("/api/", "/library", "/profiles")), (p.name, m.group(1))

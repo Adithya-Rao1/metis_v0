@@ -40,7 +40,7 @@ async function parse(resp) {
   return null;
 }
 
-// `base` (default "/api") lets a sibling app on the same origin, Lead Studio under "/lead", reuse this client (CSRF, retry, errors).
+// `base` (default "/api") lets a sibling app on the same origin, Lead Studio under "/api/lead", reuse this client (CSRF, retry, errors).
 // api("POST", "/projects", { json: {...} }) -> parsed JSON. { blob: true } returns the response body as a Blob
 // (downloads); { text: true } returns text. Throws ApiError for every non-2xx answer.
 export async function api(method, path, opts = {}) {

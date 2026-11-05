@@ -29,12 +29,13 @@ DEMO_PASSWORD = "metis-demo-2026"  # local demo account only; created on every s
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--port", type=int, default=8080)
+    ap.add_argument("--dir", default=".demo", help="state directory (database, models); default .demo")
     ap.add_argument("--reset", action="store_true", help="delete .demo/ (database and synthetic models) first")
     args = ap.parse_args()
 
     import shutil
 
-    work = ROOT / ".demo"
+    work = (ROOT / args.dir).resolve()
     if args.reset and work.exists():
         shutil.rmtree(work)
     work.mkdir(exist_ok=True)
