@@ -145,11 +145,11 @@ datasets:
     endpoint: Hydration free energy
     kind: regression
     units: kcal/mol
-    license_as_stated: CC BY-NC-SA
-    license_status: excluded
-    date_checked: null
-    confirmed_by: null
-    notes: "Non-commercial license. Never load, train on, or redistribute."
+    license_as_stated: CC-BY-4.0
+    license_status: cleared
+    date_checked: "2026-11-05"
+    confirmed_by: "Adithya Rao (owner)"
+    notes: "Owner verified CC-BY-4.0 on 2026-11-05 (an earlier note here said CC BY-NC-SA; that was not verified and is superseded). Credit Mobley and Guthrie (FreeSolv) in model cards."
   - id: Biogen_KineticSolubility
     name: Biogen kinetic solubility
     source_url: https://doi.org/10.1021/acs.jcim.3c00200
