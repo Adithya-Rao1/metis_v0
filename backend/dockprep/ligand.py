@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Ligand preparation: standardize, protonate at pH (rule-based), ETKDG+MMFF conformers, PDBQT + SDF.
 
 Protonation method: a small SMARTS table of approximate pKa values (documented below). It is NOT a pKa
@@ -406,7 +405,7 @@ def write_ligand_pdbqt(molh: Chem.Mol, conf_id: int, name: str, log: LigandLog) 
     log.add(
         "pdbqt",
         "write ligand PDBQT",
-        f"{len([l for l in lines if l.startswith(('ATOM', 'HETATM'))])} atoms, {len(rot)} torsions",
+        f"{len([ln for ln in lines if ln.startswith(('ATOM', 'HETATM'))])} atoms, {len(rot)} torsions",
         charges="RDKit Gasteiger",
         atom_types="simplified AutoDock typing (C/A/N/NA/OA/SA/HD/halogens)",
         nonpolar_hydrogens="merged into carbon",

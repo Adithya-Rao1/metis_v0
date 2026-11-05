@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """POST /dockprep/ligands, /dockprep/proteins, /dockprep/sites. Stateless: nothing is stored; the result is returned
 as JSON (files base64) or as a zip with ?bundle=zip. Auth is required on every route; rate limits belong to Accounts."""
 

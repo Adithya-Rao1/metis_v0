@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """PDB fetch behind an interface. Tests use MockFetcher; the real client is injected and enforces a host allowlist,
 HTTPS, a size limit, a timeout and no cross-host redirects."""
 
@@ -74,9 +73,8 @@ def urllib_http_get(
 
     opener = urllib.request.build_opener(_NoRedirect)
     try:
-        with opener.open(
-            urllib.request.Request(url, headers={"User-Agent": "metis-dockprep"}), timeout=timeout
-        ) as r:  # nosec B310 - https + allowlisted host checked above
+        req = urllib.request.Request(url, headers={"User-Agent": "metis-dockprep"})  # noqa: S310 - https + allowlisted host checked above
+        with opener.open(req, timeout=timeout) as r:  # noqa: S310 # nosec B310
             body = r.read(max_bytes + 1)
     except urllib.error.HTTPError as e:
         raise DockprepError(

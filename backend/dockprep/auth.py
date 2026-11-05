@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Auth dependency. Uses Agent 4's `backend.accounts.deps.current_user`; if it is not importable the endpoints fail
 closed (401), never open."""
 

@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Change-log text rendering and zip bundling (in memory; nothing is stored)."""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Sandbox worker: runs ONE prep operation on untrusted input in a separate interpreter with resource limits.
 
 Protocol: JSON on stdin {"op": ..., "payload": ...}; result as one line 'METIS_RESULT:<json>' on the real stdout.
@@ -30,7 +29,7 @@ def _limits() -> None:
 
 def main() -> None:
     out = os.fdopen(os.dup(1), "w")
-    devnull = open(os.devnull, "w")
+    devnull = open(os.devnull, "w")  # noqa: SIM115 - must stay open for the life of the process (fd 1/2 target)
     os.dup2(devnull.fileno(), 1)
     os.dup2(devnull.fileno(), 2)
     sys.stdout = sys.stderr = devnull

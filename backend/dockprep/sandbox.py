@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Run prep operations on untrusted content in a time/CPU/memory-limited child interpreter.
 
 The child is started with `python -I` (no env, no cwd/user site), an empty environment (PATH only) and a private
@@ -59,7 +58,7 @@ def run_sandboxed(op: str, payload: dict, timeout: int = SANDBOX_TIMEOUT_S) -> d
                 env[k] = os.environ[k]
         with tempfile.TemporaryDirectory(prefix="mdp_run_") as cwd:
             try:
-                r = subprocess.run(
+                r = subprocess.run(  # noqa: S603 - fixed argv (-I worker), no shell, timeout, scrubbed env
                     [sys.executable, "-I", _WORKER],
                     input=json.dumps({"op": op, "payload": payload}).encode(),  # nosec B603
                     capture_output=True,

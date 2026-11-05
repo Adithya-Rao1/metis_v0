@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Protein preparation. Every change is recorded as a structured change-log entry.
 
 Hydrogens and protonation states: PDB2PQR (BSD-3) + PROPKA (LGPL-2.1) when installed (run as a subprocess in
@@ -242,7 +241,7 @@ def detect_missing(atoms: list[Atom], st: Structure, chains: set[str], log: Chan
     # chain breaks from CA-CA distance (independent of REMARK 465)
     breaks = []
     cas = [a for a in atoms if a.name == "CA" and (a.record == "ATOM")]
-    for a, b in zip(cas, cas[1:]):
+    for a, b in zip(cas, cas[1:], strict=False):
         if a.chain == b.chain and ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2) ** 0.5 > 4.2:
             breaks.append({"chain": a.chain, "after": a.resseq, "before": b.resseq})
     if ranges:
@@ -297,7 +296,7 @@ def _run_pdb2pqr(atoms: list[Atom], ph: float, log: ChangeLog) -> list[Atom] | N
             str(outpqr),
         ]
         try:
-            r = subprocess.run(
+            r = subprocess.run(  # noqa: S603 - fixed argv, no shell, timeout, scrubbed env
                 argv,
                 cwd=td,
                 capture_output=True,
@@ -321,7 +320,7 @@ def _run_pdb2pqr(atoms: list[Atom], ph: float, log: ChangeLog) -> list[Atom] | N
 
 def _infer_states(atoms: list[Atom]) -> list[Atom]:
     """PDB2PQR keeps HIS/ASP/GLU/LYS/CYS names in PDB output; infer the state from which hydrogens exist and rename."""
-    for (c, s, ic, name), ats in _residues(atoms).items():
+    for (_c, _s, _ic, name), ats in _residues(atoms).items():
         names = {a.name for a in ats}
         new = name
         if name == "HIS":

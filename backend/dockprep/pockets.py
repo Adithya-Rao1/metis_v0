@@ -1,10 +1,10 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Pocket detection. (1) fpocket CLI wrapper (GPL-2.0 binary; run as a separate process, never linked).
 (2) A simple geometric buriedness finder in pure numpy, clearly labelled as a fallback: it is not fpocket and
 its score is its own (pocket volume weighted by mean buriedness)."""
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess  # nosec B404 - fixed argv, timeout, no shell
@@ -180,10 +180,8 @@ def parse_fpocket_info(info_text: str) -> list[dict]:
             pockets.append(cur)
         elif cur is not None and ":" in s:
             k, v = s.split(":", 1)
-            try:
+            with contextlib.suppress(ValueError):
                 cur[k.strip().lower().replace(" ", "_")] = float(v.strip())
-            except ValueError:
-                pass
     return pockets
 
 
@@ -205,7 +203,7 @@ def run_fpocket(atoms: list[Atom], timeout: int = SUBPROCESS_TIMEOUT_S) -> list[
     with tempfile.TemporaryDirectory(prefix="mdf_") as td:
         Path(td, "prot.pdb").write_text(write_pdb([a for a in atoms if a.record == "ATOM"]))
         try:
-            r = subprocess.run(
+            r = subprocess.run(  # noqa: S603 - fixed argv, no shell, timeout, scrubbed env
                 [exe, "-f", "prot.pdb"],
                 cwd=td,
                 capture_output=True,

@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Pure-python PDB / mmCIF reader and PDB writer. Content is treated purely as data (never executed).
 
 Only the first model is read. All numeric fields are validated; errors carry fixed messages.
@@ -6,6 +5,7 @@ Only the first model is read. All numeric fields are validated; errors carry fix
 
 from __future__ import annotations
 
+import contextlib
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -218,10 +218,8 @@ def _remark(st: Structure, raw: str) -> None:
     body = raw[11:].strip()
     if num == 2 and "RESOLUTION." in body and "ANGSTROM" in body.upper():
         tok = body.split("RESOLUTION.")[1].split()[0]
-        try:
+        with contextlib.suppress(ValueError):
             st.resolution, st.resolution_source = float(tok), "REMARK 2"
-        except ValueError:
-            pass
     elif (
         num == 3
         and st.resolution is None
@@ -231,10 +229,8 @@ def _remark(st: Structure, raw: str) -> None:
     ):
         # X-ray refinement "RESOLUTION RANGE HIGH (ANGSTROMS) : 2.60"
         if "HIGH" in body or body.startswith("RESOLUTION"):
-            try:
+            with contextlib.suppress(ValueError, IndexError):
                 st.resolution, st.resolution_source = float(body.split(":")[1].split()[0]), "REMARK 3"
-            except (ValueError, IndexError):
-                pass
     elif num == 465:
         parts = body.split()
         if len(parts) == 3 and parts[0].isalpha() and parts[2].lstrip("-").isdigit() and len(parts[0]) <= 4:
@@ -425,10 +421,8 @@ def parse_structure(data: bytes) -> Structure:
         except UnicodeDecodeError:
             raise DockprepError("bad_structure", "File is not valid text.", 415) from None
     head = text.lstrip()[:2000]
-    if head.startswith("data_") or "_atom_site." in text[:200000]:
-        st = parse_mmcif(text)
-    else:
-        st = parse_pdb(text)
+    is_mmcif = head.startswith("data_") or "_atom_site." in text[:200000]
+    st = parse_mmcif(text) if is_mmcif else parse_pdb(text)
     if not st.atoms:
         raise DockprepError("bad_structure", "No atom records found in structure file.", 422)
     return st
