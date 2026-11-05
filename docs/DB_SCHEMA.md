@@ -51,3 +51,10 @@ Child rows carry `(parent_id, owner_id)` composite foreign keys, so a row can ne
 - `auth_record_login` (F-60): after a lock lapses the failure count restarts at 1, so one wrong password no longer re-locks the account; an active lock still ignores both successes and failures and writes no audit row.
 - `auth_reset_password(token_hash, new_hash)`: spends a single-use reset token, sets the hash, clears the lock and counters, audits, all in one statement chain. It is the only way to clear a lock, so unlocking needs possession of the mailbox. Unverified or deleted accounts are refused without saying why.
 - Not solved here (tracked in BACKLOG): a squatter's password stays on an unverified row until the owner verifies; the robust fix is to set the password at verification time.
+
+## 0005 Lead Studio
+Four owner-RLS tables (forced RLS, policy `<table>_owner` on `current_user_id()`, `owner_id` NOT NULL FK to `app_user` ON DELETE CASCADE, UUID keys). Grants go to `metis_app` only (SELECT, DELETE, column-listed INSERT; UPDATE only on `lead_profile(name, body, updated_at)`); nothing to `metis_readonly`, `metis_auth` or `metis_janitor`.
+- `lead_saved_run`: a finished run saved to the library (title 1..120, stage, target, seed SMILES <= 2000, headline <= 300, `events` jsonb array of 1..5000 items and < 1.9 MB).
+- `lead_manual_session` and `lead_manual_step`: a manual-edit trail; steps carry `seq` 0..499 (unique per session), SMILES <= 2000, a bounded site array and a finite reward delta. Composite FK `(session_id, owner_id)` so a step cannot belong to another user than its session.
+- `lead_profile`: a named scoring profile (name 1..80, `body` jsonb object < 16 KiB).
+Per-user row caps (200 runs, 100 manual sessions, 20 profiles) are enforced in the API under a per-owner advisory lock. SMILES and structures are never logged. Tests: `tests/db/test_migration_0005.py`, `tests/security/test_lead_rls.py`.
