@@ -8,6 +8,7 @@ Conventions
   so none of the wrapped classes' `random` paths are reached.
 - `_raw(smiles, site)` returns the wrapped class's raw output (str or None) for the self-check.
 """
+
 from __future__ import annotations
 
 import logging
@@ -151,7 +152,9 @@ class AtomSubstituteOp(_BaseOp):
     """Replace one non-ring-carbon atom by `element` (ModifyAtom.modify_atom)."""
 
     def __init__(self, element: str, **kw):
-        super().__init__(id=f"atom_sub_{element.lower()}", name=f"Atom swap to {element}", category="atom", **kw)
+        super().__init__(
+            id=f"atom_sub_{element.lower()}", name=f"Atom swap to {element}", category="atom", **kw
+        )
         self.element = element
 
     def _sites(self, mol):
@@ -218,7 +221,9 @@ def _bond_sites_cached(smiles: str):
 
 class BondAddOp(_BaseOp):
     def __init__(self, bond_type: str, **kw):
-        super().__init__(id=f"bond_add_{bond_type}", name=f"Add {bond_type} bond (ring closure)", category="bond", **kw)
+        super().__init__(
+            id=f"bond_add_{bond_type}", name=f"Add {bond_type} bond (ring closure)", category="bond", **kw
+        )
         self.bond_type = bond_type
 
     def _sites(self, mol):
@@ -228,7 +233,9 @@ class BondAddOp(_BaseOp):
     def _raw_apply(self, mol, site):
         if len(site) != 2:
             return None
-        return _BOND.optimize_bond(mol, 0, bond_site=tuple(site), target_bond_type=_BOND_TYPES[self.bond_type])
+        return _BOND.optimize_bond(
+            mol, 0, bond_site=tuple(site), target_bond_type=_BOND_TYPES[self.bond_type]
+        )
 
 
 class BondRemoveOp(_BaseOp):
@@ -246,7 +253,9 @@ class BondRemoveOp(_BaseOp):
 
 class BondModifyOp(_BaseOp):
     def __init__(self, bond_type: str, **kw):
-        super().__init__(id=f"bond_to_{bond_type}", name=f"Change bond order to {bond_type}", category="bond", **kw)
+        super().__init__(
+            id=f"bond_to_{bond_type}", name=f"Change bond order to {bond_type}", category="bond", **kw
+        )
         self.bond_type = bond_type
 
     def _sites(self, mol):
@@ -256,7 +265,9 @@ class BondModifyOp(_BaseOp):
     def _raw_apply(self, mol, site):
         if len(site) != 2:
             return None
-        return _BOND.optimize_bond(mol, 2, bond_site=tuple(site), target_bond_type=_BOND_TYPES[self.bond_type])
+        return _BOND.optimize_bond(
+            mol, 2, bond_site=tuple(site), target_bond_type=_BOND_TYPES[self.bond_type]
+        )
 
 
 # ---------------------------------------------------------------- bioisostere ops
@@ -324,7 +335,9 @@ class FGRemoveOp(_BaseOp):
 
 class FGModifyOp(_BaseOp):
     def __init__(self, source: str, target: str, **kw):
-        super().__init__(id=f"fg_{source}_to_{target}", name=f"{source} -> {target}", category="functional_group", **kw)
+        super().__init__(
+            id=f"fg_{source}_to_{target}", name=f"{source} -> {target}", category="functional_group", **kw
+        )
         self.source, self.target = source, target
 
     def _sites(self, mol):
@@ -356,14 +369,39 @@ ATOM_ELEMENTS = list(_ATOM.substitution_atoms)  # C N O S P F Cl Br I B Si
 # registry extras for add (ether/methoxy, ketone/acetyl, amide, sulfonamide, sulfone) whose
 # fragments already exist in FG_FRAGMENT_SMILES.
 FG_REMOVE = [
-    "methyl", "hydroxyl", "amino", "carboxyl", "carbonyl", "aldehyde", "ketone", "ether",
-    "ester", "amide", "nitro", "cyano", "thiol", "halogen", "azide", "sulfonamide",
+    "methyl",
+    "hydroxyl",
+    "amino",
+    "carboxyl",
+    "carbonyl",
+    "aldehyde",
+    "ketone",
+    "ether",
+    "ester",
+    "amide",
+    "nitro",
+    "cyano",
+    "thiol",
+    "halogen",
+    "azide",
+    "sulfonamide",
 ]
 FG_MODIFY = [
-    ("hydroxyl", "amino"), ("hydroxyl", "thiol"), ("hydroxyl", "methyl"), ("hydroxyl", "halogen"),
-    ("amino", "hydroxyl"), ("amino", "amide"), ("carboxyl", "ester"), ("carboxyl", "amide"),
-    ("aldehyde", "ketone"), ("aldehyde", "carboxyl"), ("thiol", "hydroxyl"), ("cyano", "carboxyl"),
-    ("nitro", "amino"), ("ester", "carboxyl"), ("amide", "carboxyl"),
+    ("hydroxyl", "amino"),
+    ("hydroxyl", "thiol"),
+    ("hydroxyl", "methyl"),
+    ("hydroxyl", "halogen"),
+    ("amino", "hydroxyl"),
+    ("amino", "amide"),
+    ("carboxyl", "ester"),
+    ("carboxyl", "amide"),
+    ("aldehyde", "ketone"),
+    ("aldehyde", "carboxyl"),
+    ("thiol", "hydroxyl"),
+    ("cyano", "carboxyl"),
+    ("nitro", "amino"),
+    ("ester", "carboxyl"),
+    ("amide", "carboxyl"),
 ]
 FG_ADD_DQN = ["methyl", "hydroxyl", "amino", "halogen", "cyano", "carboxyl"]
 FG_ADD_EXTRA = ["ether", "ketone", "amide", "sulfonamide", "sulfone"]

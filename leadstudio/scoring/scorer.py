@@ -1,4 +1,5 @@
 """Cached RDKit-descriptor scorer implementing contracts.Scorer."""
+
 from __future__ import annotations
 
 import hashlib
@@ -23,8 +24,20 @@ DEFAULT_OBJECTIVES: dict[str, ObjectiveSpec] = {
 }
 
 # Soft widths (falloff scale) per descriptor for "range" objectives without room to infer one.
-_SCALE = {"qed": 0.2, "sa": 1.0, "logp": 1.0, "tpsa": 20.0, "mw": 75.0, "hbd": 1.0, "hba": 2.0,
-          "rotb": 2.0, "fsp3": 0.15, "heavy_atoms": 5.0, "lipinski_violations": 1.0, "alerts": 1.0}
+_SCALE = {
+    "qed": 0.2,
+    "sa": 1.0,
+    "logp": 1.0,
+    "tpsa": 20.0,
+    "mw": 75.0,
+    "hbd": 1.0,
+    "hba": 2.0,
+    "rotb": 2.0,
+    "fsp3": 0.15,
+    "heavy_atoms": 5.0,
+    "lipinski_violations": 1.0,
+    "alerts": 1.0,
+}
 
 
 def _sigmoid(z: float) -> float:
@@ -68,9 +81,9 @@ def config_hash(objectives: dict[str, ObjectiveSpec]) -> str:
 
 class RDKitScorer:
     def __init__(self, cache_size: int = 20000):
-        self._desc_cache = LRU(cache_size)    # canonical SMILES -> (Descriptors, alerts)
-        self._canon_cache = LRU(cache_size)   # input SMILES -> canonical SMILES
-        self._score_cache = LRU(cache_size)   # (canonical SMILES, config hash) -> ScoreResult
+        self._desc_cache = LRU(cache_size)  # canonical SMILES -> (Descriptors, alerts)
+        self._canon_cache = LRU(cache_size)  # input SMILES -> canonical SMILES
+        self._score_cache = LRU(cache_size)  # (canonical SMILES, config hash) -> ScoreResult
 
     # -- descriptors
     def _canonical(self, smiles: str) -> tuple[str, Chem.Mol | None]:

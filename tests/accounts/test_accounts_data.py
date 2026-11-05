@@ -73,7 +73,10 @@ def test_terms_reacceptance_flow(client, app):
     r = client.post("/_mutate")
     assert r.status_code == 403 and r.json()["detail"] == "terms_reacceptance_required"
     assert client.post("/consents", {"scope": "analytics", "granted": True}).status_code == 403
-    assert client.get("/_whoami").status_code == 200  # reads still work
+    # Wave 4 (F-123): reads are refused too until the terms are re-accepted; the account routes stay reachable.
+    assert client.get("/_whoami").status_code == 403
+    assert client.get("/_whoami").json()["detail"] == "terms_reacceptance_required"
+    assert client.get("/consents").status_code == 403
     assert client.get("/auth/me").json()["terms_current"] is False
     assert client.post("/terms/accept", {"version": TERMS}).status_code == 400  # stale version
     assert client.post("/terms/accept", {"version": "2026-02"}).status_code == 200

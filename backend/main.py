@@ -1,4 +1,5 @@
 """App factory. Mounts each package's router if it exists (see backend/schemas/interfaces.py)."""
+
 from __future__ import annotations
 
 import importlib

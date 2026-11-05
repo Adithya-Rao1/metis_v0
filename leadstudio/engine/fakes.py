@@ -4,6 +4,7 @@ Everything here is a stand-in: ~7 trivial atom-level edits, a QED-only scorer, a
 explainer and a Morgan+PCA embedder. None of it is the real registry / scorer / explainer / policy; outputs
 produced with these must not be presented as such.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -20,9 +21,23 @@ from leadstudio.schema import Descriptors, EditRecord, Explanation, RunConfig, S
 class FakeEdit:
     """Edit defined by a SMARTS for the site atom (first atom of the match) and an RWMol action."""
 
-    def __init__(self, id: str, name: str, category: str, smarts: str, action: Callable[[Chem.RWMol, int], None],
-                 tags: Sequence[str] = (), rationale: str = "FAKE edit (template rationale)."):
-        self.id, self.name, self.category, self.tags, self.rationale = id, name, category, list(tags), rationale
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        category: str,
+        smarts: str,
+        action: Callable[[Chem.RWMol, int], None],
+        tags: Sequence[str] = (),
+        rationale: str = "FAKE edit (template rationale).",
+    ):
+        self.id, self.name, self.category, self.tags, self.rationale = (
+            id,
+            name,
+            category,
+            list(tags),
+            rationale,
+        )
         self._patt = Chem.MolFromSmarts(smarts)
         self._action = action
 
@@ -49,6 +64,7 @@ def _attach(atomic_num: int):
     def act(rw: Chem.RWMol, idx: int) -> None:
         new = rw.AddAtom(Chem.Atom(atomic_num))
         rw.AddBond(idx, new, Chem.BondType.SINGLE)
+
     return act
 
 
@@ -70,14 +86,50 @@ def _methyl_to_hydroxymethyl(rw: Chem.RWMol, idx: int) -> None:
 class FakeRegistry:
     def __init__(self) -> None:
         self._edits = [
-            FakeEdit("fake_add_methyl", "Add methyl (aromatic CH)", "atom", "[cH]", _attach(6), ["adds_lipophilicity"]),
-            FakeEdit("fake_add_hydroxyl", "Add hydroxyl (aromatic CH)", "functional_group", "[cH]", _attach(8), ["lowers_logp"]),
-            FakeEdit("fake_add_fluoro", "Add fluorine (aromatic CH)", "atom", "[cH]", _attach(9), ["blocks_metabolism"]),
+            FakeEdit(
+                "fake_add_methyl",
+                "Add methyl (aromatic CH)",
+                "atom",
+                "[cH]",
+                _attach(6),
+                ["adds_lipophilicity"],
+            ),
+            FakeEdit(
+                "fake_add_hydroxyl",
+                "Add hydroxyl (aromatic CH)",
+                "functional_group",
+                "[cH]",
+                _attach(8),
+                ["lowers_logp"],
+            ),
+            FakeEdit(
+                "fake_add_fluoro",
+                "Add fluorine (aromatic CH)",
+                "atom",
+                "[cH]",
+                _attach(9),
+                ["blocks_metabolism"],
+            ),
             FakeEdit("fake_ch_to_n", "Ring CH -> N", "bioisostere", "[cH]", _to_nitrogen, ["lowers_logp"]),
-            FakeEdit("fake_remove_methyl", "Remove terminal methyl", "atom", "[CH3;D1]", _remove_atom, ["lowers_mw"]),
-            FakeEdit("fake_remove_halogen", "Remove halogen", "atom", "[F,Cl,Br;D1]", _remove_atom, ["lowers_mw"]),
-            FakeEdit("fake_hydroxylate_methyl", "Methyl -> hydroxymethyl", "functional_group", "[CH3;D1]",
-                     _methyl_to_hydroxymethyl, ["lowers_logp"]),
+            FakeEdit(
+                "fake_remove_methyl",
+                "Remove terminal methyl",
+                "atom",
+                "[CH3;D1]",
+                _remove_atom,
+                ["lowers_mw"],
+            ),
+            FakeEdit(
+                "fake_remove_halogen", "Remove halogen", "atom", "[F,Cl,Br;D1]", _remove_atom, ["lowers_mw"]
+            ),
+            FakeEdit(
+                "fake_hydroxylate_methyl",
+                "Methyl -> hydroxymethyl",
+                "functional_group",
+                "[CH3;D1]",
+                _methyl_to_hydroxymethyl,
+                ["lowers_logp"],
+            ),
         ]
 
     def all(self):
@@ -93,13 +145,26 @@ class FakeRegistry:
 
 # ----------------------------------------------------------------------------- scorer
 def _descriptors(mol: Chem.Mol) -> Descriptors:
-    lip = (int(RDDescriptors.MolWt(mol) > 500) + int(Crippen.MolLogP(mol) > 5)
-           + int(rdMolDescriptors.CalcNumHBD(mol) > 5) + int(rdMolDescriptors.CalcNumHBA(mol) > 10))
+    lip = (
+        int(RDDescriptors.MolWt(mol) > 500)
+        + int(Crippen.MolLogP(mol) > 5)
+        + int(rdMolDescriptors.CalcNumHBD(mol) > 5)
+        + int(rdMolDescriptors.CalcNumHBA(mol) > 10)
+    )
     return Descriptors(
-        qed=QED.qed(mol), sa=None, logp=Crippen.MolLogP(mol), tpsa=rdMolDescriptors.CalcTPSA(mol),
-        mw=RDDescriptors.MolWt(mol), hbd=rdMolDescriptors.CalcNumHBD(mol), hba=rdMolDescriptors.CalcNumHBA(mol),
-        rotb=rdMolDescriptors.CalcNumRotatableBonds(mol), fsp3=rdMolDescriptors.CalcFractionCSP3(mol),
-        heavy_atoms=mol.GetNumHeavyAtoms(), lipinski_violations=lip, alerts=0)  # FAKE: no alert catalogue
+        qed=QED.qed(mol),
+        sa=None,
+        logp=Crippen.MolLogP(mol),
+        tpsa=rdMolDescriptors.CalcTPSA(mol),
+        mw=RDDescriptors.MolWt(mol),
+        hbd=rdMolDescriptors.CalcNumHBD(mol),
+        hba=rdMolDescriptors.CalcNumHBA(mol),
+        rotb=rdMolDescriptors.CalcNumRotatableBonds(mol),
+        fsp3=rdMolDescriptors.CalcFractionCSP3(mol),
+        heavy_atoms=mol.GetNumHeavyAtoms(),
+        lipinski_violations=lip,
+        alerts=0,
+    )  # FAKE: no alert catalogue
 
 
 class FakeScorer:
@@ -116,6 +181,7 @@ class FakeScorer:
 # ----------------------------------------------------------------------------- policy
 class FakePolicy:
     """Uniform policy: all candidates equally preferred. update() counts transitions and returns no loss."""
+
     note = "FAKE uniform policy (no learning)"
 
     def __init__(self) -> None:
@@ -131,6 +197,7 @@ class FakePolicy:
 
 class PreferencePolicy(FakePolicy):
     """Test helper: strongly prefers one edit id and reports a deterministic fake loss."""
+
     note = "FAKE preference policy (test helper)"
 
     def __init__(self, preferred_edit_id: str):
@@ -149,19 +216,32 @@ class PreferencePolicy(FakePolicy):
 class FakeExplainer:
     """Template explanations from descriptor deltas (FAKE: no alerts, no atom contributions)."""
 
-    def explain(self, parent_smiles, child_smiles, edit: EditRecord, parent_score: ScoreResult,
-                child_score: ScoreResult, edit_op=None) -> Explanation:
+    def explain(
+        self,
+        parent_smiles,
+        child_smiles,
+        edit: EditRecord,
+        parent_score: ScoreResult,
+        child_score: ScoreResult,
+        edit_op=None,
+    ) -> Explanation:
         p, c = parent_score.descriptors, child_score.descriptors
-        deltas = {k: float(getattr(c, k) - getattr(p, k)) for k in ("qed", "logp", "tpsa", "mw", "hbd", "hba", "alerts")}
+        deltas = {
+            k: float(getattr(c, k) - getattr(p, k))
+            for k in ("qed", "logp", "tpsa", "mw", "hbd", "hba", "alerts")
+        }
         tags = [t for t in (edit_op.tags if edit_op is not None else [])]
         return Explanation(
-            descriptor_deltas=deltas, rationale=f"[FAKE] {edit.name}: QED {deltas['qed']:+.3f}, logP {deltas['logp']:+.2f}",
-            tags=list(tags))
+            descriptor_deltas=deltas,
+            rationale=f"[FAKE] {edit.name}: QED {deltas['qed']:+.3f}, logP {deltas['logp']:+.2f}",
+            tags=list(tags),
+        )
 
 
 # ----------------------------------------------------------------------------- embedder
 class FakeEmbedder:
     """Morgan fingerprints -> top-2 principal components via SVD (FAKE-light: labelled morgan_pca)."""
+
     method = "morgan_pca"
 
     def map_xy(self, smiles: Sequence[str], anchor: str | None = None) -> list[tuple]:
@@ -179,4 +259,5 @@ class FakeEmbedder:
 
 def make_fake_engine(**kwargs):
     from leadstudio.engine.engine import Engine
+
     return Engine(FakeRegistry(), FakeScorer(), FakeExplainer(), FakeEmbedder(), FakePolicy(), **kwargs)

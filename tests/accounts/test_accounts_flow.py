@@ -52,13 +52,20 @@ def test_register_response_uniform_for_existing_email(client, client2):
     assert [k for k, _, _ in client.mailer.outbox] == ["verify", "exists"]
 
 
-def test_reregister_unverified_resends_verification_and_keeps_hash(client, client2, su):
+def test_reregister_unverified_resends_verification_and_newest_registration_wins(client, client2, su):
+    """Wave 4 (F-122, decision 0005): was 'keeps_hash'. The first caller's password must not survive for the real owner,
+    so a repeated registration of a still-unverified address replaces the stored hash and retires the earlier link."""
     client.register("dup@example.com", pw="first correct horse")
+    first_token = client.token_for("dup@example.com")
     h1 = su.execute("SELECT password_hash FROM app_user").fetchone()[0]
-    r = client2.register("dup@example.com", pw="attacker chosen pass")
+    r = client2.register("dup@example.com", pw="owner chosen passphrase")
     assert r.status_code == 202
     assert [k for k, _, _ in client.mailer.outbox] == ["verify", "verify"]
-    assert su.execute("SELECT password_hash FROM app_user").fetchone()[0] == h1
+    assert su.execute("SELECT password_hash FROM app_user").fetchone()[0] != h1
+    assert client.post("/auth/verify", {"token": first_token}).status_code == 400  # the earlier link is dead
+    assert client2.verify("dup@example.com").status_code == 200
+    assert client.login("dup@example.com", "first correct horse").status_code == 401
+    assert client2.login("dup@example.com", "owner chosen passphrase").status_code == 200
 
 
 def test_resend_verification_uniform(client, client2):

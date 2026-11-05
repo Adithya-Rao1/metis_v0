@@ -5,6 +5,7 @@ their implementation compatible with these signatures; consumers must depend onl
 on these signatures, never on a concrete class, so streams can be built in parallel
 and tested with fakes.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence

@@ -1,4 +1,5 @@
 """Local-cache loader. Downloads happen only with an explicit --download flag, into git-ignored data/."""
+
 from __future__ import annotations
 
 import argparse
@@ -43,6 +44,7 @@ def download(dataset_id: str, cache_dir: Path | str = DEFAULT_CACHE) -> Path:
     assert_loadable(dataset_id)
     from tdc.utils import retrieve_dataset_names  # noqa: F401  (lazy; not in requirements)
     from tdc.single_pred import ADME, Tox
+
     cls = Tox if dataset_id in ("hERG", "hERG_Karim", "AMES", "LD50_Zhu", "DILI") else ADME
     df = cls(name=dataset_id).get_data()
     p = cache_path(dataset_id, cache_dir)

@@ -1,4 +1,5 @@
 """Domain-profile schema + validation (shared by the routes and ProfileScorer)."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
@@ -30,6 +31,7 @@ def check_smarts(s: str) -> str | None:
 def known_edit_ids() -> set | None:
     try:
         from leadstudio.registry import get_registry
+
         return {op.id for op in get_registry().all()}
     except Exception:
         return None

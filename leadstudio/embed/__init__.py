@@ -4,6 +4,7 @@
 If ChemBERTa is requested but cannot load, Morgan is returned and `method`
 says "morgan_pca" so the UI labels the map truthfully.
 """
+
 from __future__ import annotations
 
 import logging

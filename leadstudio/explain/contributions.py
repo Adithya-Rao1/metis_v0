@@ -1,4 +1,5 @@
 """Per-atom RDKit decompositions of one molecule (exact, deterministic)."""
+
 from __future__ import annotations
 
 import math

@@ -1,4 +1,5 @@
 """RDKit descriptor computation -> schema.Descriptors (+ alert hits)."""
+
 from __future__ import annotations
 
 import threading
@@ -40,10 +41,18 @@ def compute_descriptors(mol: Chem.Mol) -> tuple[Descriptors, list[AlertHit]]:
         except Exception:
             sa = None
     desc = Descriptors(
-        qed=float(QED.qed(mol)), sa=sa, logp=float(logp), tpsa=float(rdMolDescriptors.CalcTPSA(mol)),
-        mw=float(mw), hbd=hbd, hba=hba, rotb=rdMolDescriptors.CalcNumRotatableBonds(mol),
-        fsp3=float(rdMolDescriptors.CalcFractionCSP3(mol)), heavy_atoms=mol.GetNumHeavyAtoms(),
-        lipinski_violations=lip, alerts=len(alerts),
+        qed=float(QED.qed(mol)),
+        sa=sa,
+        logp=float(logp),
+        tpsa=float(rdMolDescriptors.CalcTPSA(mol)),
+        mw=float(mw),
+        hbd=hbd,
+        hba=hba,
+        rotb=rdMolDescriptors.CalcNumRotatableBonds(mol),
+        fsp3=float(rdMolDescriptors.CalcFractionCSP3(mol)),
+        heavy_atoms=mol.GetNumHeavyAtoms(),
+        lipinski_violations=lip,
+        alerts=len(alerts),
     )
     return desc, alerts
 

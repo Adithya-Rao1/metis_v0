@@ -73,7 +73,7 @@ def test_failed_step_raises_without_hiding_others(factory, su, monkeypatch, capl
 
 def test_main_exit_codes(factory, su, monkeypatch):
     _seed(su)
-    monkeypatch.setattr(runner, "make_engine", lambda: factory.kw["bind"])
+    monkeypatch.setattr(runner, "make_engine", lambda **_kw: factory.kw["bind"])
     assert runner.main([]) == 0
     steps = ((("rate_limit_buckets", "SELECT no_such_function_for_test()"),))
     monkeypatch.setattr(runner, "_STEPS", steps)
@@ -81,7 +81,7 @@ def test_main_exit_codes(factory, su, monkeypatch):
 
 
 def test_main_exit_code_when_unconfigured(monkeypatch):
-    def boom():
+    def boom(**_kw):
         raise RuntimeError("METIS_DATABASE_URL is not set")
 
     monkeypatch.setattr(runner, "make_engine", boom)

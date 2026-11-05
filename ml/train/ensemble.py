@@ -1,6 +1,7 @@
 """Pool of 20 ensemble members per endpoint. Each member has a distinct seed and a scaffold-resampled
 training subset (random 80% of Murcko-scaffold groups; acyclic molecules are their own groups).
 N in {3,5,10,20} always uses the first N members, so calibration per N is well defined."""
+
 from __future__ import annotations
 
 import hashlib
@@ -48,14 +49,27 @@ def _hash_ints(a: list[int]) -> str:
 
 
 class EnsemblePool:
-    def __init__(self, member_cls: type[MemberModel], kind: str, member_params: dict | None = None,
-                 n_members: int = POOL_SIZE, base_seed: int = 0, subset_frac: float = 0.8):
+    def __init__(
+        self,
+        member_cls: type[MemberModel],
+        kind: str,
+        member_params: dict | None = None,
+        n_members: int = POOL_SIZE,
+        base_seed: int = 0,
+        subset_frac: float = 0.8,
+    ):
         self.member_cls, self.kind, self.params = member_cls, kind, member_params or {}
         self.n_members, self.base_seed, self.subset_frac = n_members, base_seed, subset_frac
         self.members: list[MemberModel] = []
 
-    def train(self, smiles: list[str], y, ckpt_dir: Path | str | None = None, resume: bool = True,
-              on_member: Callable[[int, bool], None] | None = None) -> "EnsemblePool":
+    def train(
+        self,
+        smiles: list[str],
+        y,
+        ckpt_dir: Path | str | None = None,
+        resume: bool = True,
+        on_member: Callable[[int, bool], None] | None = None,
+    ) -> "EnsemblePool":
         """Trains all members. With ckpt_dir, each finished member is saved (member_XX.ckpt + .json sidecar);
         re-running skips members whose checkpoint exists and whose seed/subset hash match (resumable, deterministic)."""
         y = np.asarray(y)
@@ -71,7 +85,13 @@ class EnsemblePool:
             path = ckpt / f"member_{k:02d}.ckpt" if ckpt else None
             side_path = ckpt / f"member_{k:02d}.json" if ckpt else None
             reused = False
-            if resume and path and path.exists() and side_path.exists() and json.loads(side_path.read_text()) == side:
+            if (
+                resume
+                and path
+                and path.exists()
+                and side_path.exists()
+                and json.loads(side_path.read_text()) == side
+            ):
                 self.members.append(self.member_cls.load(path))
                 reused = True
             else:

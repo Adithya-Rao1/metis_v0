@@ -1,4 +1,5 @@
 """Exact, RDKit-based explainer implementing contracts.Explainer. No ML, no network."""
+
 from __future__ import annotations
 
 from rdkit import Chem

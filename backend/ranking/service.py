@@ -41,7 +41,9 @@ def endpoint_info(registry: ModelRegistry, endpoint: str) -> EndpointInfo:
     return EndpointInfo(default_range=card.default_range, median_width=generic, median_width_by_n=by_n)
 
 
-def latest_predictions(session: Session, owner_id: uuid.UUID, project_id: uuid.UUID) -> dict[uuid.UUID, dict[str, tuple[uuid.UUID, Prediction]]]:
+def latest_predictions(
+    session: Session, owner_id: uuid.UUID, project_id: uuid.UUID
+) -> dict[uuid.UUID, dict[str, tuple[uuid.UUID, Prediction]]]:
     rows = (
         session.execute(
             text(
@@ -77,14 +79,34 @@ def current_version_id(registry: ModelRegistry, endpoint: str, smiles: str, n: i
 
 
 def rank_project(
-    session: Session, registry: ModelRegistry, owner_id: uuid.UUID, project_id: uuid.UUID, config: RankingConfig
+    session: Session,
+    registry: ModelRegistry,
+    owner_id: uuid.UUID,
+    project_id: uuid.UUID,
+    config: RankingConfig,
 ) -> tuple[list[RankedCompound], list[dict]]:
     """Returns (ranking, stale). `stale` lists stored predictions whose model version is not the live one: they are
     still ranked (using each prediction's own interval and N) but flagged, never silently mixed."""
-    ids = [r[0] for r in session.execute(text("SELECT id FROM compound WHERE project_id = :pid AND owner_id = :uid ORDER BY created_at, id"), {"pid": project_id, "uid": owner_id})]
-    smiles = {r[0]: r[1] for r in session.execute(text("SELECT id, canonical_smiles FROM compound WHERE project_id = :pid AND owner_id = :uid"), {"pid": project_id, "uid": owner_id})}
+    ids = [
+        r[0]
+        for r in session.execute(
+            text(
+                "SELECT id FROM compound WHERE project_id = :pid AND owner_id = :uid ORDER BY created_at, id"
+            ),
+            {"pid": project_id, "uid": owner_id},
+        )
+    ]
+    smiles = {
+        r[0]: r[1]
+        for r in session.execute(
+            text("SELECT id, canonical_smiles FROM compound WHERE project_id = :pid AND owner_id = :uid"),
+            {"pid": project_id, "uid": owner_id},
+        )
+    }
     latest = latest_predictions(session, owner_id, project_id)
-    preds: dict[str, dict[str, Prediction]] = {str(cid): {e: p for e, (_, p) in latest.get(cid, {}).items()} for cid in ids}
+    preds: dict[str, dict[str, Prediction]] = {
+        str(cid): {e: p for e, (_, p) in latest.get(cid, {}).items()} for cid in ids
+    }
     endpoints = {w.endpoint for w in config.weights} | {lim.endpoint for lim in config.limits}
     info = {e: endpoint_info(registry, e) for e in endpoints}
     ranked = rank_compounds(preds, config, info)
@@ -98,7 +120,14 @@ def rank_project(
             if e not in live:
                 live[e] = current_version_id(registry, e, smiles[cid], p.ensemble_n)
             if live[e] is None or live[e] != p.model_version_id:
-                stale.append({"compound_id": str(cid), "endpoint": e, "model_version_id": str(p.model_version_id),
-                              "reason": "stale: predicted with a different model version than the current one; re-run predictions" if live[e] is not None
-                              else "stale: current model version could not be verified"})
+                stale.append(
+                    {
+                        "compound_id": str(cid),
+                        "endpoint": e,
+                        "model_version_id": str(p.model_version_id),
+                        "reason": "stale: predicted with a different model version than the current one; re-run predictions"
+                        if live[e] is not None
+                        else "stale: current model version could not be verified",
+                    }
+                )
     return ranked, stale

@@ -1,5 +1,5 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Change-log text rendering and zip bundling (in memory; nothing is stored)."""
+
 from __future__ import annotations
 
 import base64
@@ -9,7 +9,12 @@ import zipfile
 
 
 def change_log_text(entries: list[dict], title: str = "Metis docking prep change log") -> str:
-    out = [title, "=" * len(title), "Every step and parameter applied to the input. Experimental coordinates are only changed as listed.", ""]
+    out = [
+        title,
+        "=" * len(title),
+        "Every step and parameter applied to the input. Experimental coordinates are only changed as listed.",
+        "",
+    ]
     for i, e in enumerate(entries, 1):
         head = f"{i:04d} [{e['step']}] {e['action']}"
         if e.get("target"):
@@ -22,7 +27,9 @@ def change_log_text(entries: list[dict], title: str = "Metis docking prep change
     return "\n".join(out) + "\n"
 
 
-def make_zip(files: dict[str, str], change_log: list[dict], report: dict, extra: dict[str, str] | None = None) -> bytes:
+def make_zip(
+    files: dict[str, str], change_log: list[dict], report: dict, extra: dict[str, str] | None = None
+) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for name, content in {**files, **(extra or {})}.items():
@@ -34,4 +41,7 @@ def make_zip(files: dict[str, str], change_log: list[dict], report: dict, extra:
 
 
 def files_b64(files: dict[str, str]) -> dict[str, dict]:
-    return {n: {"content_b64": base64.b64encode(c.encode()).decode(), "bytes": len(c.encode())} for n, c in files.items()}
+    return {
+        n: {"content_b64": base64.b64encode(c.encode()).decode(), "bytes": len(c.encode())}
+        for n, c in files.items()
+    }

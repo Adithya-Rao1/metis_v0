@@ -5,6 +5,7 @@ Single source of truth for every JSON shape that crosses a process boundary
 models; do not change a field without updating docs/event_contract.md and telling
 the integrator.
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -57,6 +58,7 @@ class ScoreResult(BaseModel):
 # ------------------------------------------------------------------ objectives
 class ObjectiveSpec(BaseModel):
     """One user-controllable objective. Desirability is 1 inside [low, high]."""
+
     model_config = ConfigDict(extra="forbid")
     weight: float = Field(default=1.0, ge=0.0, le=10.0, allow_inf_nan=False)
     low: float | None = Field(default=None, ge=-1e6, le=1e6, allow_inf_nan=False)
@@ -66,27 +68,44 @@ class ObjectiveSpec(BaseModel):
 
 class RunConfig(BaseModel):
     seed_smiles: str = Field(max_length=MAX_SMILES)
-    objectives: dict[str, ObjectiveSpec] = Field(default_factory=dict, max_length=20)  # keys = Descriptors fields
+    objectives: dict[str, ObjectiveSpec] = Field(
+        default_factory=dict, max_length=20
+    )  # keys = Descriptors fields
     population_size: int = Field(default=20, ge=1, le=10_000)  # the server clamps to its own, lower caps
     generations: int = Field(default=10, ge=1, le=10_000)
     rng_seed: int = Field(default=0, ge=0, le=2**31 - 1)
-    policy_guidance: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)  # share of mutations chosen by the policy
+    policy_guidance: float = Field(
+        default=0.5, ge=0.0, le=1.0, allow_inf_nan=False
+    )  # share of mutations chosen by the policy
     use_crossover: bool = True
     use_reactions: bool = False  # SynGA-style reaction operator (stretch)
-    locked_atoms: list[int] = Field(default_factory=list, max_length=120)  # seed atom indices that must not change
+    locked_atoms: list[int] = Field(
+        default_factory=list, max_length=120
+    )  # seed atom indices that must not change
     preset_id: str | None = Field(default=None, max_length=MAX_ID)
     stage: Stage = "pharmacology"
-    target_id: str | None = Field(default=None, max_length=MAX_ID)  # key into leadstudio/data/targets (binding stage needs it)
-    min_similarity_to_seed: float = Field(default=0.4, ge=0.0, le=1.0, allow_inf_nan=False)  # Tanimoto guard (stage 1)
+    target_id: str | None = Field(
+        default=None, max_length=MAX_ID
+    )  # key into leadstudio/data/targets (binding stage needs it)
+    min_similarity_to_seed: float = Field(
+        default=0.4, ge=0.0, le=1.0, allow_inf_nan=False
+    )  # Tanimoto guard (stage 1)
     max_mw: float | None = Field(default=None, ge=0.0, le=1e5, allow_inf_nan=False)
-    profile_id: str | None = Field(default=None, max_length=MAX_ID)  # id of a saved scoring profile (/lead/profiles)
-    adapter_id: str | None = Field(default=None, max_length=MAX_ID)  # per-user policy adapter: NOT available in Metis
-    seed_molblock: str | None = Field(default=None, max_length=MAX_MOLFILE)  # accepted but ignored by the engine
+    profile_id: str | None = Field(
+        default=None, max_length=MAX_ID
+    )  # id of a saved scoring profile (/lead/profiles)
+    adapter_id: str | None = Field(
+        default=None, max_length=MAX_ID
+    )  # per-user policy adapter: NOT available in Metis
+    seed_molblock: str | None = Field(
+        default=None, max_length=MAX_MOLFILE
+    )  # accepted but ignored by the engine
 
 
 # ------------------------------------------------------------------- explaining
 class AtomContributions(BaseModel):
     """Per-atom decompositions of the CHILD molecule, index-aligned with its RDKit atoms."""
+
     crippen_logp: list[float]
     tpsa: list[float]
     gasteiger: list[float]
@@ -205,7 +224,9 @@ class ValidateResponse(BaseModel):
     molblock: str | None = None
     score: ScoreResult | None = None
     error: str | None = None
-    source: Literal["live", "mock"] = "live"  # "mock": the service runs in scripted-replay mode (no real scoring)
+    source: Literal["live", "mock"] = (
+        "live"  # "mock": the service runs in scripted-replay mode (no real scoring)
+    )
 
 
 class RunCreated(BaseModel):

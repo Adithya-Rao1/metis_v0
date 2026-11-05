@@ -6,6 +6,7 @@ nothing about why an edit helps; all explanations come from RDKit descriptors.
 Weights are pickle-format (pytorch_model.bin): we load only the allow-listed repos
 below, at the pinned revision hash, never from an arbitrary path or id.
 """
+
 from __future__ import annotations
 
 import logging

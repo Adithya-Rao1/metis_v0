@@ -3,8 +3,9 @@
     python -m backend.maintenance                 run once, exit 0 / non-zero on error
     python -m backend.maintenance --loop 3600     run every 3600 s until stopped
 
-Connects as the app role (METIS_DATABASE_URL). The functions enforce their own safety floors in the database
-(rate buckets older than 2 h, expired revocations, never-verified sign-ups older than the given age, min
+Connects as the app role (METIS_DATABASE_URL), the only setting it needs (backend.core.settings.DbSettings).
+The functions enforce their own safety floors in the database (rate buckets older than 2 h, expired
+revocations, never-verified sign-ups older than the given age, min
 1 day), so this process cannot widen what it deletes. Logs never contain emails, ids or any user data.
 """
 
@@ -23,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.core.db import make_engine, make_session_factory, request_session
+from backend.core.settings import get_db_settings
 
 log = logging.getLogger("metis.maintenance")
 
@@ -86,7 +88,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ap.error(f"--loop must be at least {MIN_LOOP_INTERVAL_S} seconds")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     try:
-        factory = make_session_factory(make_engine())
+        factory = make_session_factory(make_engine(settings=get_db_settings()))
     except Exception as exc:  # noqa: BLE001 - settings errors are names-only by design; never echo the URL
         log.error("cannot start: %s", type(exc).__name__)
         return 2

@@ -80,7 +80,9 @@ class BodyGuardMiddleware:
                 break
         body = b"".join(chunks)
         if body and _is_json(headers) and has_non_finite_json(body):
-            await self._reply(send, 422, [{"type": "json_invalid", "loc": ["body"], "msg": "NaN/Infinity not allowed"}])
+            await self._reply(
+                send, 422, [{"type": "json_invalid", "loc": ["body"], "msg": "NaN/Infinity not allowed"}]
+            )
             return
         sent = False
 
@@ -117,6 +119,77 @@ async def _validation_handler(_request: Any, exc: RequestValidationError) -> JSO
     return JSONResponse({"detail": jsonable_encoder(errors)}, status_code=422)
 
 
+HSTS = b"max-age=63072000; includeSubDomains"  # no "preload" until the domain is decided
+NO_STORE = b"no-store"
+_NO_STORE_PREFIXES = (
+    "/auth",
+    "/account",
+    "/consents",
+    "/projects",
+    "/jobs",
+    "/predictions",
+    "/lead",
+    "/dockprep",
+)
+
+
+class ResponseHeadersMiddleware:
+    """API response headers (pure ASGI, so streaming responses pass through untouched).
+
+    * `Cache-Control: no-store` on every response to a request that carries the session cookie and on the account
+      routes, so a back/forward cache or a default-caching intermediary cannot keep one user's data after logout (F-133).
+      A route that sets its own Cache-Control keeps it. The static web files are not served by this app.
+    * `Strict-Transport-Security` when the request arrived over TLS: directly (scheme https) or, only with
+      METIS_ACCOUNTS_TRUST_PROXY, as reported by the last X-Forwarded-Proto hop (F-132). The static site gets its own
+      header from `web/_headers`.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    @staticmethod
+    def _trust_proxy(scope: dict) -> bool:
+        from backend.accounts.config import AccountsConfig
+
+        state = scope["app"].state
+        cfg = getattr(state, "accounts_config", None)
+        if cfg is None:
+            cfg = state.accounts_config = AccountsConfig()
+        return bool(cfg.trust_proxy)
+
+    def _is_tls(self, scope: dict, headers: dict[bytes, bytes]) -> bool:
+        if scope.get("scheme") == "https":
+            return True
+        if self._trust_proxy(scope):
+            proto = headers.get(b"x-forwarded-proto", b"").split(b",")[-1].strip().lower()
+            return proto == b"https"
+        return False
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        req = {k.lower(): v for k, v in scope.get("headers", [])}
+        path = scope.get("path", "")
+        has_session = b"metis_session=" in req.get(b"cookie", b"")
+        no_store = has_session or path.startswith(_NO_STORE_PREFIXES)
+        hsts = self._is_tls(scope, req)
+
+        async def send_wrapper(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                names = {k.lower() for k, _ in headers}
+                if no_store and b"cache-control" not in names:
+                    headers.append((b"cache-control", NO_STORE))
+                if hsts and b"strict-transport-security" not in names:
+                    headers.append((b"strict-transport-security", HSTS))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
 def install(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_middleware(BodyGuardMiddleware)
+    app.add_middleware(ResponseHeadersMiddleware)

@@ -11,6 +11,10 @@ line-length = 110
 target-version = "py312"
 extend-exclude = [".venv", ".tmpvenv", "web", "node_modules"]
 
+[tool.ruff.format]
+# Copied edit operators keep their original layout (see the lint ignore below).
+exclude = ["leadstudio/molmods"]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 
@@ -21,7 +25,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 # E501 = lines up to ~130 chars; UP045/UP037/UP035/UP017/I001/B905 = style modernisation; the rest are
 # single real findings (E741 ambiguous name, E702 semicolons, E731 lambda, F401/F841 unused, B023 loop var,
 # SIM105/SIM300, S603 = sandbox subprocess with fixed argv and env={}). dockprep/* still carries its own
-# in-file "ruff: noqa" headers (not owned here), so ruff skips those files entirely.
+# in-file "ruff: noqa" headers (removed in Wave 4: dockprep is now linted like everything else).
 "backend/compounds/routes.py" = ["B008", "E501", "UP045"]
 "backend/compounds/sandbox.py" = ["S603"]
 "backend/compounds/standardize.py" = ["E501"]
@@ -31,7 +35,9 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 "backend/accounts/router.py" = ["E501"]
 "backend/accounts/security.py" = ["SIM905"]
 "ml/registry/sync_db.py" = ["E501"]
-"backend/dockprep/sandbox.py" = ["I001"]
+# dockprep: E501 = long messages/comments; B008 = FastAPI Depends() defaults (idiomatic).
+"backend/dockprep/*.py" = ["E501"]
+"backend/dockprep/router.py" = ["B008"]
 "backend/exports/formats.py" = ["E501", "UP045"]
 "backend/exports/routes.py" = ["B008", "B905", "E501"]
 "backend/jobs/deps.py" = ["B008", "E501"]

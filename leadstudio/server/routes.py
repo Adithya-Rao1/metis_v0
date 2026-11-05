@@ -8,6 +8,7 @@ AUTHENTICATION is the Metis session: every route depends on `backend.accounts.de
 CSRF double-submit and the current terms version on every mutation). Anonymous -> 401. Objects of other users ->
 404, never 403. Rate limits use the shared database limiter. See docs/OPERATIONS.md for the env settings.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,6 +19,7 @@ import secrets
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
@@ -54,7 +56,7 @@ from leadstudio.server.state import LeadState, get_state
 
 log = logging.getLogger("leadstudio.server")
 
-MAX_SAVED_PAYLOAD = 1_500_000        # bytes of JSON for one saved run
+MAX_SAVED_PAYLOAD = 1_500_000  # bytes of JSON for one saved run
 MAX_MANUAL_STEPS = 500
 ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"  # ids of in-memory runs / sessions / pose jobs (token_urlsafe)
 OBJECTIVE_KEYS = frozenset(Descriptors.model_fields)
@@ -84,10 +86,14 @@ def health(st: LeadState = Depends(get_state)) -> dict:
         "components": st.components,
         "details": st.details,
         "limits": {
-            "max_concurrent_runs": s.max_concurrent, "max_queue": s.max_queue,
-            "runs_per_user": s.per_user_active, "run_timeout_s": s.run_timeout,
-            "max_generations": s.max_generations, "max_population": s.max_population,
-            "runs_per_minute_per_user": s.runs_per_minute, "max_heavy_atoms": molio.MAX_HEAVY_ATOMS,
+            "max_concurrent_runs": s.max_concurrent,
+            "max_queue": s.max_queue,
+            "runs_per_user": s.per_user_active,
+            "run_timeout_s": s.run_timeout,
+            "max_generations": s.max_generations,
+            "max_population": s.max_population,
+            "runs_per_minute_per_user": s.runs_per_minute,
+            "max_heavy_atoms": molio.MAX_HEAVY_ATOMS,
             "max_smiles_chars": molio.MAX_SMILES_CHARS,
         },
     }
@@ -99,7 +105,9 @@ def presets(st: LeadState = Depends(get_state)) -> list:
 
 
 @api.post("/molecules/validate", response_model=ValidateResponse)
-def validate(req: ValidateRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> ValidateResponse:
+def validate(
+    req: ValidateRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> ValidateResponse:
     throttle(sc, "validate", st.settings.validates_per_minute)
     with st.heavy:
         try:
@@ -109,16 +117,27 @@ def validate(req: ValidateRequest, sc: Scope = Depends(scope), st: LeadState = D
         smi = molio.canonical(mol)
         block, _provider = molio.molblock_3d(smi)
         if block is None:
-            return ValidateResponse(ok=False, canonical_smiles=smi, heavy_atoms=mol.GetNumHeavyAtoms(), source=st.source,
-                                    error="Could not generate a 3D conformer for this molecule")
+            return ValidateResponse(
+                ok=False,
+                canonical_smiles=smi,
+                heavy_atoms=mol.GetNumHeavyAtoms(),
+                source=st.source,
+                error="Could not generate a 3D conformer for this molecule",
+            )
         score: ScoreResult | None = None
         if st.scorer is not None:
             try:
                 score = st.scorer.score(smi, RunConfig(seed_smiles=smi))
             except Exception as exc:
                 log.warning("seed scoring failed: %s", type(exc).__name__)
-        return ValidateResponse(ok=True, canonical_smiles=smi, heavy_atoms=mol.GetNumHeavyAtoms(), molblock=block,
-                                score=score, source=st.source)
+        return ValidateResponse(
+            ok=True,
+            canonical_smiles=smi,
+            heavy_atoms=mol.GetNumHeavyAtoms(),
+            molblock=block,
+            score=score,
+            source=st.source,
+        )
 
 
 def _profile_wrapper(sc: Scope, cfg: RunConfig):
@@ -162,37 +181,77 @@ def create_run(cfg: RunConfig, sc: Scope = Depends(scope), st: LeadState = Depen
         raise HTTPException(422, "locked_atoms index out of range")
     cfg = stages.prepare_config(cfg, st.svc, st.engine is not None)
     wrap = _profile_wrapper(sc, cfg)
-    cfg = cfg.model_copy(update={
-        "seed_smiles": molio.canonical(mol),
-        "generations": max(1, min(cfg.generations, s.max_generations)),
-        "population_size": max(2, min(cfg.population_size, s.max_population)),
-        "policy_guidance": max(0.0, min(cfg.policy_guidance, 1.0)),
-        "locked_atoms": sorted(set(cfg.locked_atoms)),
-        "use_reactions": cfg.use_reactions if st.engine is not None else False,
-        "seed_molblock": None,  # the engine builds its own 3D seed; a client-supplied block is never used
-    })
+    cfg = cfg.model_copy(
+        update={
+            "seed_smiles": molio.canonical(mol),
+            "generations": max(1, min(cfg.generations, s.max_generations)),
+            "population_size": max(2, min(cfg.population_size, s.max_population)),
+            "policy_guidance": max(0.0, min(cfg.policy_guidance, 1.0)),
+            "locked_atoms": sorted(set(cfg.locked_atoms)),
+            "use_reactions": cfg.use_reactions if st.engine is not None else False,
+            "seed_molblock": None,  # the engine builds its own 3D seed; a client-supplied block is never used
+        }
+    )
     run = st.mgr.submit(sc.user.id, cfg, secrets.token_urlsafe(9), scorer_wrap=wrap)
-    log.info("run %s created source=%s heavy_atoms=%d gens=%d pop=%d", run.run_id[:6], run.source, n,
-             cfg.generations, cfg.population_size)
+    log.info(
+        "run %s created source=%s heavy_atoms=%d gens=%d pop=%d",
+        run.run_id[:6],
+        run.source,
+        n,
+        cfg.generations,
+        cfg.population_size,
+    )
     return RunCreated(run_id=run.run_id, source="mock" if run.source == "mock" else "live")
 
 
 @api.delete("/runs/{run_id}")
-def cancel_run(run_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user), st: LeadState = Depends(get_state)) -> dict:
+def cancel_run(
+    run_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user), st: LeadState = Depends(get_state)
+) -> dict:
     run = st.mgr.get(run_id, user.id)
     if run is None:
         raise HTTPException(404, "unknown run")
     return {"cancelled": st.mgr.cancel(run)}
 
 
+class _ReleasingStream(StreamingResponse):
+    """StreamingResponse that calls `release` when the ASGI call ends, even if the body generator never started."""
+
+    def __init__(self, content: Any, release: Callable[[], None], **kw: Any) -> None:
+        super().__init__(content, **kw)
+        self._release = release
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._release()
+
+
 @api.get("/runs/{run_id}/events")
-async def run_events(request: Request, run_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user),
-                     st: LeadState = Depends(get_state)) -> StreamingResponse:
+async def run_events(
+    request: Request,
+    run_id: str = Path(pattern=ID_PATTERN),
+    user=Depends(current_user),
+    st: LeadState = Depends(get_state),
+) -> StreamingResponse:
     run = st.mgr.get(run_id, user.id)
     if run is None:
         raise HTTPException(404, "unknown run")
     if not st.mgr.open_stream(user.id):
         raise Rejected(429, "Too many open event streams", 5)
+    st.mgr.attach(run)
+    released = False
+
+    def release() -> None:
+        """Give back the per-user stream slot and the run's reader count exactly once, however the response ends
+        (finished, client disconnect, cancellation, or never started: the generator's own finally would not run)."""
+        nonlocal released
+        if not released:
+            released = True
+            st.mgr.close_stream(user.id)
+            st.mgr.detach(run)
+
     last = request.headers.get("last-event-id")
     start = int(last) + 1 if last and last.isdigit() and len(last) < 9 else 0
     heartbeat = st.settings.heartbeat
@@ -202,6 +261,8 @@ async def run_events(request: Request, run_id: str = Path(pattern=ID_PATTERN), u
         try:
             yield "retry: 3000\n\n"
             while True:
+                if await request.is_disconnected():
+                    return
                 if i < len(run.events):
                     ev = run.events[i]
                     if run.pace and i > start:
@@ -211,17 +272,19 @@ async def run_events(request: Request, run_id: str = Path(pattern=ID_PATTERN), u
                     continue
                 if run.finished:
                     return
-                if await request.is_disconnected():
-                    return
                 if time.monotonic() - idle >= heartbeat:
                     yield ": heartbeat\n\n"
                     idle = time.monotonic()
                 await asyncio.sleep(0.1)
         finally:
-            st.mgr.close_stream(user.id)
+            release()
 
-    return StreamingResponse(stream(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return _ReleasingStream(
+        stream(),
+        release,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @api.get("/targets")
@@ -246,7 +309,9 @@ def data(path: str = Path(max_length=200)) -> FileResponse:
 
 
 @api.post("/poses", response_model=PoseResult)
-def create_pose(req: PoseRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> PoseResult:
+def create_pose(
+    req: PoseRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> PoseResult:
     throttle(sc, "poses_any", 120)
     if st.svc.get_target(req.target_id) is None:
         raise HTTPException(422, "unknown target_id")
@@ -255,12 +320,16 @@ def create_pose(req: PoseRequest, sc: Scope = Depends(scope), st: LeadState = De
     except molio.InvalidMolecule as exc:
         raise HTTPException(422, str(exc)) from None
     if not st.poses.precomputed_exists(req.target_id, smi):
-        throttle(sc, "poses", 10)  # only requests that would reach the docking service are held to the strict limit
+        throttle(
+            sc, "poses", 10
+        )  # only requests that would reach the docking service are held to the strict limit
     return st.poses.submit(sc.user.id, req.target_id, smi)
 
 
 @api.get("/poses/{job_id}", response_model=PoseResult)
-def get_pose(job_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user), st: LeadState = Depends(get_state)) -> PoseResult:
+def get_pose(
+    job_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user), st: LeadState = Depends(get_state)
+) -> PoseResult:
     j = st.poses.get(job_id, user.id)
     if j is None:
         raise HTTPException(404, "unknown or expired pose job")
@@ -269,15 +338,21 @@ def get_pose(job_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user),
 
 # ---------------------------------------------------------------------------------------------- manual mode
 @api.get("/manual/applicable")
-def applicable(smiles: str = Query(..., max_length=2000), locked: str = Query("", max_length=300),
-               sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> list:
+def applicable(
+    smiles: str = Query(..., max_length=2000),
+    locked: str = Query("", max_length=300),
+    sc: Scope = Depends(scope),
+    st: LeadState = Depends(get_state),
+) -> list:
     throttle(sc, "applicable", 120)
     with st.heavy:
         return st.manual.applicable(smiles, locked)
 
 
 @api.post("/manual/preview", response_model=ManualPreview)
-def preview(req: ManualPreviewRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> ManualPreview:
+def preview(
+    req: ManualPreviewRequest, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> ManualPreview:
     throttle(sc, "preview", 120)
     with st.heavy:
         return st.manual.preview(req)
@@ -290,26 +365,37 @@ class SessionCreate(BaseModel):
 
 
 @api.post("/manual/sessions", response_model=ManualSession)
-def create_session(req: SessionCreate, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> ManualSession:
+def create_session(
+    req: SessionCreate, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> ManualSession:
     throttle(sc, "msess", 20)
     return st.manual.create_session(sc.user.id, req.seed_smiles, req.target_id)
 
 
 @api.post("/manual/sessions/{session_id}/steps", response_model=ManualSession)
-def add_step(step: ManualStep, session_id: str = Path(pattern=ID_PATTERN), sc: Scope = Depends(scope),
-             st: LeadState = Depends(get_state)) -> ManualSession:
+def add_step(
+    step: ManualStep,
+    session_id: str = Path(pattern=ID_PATTERN),
+    sc: Scope = Depends(scope),
+    st: LeadState = Depends(get_state),
+) -> ManualSession:
     throttle(sc, "mstep", 240)
     with st.heavy:
         return st.manual.add_step(sc.user.id, session_id, step)
 
 
 @api.get("/manual/sessions/{session_id}/export")
-def export(session_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user), st: LeadState = Depends(get_state)) -> Response:
+def export(
+    session_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user), st: LeadState = Depends(get_state)
+) -> Response:
     s = st.manual.sessions.get(session_id, user.id)
     if s is None:
         raise HTTPException(404, "unknown session")
-    return Response(export_jsonl(s), media_type="application/x-ndjson",
-                    headers={"Content-Disposition": 'attachment; filename="manual_session.jsonl"'})
+    return Response(
+        export_jsonl(s),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": 'attachment; filename="manual_session.jsonl"'},
+    )
 
 
 # ================================================================================================= adapt
@@ -336,6 +422,7 @@ def _adapt_manager(request: Request) -> Any:
                 def runner(transitions: Any, owner: str, progress: Any = None) -> dict:
                     from leadstudio.adapt import pipeline
                     from leadstudio.registry import get_registry
+
                     return pipeline.run(transitions, owner, registry=get_registry(), progress=progress)
 
                 mgr = st.lead_adapt = JobManager(runner)
@@ -343,8 +430,9 @@ def _adapt_manager(request: Request) -> Any:
 
 
 @api.post("/adapt/jobs", status_code=202)
-def create_adapt_job(body: AdaptJobIn, request: Request, sc: Scope = Depends(scope),
-                     st: LeadState = Depends(get_state)) -> dict:
+def create_adapt_job(
+    body: AdaptJobIn, request: Request, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> dict:
     throttle(sc, "adapt", 5)
     if (body.transitions is None) == (body.manual_session_id is None):
         raise HTTPException(422, "Send exactly one of transitions or manual_session_id")
@@ -355,8 +443,16 @@ def create_adapt_job(body: AdaptJobIn, request: Request, sc: Scope = Depends(sco
             m = store.get_manual(s, sc.user.id, body.manual_session_id)
         if m is None:
             raise not_found()
-        trans = [{"parent_smiles": x["parent_smiles"], "edit_id": x["edit_id"], "site": list(x["site"] or []),
-                  "child_smiles": x["child_smiles"], "reward": float(x["reward_delta"] or 0.0)} for x in m["steps"]]
+        trans = [
+            {
+                "parent_smiles": x["parent_smiles"],
+                "edit_id": x["edit_id"],
+                "site": list(x["site"] or []),
+                "child_smiles": x["child_smiles"],
+                "reward": float(x["reward_delta"] or 0.0),
+            }
+            for x in m["steps"]
+        ]
     else:
         trans = body.transitions or []
     if len(trans) < MIN_VALID_STEPS:
@@ -372,8 +468,12 @@ def create_adapt_job(body: AdaptJobIn, request: Request, sc: Scope = Depends(sco
 
 
 @api.get("/adapt/jobs/{job_id}")
-def get_adapt_job(request: Request, job_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user),
-                  st: LeadState = Depends(get_state)) -> dict:
+def get_adapt_job(
+    request: Request,
+    job_id: str = Path(pattern=ID_PATTERN),
+    user=Depends(current_user),
+    st: LeadState = Depends(get_state),
+) -> dict:
     j = _adapt_manager(request).get(job_id, str(user.id))
     if j is None:
         raise HTTPException(404, "unknown job")
@@ -433,9 +533,16 @@ def save_run(body: RunIn, sc: Scope = Depends(scope)) -> dict:
     with sc.session() as s:
         store.lock_owner(s, sc.user.id, "run")
         _cap(store.count_runs(s, sc.user.id), store.MAX_RUNS, "saved runs")
-        row = store.insert_run(s, sc.user.id, title, stage, target,
-                               seed[:2000] if isinstance(seed, str) and seed else None,
-                               headline[:300] if isinstance(headline, str) else None, blob)
+        row = store.insert_run(
+            s,
+            sc.user.id,
+            title,
+            stage,
+            target,
+            seed[:2000] if isinstance(seed, str) and seed else None,
+            headline[:300] if isinstance(headline, str) else None,
+            blob,
+        )
     return _run_summary(row)
 
 
@@ -458,13 +565,19 @@ def delete_run(run_id: uuid.UUID, sc: Scope = Depends(scope)) -> dict:
 
 class StepIn(BaseModel):
     """One saved manual step. Accepts both the ManualStep shape and the exported transition shape ('reward')."""
+
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
     parent_smiles: str = Field(max_length=2000)
     child_smiles: str = Field(max_length=2000)
     edit_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_:.-]+$")
     site: list[int] = Field(default_factory=list, max_length=64)
-    reward_delta: float | None = Field(default=None, ge=-1e6, le=1e6, allow_inf_nan=False,
-                                          validation_alias=AliasChoices("reward_delta", "reward"))
+    reward_delta: float | None = Field(
+        default=None,
+        ge=-1e6,
+        le=1e6,
+        allow_inf_nan=False,
+        validation_alias=AliasChoices("reward_delta", "reward"),
+    )
     t: float = Field(default=0.0, ge=0.0, le=1e9, allow_inf_nan=False)
     seed_smiles: str | None = Field(default=None, max_length=2000)
 
@@ -478,8 +591,13 @@ class ManualIn(BaseModel):
 
 
 def _manual_summary(m: dict[str, Any]) -> dict[str, Any]:
-    return {"id": m["id"], "seed_smiles": m["seed_smiles"], "target_id": m["target_id"],
-            "created_at": m["created_at"], "n_steps": m.get("n_steps", 0)}
+    return {
+        "id": m["id"],
+        "seed_smiles": m["seed_smiles"],
+        "target_id": m["target_id"],
+        "created_at": m["created_at"],
+        "n_steps": m.get("n_steps", 0),
+    }
 
 
 @library.get("/manual")
@@ -516,8 +634,17 @@ def save_manual(body: ManualIn, sc: Scope = Depends(scope)) -> dict:
         raise HTTPException(422, str(exc)) from None
     if any(i < 0 or i > 10_000 for st_ in steps for i in st_.site):
         raise HTTPException(422, "site index out of range")
-    rows = [{"parent_smiles": x.parent_smiles, "child_smiles": x.child_smiles, "edit_id": x.edit_id, "site": x.site,
-             "reward_delta": x.reward_delta, "t": x.t} for x in steps]
+    rows = [
+        {
+            "parent_smiles": x.parent_smiles,
+            "child_smiles": x.child_smiles,
+            "edit_id": x.edit_id,
+            "site": x.site,
+            "reward_delta": x.reward_delta,
+            "t": x.t,
+        }
+        for x in steps
+    ]
     with sc.session() as s:
         store.lock_owner(s, sc.user.id, "manual")
         _cap(store.count_manual(s, sc.user.id), store.MAX_MANUAL, "manual sessions")
@@ -563,7 +690,9 @@ class SmartsCheck(BaseModel):
 
 
 @profiles.post("/check-smarts")
-def check_smarts_route(body: SmartsCheck, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> dict:
+def check_smarts_route(
+    body: SmartsCheck, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)
+) -> dict:
     """Live validation for the editor: [{ok, error}] per pattern. Stores nothing. At most MAX_SMARTS patterns of
     MAX_SMARTS_LEN characters each, parsed under the process-wide heavy-operation gate (busy -> 429)."""
     throttle(sc, "smarts", 120)

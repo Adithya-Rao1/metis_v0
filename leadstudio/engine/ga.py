@@ -11,6 +11,7 @@ Transition tuples handed to ``Policy.update`` are
 ``(parent_smiles, edit_op, site, child_smiles, reward_delta)`` where ``reward_delta`` is the child's
 composite minus the parent's composite.
 """
+
 from __future__ import annotations
 
 import itertools
@@ -57,6 +58,7 @@ class Individual:
 @dataclass
 class Proposal:
     """A valid, lock-respecting, not-yet-scored child."""
+
     smiles: str
     parents: list[Individual]
     edit: EditRecord
@@ -82,8 +84,9 @@ def canonical_valid(smiles: str, max_heavy: int = MAX_HEAVY_ATOMS) -> str | None
 class Locks:
     """Seed atoms that must survive every edit. Verified by MCS tracking + substructure."""
 
-    def __init__(self, seed_smiles: str, locked: Sequence[int],
-                 mapper: Callable[[str, str], list[tuple[int, int]]]):
+    def __init__(
+        self, seed_smiles: str, locked: Sequence[int], mapper: Callable[[str, str], list[tuple[int, int]]]
+    ):
         self._mapper = mapper
         self.seed_locked = tuple(sorted(set(locked)))
         self._patt = None
@@ -113,8 +116,15 @@ class Locks:
 
 # ----------------------------------------------------------------------------- operators
 class Operators:
-    def __init__(self, registry: Registry, policy: Policy, config: RunConfig, rng: random.Random,
-                 locks: Locks, crossover_rate: float = 0.3):
+    def __init__(
+        self,
+        registry: Registry,
+        policy: Policy,
+        config: RunConfig,
+        rng: random.Random,
+        locks: Locks,
+        crossover_rate: float = 0.3,
+    ):
         self.registry, self.policy, self.config, self.rng, self.locks = registry, policy, config, rng, locks
         self.crossover_rate = crossover_rate
         self._cands: dict[tuple[str, tuple[int, ...]], list[tuple]] = {}
@@ -183,8 +193,14 @@ class Operators:
         locked = self.locks.track(ind, child)
         if locked is None:
             return None
-        rec = EditRecord(edit_id=op.id, name=op.name, category=op.category, site=list(site),
-                         chosen_by=chosen_by, parents=[ind.smiles])
+        rec = EditRecord(
+            edit_id=op.id,
+            name=op.name,
+            category=op.category,
+            site=list(site),
+            chosen_by=chosen_by,
+            parents=[ind.smiles],
+        )
         return Proposal(child, [ind], rec, op, tuple(site), locked)
 
     # -- crossover (BRICS)
@@ -203,8 +219,13 @@ class Operators:
         seed_frag = self.rng.choice(fa)
         try:
             frags = [Chem.MolFromSmiles(s) for s in sorted(set(pool) | {seed_frag})]
-            gen = BRICS.BRICSBuild(frags, onlyCompleteMols=True, seeds=[Chem.MolFromSmiles(seed_frag)],
-                                   scrambleReagents=False, maxDepth=2)
+            gen = BRICS.BRICSBuild(
+                frags,
+                onlyCompleteMols=True,
+                seeds=[Chem.MolFromSmiles(seed_frag)],
+                scrambleReagents=False,
+                maxDepth=2,
+            )
             raw = []
             for m in itertools.islice(gen, max_products):
                 try:
@@ -221,13 +242,23 @@ class Operators:
         locked = self.locks.track(a, child)
         if locked is None:
             return None
-        rec = EditRecord(edit_id="brics_crossover", name="BRICS crossover", category="crossover",
-                         site=[], chosen_by="crossover", parents=[a.smiles, b.smiles])
+        rec = EditRecord(
+            edit_id="brics_crossover",
+            name="BRICS crossover",
+            category="crossover",
+            site=[],
+            chosen_by="crossover",
+            parents=[a.smiles, b.smiles],
+        )
         return Proposal(child, [a, b], rec, None, (), locked)
 
     def propose(self, pop: Sequence[Individual]) -> Proposal | None:
         """One attempt at a child: crossover with probability ``crossover_rate``, otherwise mutation."""
-        if self.config.use_crossover and len({i.smiles for i in pop}) >= 2 and self.rng.random() < self.crossover_rate:
+        if (
+            self.config.use_crossover
+            and len({i.smiles for i in pop}) >= 2
+            and self.rng.random() < self.crossover_rate
+        ):
             a = self.toolbox.select(pop)
             others = [i for i in pop if i.smiles != a.smiles]
             b = self.toolbox.select(others)

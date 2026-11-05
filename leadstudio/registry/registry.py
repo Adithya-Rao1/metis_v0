@@ -1,4 +1,5 @@
 """Registry implementation: ops from ops.py + metadata from edits.yaml."""
+
 from __future__ import annotations
 
 import os
@@ -44,8 +45,9 @@ class RegistryImpl:
     def get(self, edit_id: str) -> _BaseOp:
         return self._by_id[edit_id]
 
-    def applicable(self, smiles: str, locked_atoms: Sequence[int] = (),
-                   demo_safe_only: bool | None = None) -> list[tuple[_BaseOp, list[int]]]:
+    def applicable(
+        self, smiles: str, locked_atoms: Sequence[int] = (), demo_safe_only: bool | None = None
+    ) -> list[tuple[_BaseOp, list[int]]]:
         """Applicable (op, site) pairs. ``demo_safe_only`` defaults to True unless env STUDIO_ALL_EDITS=1."""
         if demo_safe_only is None:
             demo_safe_only = os.environ.get("STUDIO_ALL_EDITS") != "1"

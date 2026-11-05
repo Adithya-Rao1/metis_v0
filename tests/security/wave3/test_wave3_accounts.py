@@ -196,13 +196,11 @@ class TestTermsGate:
         other.signup("bob@example.com")
         assert Cl(d.app).login("bob@example.com", S.PW).json()["terms_reaccept_required"] is True      # bob's state is his own
 
-    @defect("F-123", "LOW", "the terms gate refuses only mutating methods (deps.current_user): until the user re-accepts, GET /projects, /account/data (export), /consents and the compute-heavy /predictions/{id}/uncertainty and depiction/conformer routes keep answering; only the web client's redirect enforces the acceptance")
     def test_reads_are_also_refused_until_reaccepted(self, mk3, w3):
         _, c, d, pid = self._stale(mk3, w3)
         assert d.get("/projects").status_code == 403
         assert d.get("/account/data").status_code == 403
 
-    @defect("F-124", "LOW", "POST /auth/terms/accept has no rate limit and each call appends 3 rows to the append-only terms_acceptance table, so one session can grow it without bound (no UPDATE/DELETE privilege exists to trim it)")
     def test_terms_accept_is_rate_limited(self, mk3, w3):
         _, c, d, _ = self._stale(mk3, w3)
         codes = {d.post("/auth/terms/accept", {"version": "2026-02"}).status_code for _ in range(40)}
@@ -351,7 +349,6 @@ class TestForgotResetResend:
                 codes.append(c.post(route, b).status_code)
             assert 429 in codes, route
 
-    @defect("F-125", "LOW", "outstanding reset tokens are not invalidated: a second 'forgot' does not kill the first token, and neither a completed reset nor a password change kills the others, so a mailbox snooper holding an older mail can reset the password again for up to an hour (reset_ttl_s)")
     def test_a_reset_or_password_change_retires_every_other_outstanding_reset_token(self, mk3):
         app = mk3()
         c = Cl(app)
@@ -361,7 +358,6 @@ class TestForgotResetResend:
         assert Cl(app).post("/auth/reset", {"token": t1, "password": NEW_PW}).status_code == 200
         assert Cl(app).post("/auth/reset", {"token": t2, "password": "attacker chosen passphrase 9"}).status_code == 400
 
-    @defect("F-125", "LOW", "an outstanding reset token survives a password change made from a logged-in session (same root cause)")
     def test_password_change_retires_outstanding_reset_tokens(self, mk3):
         app = mk3()
         c = Cl(app)
@@ -373,7 +369,6 @@ class TestForgotResetResend:
 
 # ================================================================================ pre-hijacking / squatting
 class TestSquatting:
-    @defect("F-122", "MEDIUM", "pre-hijacking: the password hash of an UNVERIFIED registration is whatever the first (anonymous) caller chose and is never replaced; when the real owner later verifies the address (from the mail the attacker triggered, or after signing up themselves) the attacker's password is the account's password and the owner's own choice is silently ignored (tracked in BACKLOG, not fixed)")
     def test_attacker_chosen_password_does_not_survive_the_owners_verification(self, mk3):
         app = mk3()
         attacker, victim = Cl(app), Cl(app)
@@ -439,7 +434,6 @@ def _app_with(mk3, mailer):
     return app, c
 
 
-@defect("F-131", "LOW", "mail is sent inline and only when an address is registered, so as soon as a real mailer exists the response time of /auth/forgot and /auth/resend-verification reveals whether an address has an account (and a mailer outage turns the same request into a 500 for registered addresses only); both hold today only because the console/in-memory mailers are instantaneous")
 def test_forgot_and_resend_do_not_reveal_registration_through_timing_or_mailer_errors(mk3):
     import statistics
     import time
@@ -511,7 +505,6 @@ def test_every_route_but_the_public_list_is_401_without_a_session_including_the_
 
 
 # ================================================================================================ caching
-@defect("F-133", "LOW", "authenticated JSON (GET /auth/me, /projects, /account, /consents, the login answer that carries a CSRF token) is sent without Cache-Control: no-store (only the export has it), so a browser back/forward cache or an intermediary configured to cache by default can keep one user's project data after logout on a shared machine")
 def test_authenticated_json_is_not_cacheable(mk3):
     app = mk3()
     c = Cl(app)

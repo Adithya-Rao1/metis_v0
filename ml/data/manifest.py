@@ -1,4 +1,5 @@
 """License-gated dataset manifest. Training requires license_status == cleared."""
+
 from __future__ import annotations
 
 import re
@@ -17,8 +18,9 @@ ID_RE = re.compile(r"^[A-Za-z0-9_]+$")
 # A cleared entry may never look like FreeSolv (any id) or carry non-commercial / no-derivatives terms.
 _EXCLUDED_SOURCE_RE = re.compile(r"free[\W_]*solv|mobleylab", re.I)
 # Exact allow-list of NORMALISED permissive licence identifiers (see normalise_licence). Anything else is not cleared.
-ALLOWED_LICENCES = frozenset({"cc0", "cc0-1.0", "cc-by-4.0", "cc-by-sa-4.0", "mit", "apache-2.0", "bsd-3-clause",
-                              "public-domain"})
+ALLOWED_LICENCES = frozenset(
+    {"cc0", "cc0-1.0", "cc-by-4.0", "cc-by-sa-4.0", "mit", "apache-2.0", "bsd-3-clause", "public-domain"}
+)
 _JUNK_CONFIRMERS = {"", "false", "true", "none", "null", "nan", "n/a", "na", "unknown", "x", "tbd", "todo"}
 
 
@@ -45,7 +47,9 @@ def load_manifest(path: Path | str = MANIFEST_PATH) -> dict[str, DatasetEntry]:
     raw = yaml.safe_load(Path(path).read_text())["datasets"]
     out: dict[str, DatasetEntry] = {}
     for r in raw:
-        e = DatasetEntry(**{k: (str(r[k]) if r[k] is not None else None) for k in DatasetEntry.__dataclass_fields__})
+        e = DatasetEntry(
+            **{k: (str(r[k]) if r[k] is not None else None) for k in DatasetEntry.__dataclass_fields__}
+        )
         if e.license_status not in STATUSES:
             raise ValueError(f"{e.id}: bad license_status {e.license_status}")
         if e.kind not in KINDS:
@@ -68,11 +72,15 @@ def normalise_licence(text: str) -> str:
 
 
 def _validate_cleared(e: DatasetEntry) -> None:
-    if e.id in ALWAYS_REFUSED or any(_EXCLUDED_SOURCE_RE.search(x or "") for x in (e.id, e.name, e.source_url)):
+    if e.id in ALWAYS_REFUSED or any(
+        _EXCLUDED_SOURCE_RE.search(x or "") for x in (e.id, e.name, e.source_url)
+    ):
         raise LicenseError(f"{e.id}: FreeSolv (or an alias/source of it) can never be cleared")
     lic = e.license_as_stated or ""
     if normalise_licence(lic) not in ALLOWED_LICENCES:
-        raise LicenseError(f"{e.id}: licence {lic!r} is not on the permissive allow-list {sorted(ALLOWED_LICENCES)}; cannot be cleared")
+        raise LicenseError(
+            f"{e.id}: licence {lic!r} is not on the permissive allow-list {sorted(ALLOWED_LICENCES)}; cannot be cleared"
+        )
     try:
         d = date.fromisoformat((e.date_checked or "").strip())
     except ValueError:

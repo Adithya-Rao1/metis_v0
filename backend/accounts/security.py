@@ -28,13 +28,22 @@ _COMMON_BASES = frozenset(
     university student science chemistry biology abcdefgh abcdefghij abcd1234 abc12345 aaaaaaaa mustang
     killer pepper ginger cookie banana chocolate maggie jessica hannah ashley nicole liverpool arsenal
     chelsea barcelona madrid yankees lakers matrix master123 test1234 testtest tester guest root toor
-    """
-    .split()
+    """.split()
 )
 # Short list of fully-literal weak passwords (digits-only runs are caught separately).
 _COMMON = frozenset(
-    {"1234567890", "0123456789", "9876543210", "1234512345", "0000000000", "1111111111", "qwertyuiop",
-     "asdfghjkl;", "zaq12wsxcde3", "correcthorsebatterystaple"}
+    {
+        "1234567890",
+        "0123456789",
+        "9876543210",
+        "1234512345",
+        "0000000000",
+        "1111111111",
+        "qwertyuiop",
+        "asdfghjkl;",
+        "zaq12wsxcde3",
+        "correcthorsebatterystaple",
+    }
 )
 _LEET = str.maketrans("@$!0134578", "asioleastb")
 
@@ -97,9 +106,7 @@ def pw_version(password_hash: str) -> str:
     return hashlib.sha256(password_hash.encode()).hexdigest()[:16]
 
 
-def make_session_token(
-    user_id: uuid.UUID, ttl_s: int, pwv: str | None = None
-) -> tuple[str, uuid.UUID, int]:
+def make_session_token(user_id: uuid.UUID, ttl_s: int, pwv: str | None = None) -> tuple[str, uuid.UUID, int]:
     now = int(time.time())
     jti = uuid.uuid4()
     exp = now + ttl_s

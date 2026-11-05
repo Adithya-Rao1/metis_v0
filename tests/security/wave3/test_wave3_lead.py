@@ -92,7 +92,9 @@ def test_terms_gate_blocks_mutations_until_reaccepted(mk3):
     c = Cl(app)
     c.signup("a@example.org")
     app.state.accounts_config = app.state.accounts_config.model_copy(update={"terms_version": "2099-01"})
-    assert c.get("/lead/api/health").status_code == 200            # reads are not gated
+    # Wave 4 (F-123): reads are gated too, every Lead Studio route included
+    r0 = c.get("/lead/api/health")
+    assert r0.status_code == 403 and r0.json()["detail"] == "terms_reacceptance_required"
     for url, body in (("/lead/api/runs", {"seed_smiles": NITRO}), ("/lead/profiles", {"name": "x"}),
                       ("/lead/library/manual", {"steps": []})):
         r = c.post(url, body)

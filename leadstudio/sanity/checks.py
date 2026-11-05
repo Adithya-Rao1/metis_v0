@@ -5,6 +5,7 @@ binding stage reuses it, so it must not import ``leadstudio.scoring``. ``parent_
 and pattern baselines are "neutral, no motifs"). Reasons are short machine strings; pattern rejections read
 ``bad_pattern:<name>``. Typical cost < 2 ms.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -25,14 +26,17 @@ for _e in yaml.safe_load(PATTERNS_PATH.read_text())["patterns"]:
     _BAD.append((_e["name"], _q))
 
 # neutral zwitterion groups whose charged atoms are accepted (indices of the charged atoms are collected)
-_OK_CHARGED = [Chem.MolFromSmarts(s) for s in (
-    "[N+](=O)[O-]",              # nitro
-    "[#7+][O-]",                 # N-oxide (incl. aromatic)
-    "[S+][O-]",                  # sulfoxide-type
-    "[N-]=[N+]=[N,N-]",          # azide (either resonance form)
-    "[N+]=[N-]",                 # diazo-like azide fragment
-    "[P+][O-]",                  # phosphine oxide / phosphonate drawn charge-separated
-)]
+_OK_CHARGED = [
+    Chem.MolFromSmarts(s)
+    for s in (
+        "[N+](=O)[O-]",  # nitro
+        "[#7+][O-]",  # N-oxide (incl. aromatic)
+        "[S+][O-]",  # sulfoxide-type
+        "[N-]=[N+]=[N,N-]",  # azide (either resonance form)
+        "[N+]=[N-]",  # diazo-like azide fragment
+        "[P+][O-]",  # phosphine oxide / phosphonate drawn charge-separated
+    )
+]
 _AMMONIUM = Chem.MolFromSmarts("[NX4+;!$([N+]~[O-])]")
 _CARBOXYLATE = Chem.MolFromSmarts("[O-][CX3]=O")
 

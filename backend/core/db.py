@@ -19,7 +19,7 @@ from typing import Any
 from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.core.settings import Settings, get_settings
+from backend.core.settings import DbSettings, Settings, get_settings
 
 _CANONICAL_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
@@ -37,7 +37,9 @@ def _discard_all(dbapi_conn: Any, _record: Any) -> None:
         dbapi_conn.autocommit = previous
 
 
-def make_engine(url: str | None = None, settings: Settings | None = None, **kwargs: Any) -> Engine:
+def make_engine(
+    url: str | None = None, settings: Settings | DbSettings | None = None, **kwargs: Any
+) -> Engine:
     settings = settings or get_settings()
     if url is None:
         if settings.database_url is None:

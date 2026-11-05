@@ -1,5 +1,6 @@
 """File-based ModelRegistry (backend.schemas.interfaces.ModelRegistry). Reads ml/registry/manifest.json and the
 git-ignored artifacts dir. Members are hash-verified against the manifest before they are deserialised."""
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,9 @@ class NotTrained(RuntimeError):
     """No trained, published model exists for this endpoint (yet)."""
 
     def __init__(self, endpoint: str):
-        super().__init__(f"no trained model is published for endpoint {endpoint!r}; predictions are unavailable (not trained)")
+        super().__init__(
+            f"no trained model is published for endpoint {endpoint!r}; predictions are unavailable (not trained)"
+        )
         self.endpoint = endpoint
 
 
@@ -75,7 +78,9 @@ class FileModelRegistry:
         if n_compounds < 1:
             raise ValueError("n_compounds must be >= 1")
         rt = self._entry(endpoint)["runtime"]
-        return float(rt["fixed_overhead_seconds"] + n_compounds * rt["seconds_per_compound_by_n"][str(ensemble_n)])
+        return float(
+            rt["fixed_overhead_seconds"] + n_compounds * rt["seconds_per_compound_by_n"][str(ensemble_n)]
+        )
 
     def _bundle(self, endpoint: str):
         e = self._entry(endpoint)
@@ -84,7 +89,9 @@ class FileModelRegistry:
             raise ValueError("manifest model_version_id does not match endpoint/version/weights hash")
         key = (endpoint, e["weights_sha256"], e["bundle_sha256"])
         if key not in self._bundles:
-            self._bundles[key] = load_bundle(self.root / e["bundle_dir"], e["bundle_sha256"], expected_weights_sha256=e["weights_sha256"])
+            self._bundles[key] = load_bundle(
+                self.root / e["bundle_dir"], e["bundle_sha256"], expected_weights_sha256=e["weights_sha256"]
+            )
         return self._bundles[key], vid, e
 
     def predict(self, endpoint: str, canonical_smiles: str, ensemble_n: int) -> PredictionDetail:

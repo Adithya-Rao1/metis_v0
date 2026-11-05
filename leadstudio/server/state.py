@@ -2,6 +2,7 @@
 
 Tests (and `scripts/demo.py`) can pre-build one with `build_state(...)` and assign it to `app.state.lead`.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -35,7 +36,7 @@ _build_lock = threading.Lock()
 @dataclass
 class LeadState:
     settings: Settings
-    engine: Any                    # StageEngine around the real Engine, or None in mock mode
+    engine: Any  # StageEngine around the real Engine, or None in mock mode
     scorer: Any
     svc: stages.Services
     mgr: RunManager
@@ -79,9 +80,14 @@ def _load_presets() -> list[Any]:
         return []
 
 
-def build_state(engine: Any = None, scorer: Any = None, settings: Settings | None = None,
-                services: stages.Services | None = None, pose_client: Any = None,
-                allowed_dock_url: str | None = None) -> LeadState:
+def build_state(
+    engine: Any = None,
+    scorer: Any = None,
+    settings: Settings | None = None,
+    services: stages.Services | None = None,
+    pose_client: Any = None,
+    allowed_dock_url: str | None = None,
+) -> LeadState:
     s = settings or Settings.from_env()
     if s.force_mock:
         engine, scorer = None, None
@@ -108,11 +114,23 @@ def build_state(engine: Any = None, scorer: Any = None, settings: Settings | Non
         **({} if s.force_mock else svc.health()),
     }
     return LeadState(
-        settings=s, engine=engine, scorer=scorer, svc=svc, mgr=RunManager(s, engine, mock_events),
-        poses=PoseManager(svc, allowed_url=allowed_dock_url, poll=_envf("DYNAMICBIND_POLL", 2.0),
-                          timeout=_envf("DYNAMICBIND_TIMEOUT", 900.0)),
-        manual=ManualService(svc, scorer, s), heavy=HeavyGate(s.max_heavy_ops),
-        details=details, components=components, presets=_load_presets())
+        settings=s,
+        engine=engine,
+        scorer=scorer,
+        svc=svc,
+        mgr=RunManager(s, engine, mock_events),
+        poses=PoseManager(
+            svc,
+            allowed_url=allowed_dock_url,
+            poll=_envf("DYNAMICBIND_POLL", 2.0),
+            timeout=_envf("DYNAMICBIND_TIMEOUT", 900.0),
+        ),
+        manual=ManualService(svc, scorer, s),
+        heavy=HeavyGate(s.max_heavy_ops),
+        details=details,
+        components=components,
+        presets=_load_presets(),
+    )
 
 
 def _envf(name: str, default: float) -> float:

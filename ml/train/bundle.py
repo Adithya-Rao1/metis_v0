@@ -1,5 +1,6 @@
 """On-disk model bundle: members/, calibration.json, train_data.json, meta.json. Lives under a git-ignored
 artifacts dir. Nothing here is committed."""
+
 from __future__ import annotations
 
 import hashlib
@@ -129,8 +130,8 @@ class Bundle:
     root: Path
     meta: dict
     pool: EnsemblePool
-    conformal: ConformalByN | None          # regression
-    class_cal: ClassCalibrators | None      # classification
+    conformal: ConformalByN | None  # regression
+    class_cal: ClassCalibrators | None  # classification
     err_models: dict[int, SimilarityErrorModel]  # per N, expected abs error vs similarity (both kinds)
     index: SimilarityIndex
     train_smiles: list[str]
@@ -142,32 +143,50 @@ class Bundle:
 
 
 def save_calibration(root: Path, conformal, class_cal, err_models, extra: dict) -> None:
-    d = {"conformal": conformal.to_dict() if conformal else None,
-         "class_cal": class_cal.to_dict() if class_cal else None,
-         "err_models": {str(N): m.to_dict() for N, m in err_models.items()}, **extra}
+    d = {
+        "conformal": conformal.to_dict() if conformal else None,
+        "class_cal": class_cal.to_dict() if class_cal else None,
+        "err_models": {str(N): m.to_dict() for N, m in err_models.items()},
+        **extra,
+    }
     (root / "calibration.json").write_text(json.dumps(d))
 
 
-def load_bundle(root: Path | str, expected_bundle_sha256: str, expected_weights_sha256: str | None = None) -> Bundle:
+def load_bundle(
+    root: Path | str, expected_bundle_sha256: str, expected_weights_sha256: str | None = None
+) -> Bundle:
     """Loads a bundle. The whole-bundle hash is MANDATORY and verified BEFORE any file is parsed or deserialised
     (sklearn members are joblib files = arbitrary code on load). The expected value must come from an out-of-band
     record (the registry manifest), never be recomputed from the same directory."""
     root = Path(root)
-    if not isinstance(expected_bundle_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_bundle_sha256):
+    if not isinstance(expected_bundle_sha256, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", expected_bundle_sha256
+    ):
         raise ValueError("a verified bundle sha256 is required to load a bundle")
     if bundle_sha256(root) != expected_bundle_sha256:
-        raise ValueError("bundle hash mismatch: refusing to load (a bundle file was added, removed or modified)")
+        raise ValueError(
+            "bundle hash mismatch: refusing to load (a bundle file was added, removed or modified)"
+        )
     meta = json.loads((root / "meta.json").read_text())
     if weights_sha256(root / "members") != meta["weights_sha256"] or (
-            expected_weights_sha256 is not None and weights_sha256(root / "members") != expected_weights_sha256):
+        expected_weights_sha256 is not None and weights_sha256(root / "members") != expected_weights_sha256
+    ):
         raise ValueError("weights hash mismatch: refusing to load members")
     cal = json.loads((root / "calibration.json").read_text())
     td = json.loads((root / "train_data.json").read_text())
     cls = get_member_cls(meta["backend"])
-    pool = EnsemblePool(cls, meta["kind"], meta.get("member_params", {}), meta["n_members"], meta["base_seed"])
+    pool = EnsemblePool(
+        cls, meta["kind"], meta.get("member_params", {}), meta["n_members"], meta["base_seed"]
+    )
     pool.members = [cls.load(root / "members" / f"member_{k:02d}.ckpt") for k in range(meta["n_members"])]
-    return Bundle(root, meta, pool,
-                  ConformalByN.from_dict(cal["conformal"]) if cal["conformal"] else None,
-                  ClassCalibrators.from_dict(cal["class_cal"]) if cal["class_cal"] else None,
-                  {int(N): SimilarityErrorModel.from_dict(v) for N, v in cal["err_models"].items()},
-                  SimilarityIndex(td["smiles"]), td["smiles"], td["y"])
+    return Bundle(
+        root,
+        meta,
+        pool,
+        ConformalByN.from_dict(cal["conformal"]) if cal["conformal"] else None,
+        ClassCalibrators.from_dict(cal["class_cal"]) if cal["class_cal"] else None,
+        {int(N): SimilarityErrorModel.from_dict(v) for N, v in cal["err_models"].items()},
+        SimilarityIndex(td["smiles"]),
+        td["smiles"],
+        td["y"],
+    )

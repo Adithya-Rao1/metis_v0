@@ -1,4 +1,5 @@
 """Stage-1 wiring: the real engine pieces with the BindingScorer, pure GA (policy_guidance forced to 0)."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
@@ -26,8 +27,10 @@ class BindingEngine:
         return self.engine.run(run_id, binding_config(config))
 
 
-def build_binding_engine(backend: BindingBackend | None = None,
-                         target_provider: Callable[[str], object] | None = None) -> BindingEngine:
+def build_binding_engine(
+    backend: BindingBackend | None = None, target_provider: Callable[[str], object] | None = None
+) -> BindingEngine:
     from leadstudio.wiring import build_engine
+
     scorer = BindingScorer(backend or make_backend("plapt"), target_provider)
     return BindingEngine(build_engine(scorer), scorer)

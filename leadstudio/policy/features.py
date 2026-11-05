@@ -6,6 +6,7 @@ get_bond_features), re-implemented here in plain numpy because importing
 studio runtime must not need. Layout is kept identical so the feature semantics
 match the original DQN.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -31,7 +32,9 @@ def atom_features(a: Chem.Atom) -> list:
     f += _oh(str(a.GetHybridization()), ["S", "SP", "SP2", "SP3", "SP3D", "SP3D2", "OutOfRange"])
     f += [float(a.IsInRing()), float(a.GetIsAromatic())]
     f += [(_PT.GetRvdw(a.GetAtomicNum()) - 1.5) / 0.6, (_PT.GetRcovalent(a.GetAtomicNum()) - 0.64) / 0.76]
-    f += _oh(str(a.GetChiralTag()), ["CHI_UNSPECIFIED", "CHI_TETRAHEDRAL_CW", "CHI_TETRAHEDRAL_CCW", "CHI_OTHER"])
+    f += _oh(
+        str(a.GetChiralTag()), ["CHI_UNSPECIFIED", "CHI_TETRAHEDRAL_CW", "CHI_TETRAHEDRAL_CCW", "CHI_OTHER"]
+    )
     f += _oh(int(a.GetTotalNumHs()), [0, 1, 2, 3, 4, "OutOfRange"])
     return f
 

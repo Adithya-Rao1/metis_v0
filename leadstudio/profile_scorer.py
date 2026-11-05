@@ -8,6 +8,7 @@
 Server resolution: `leadstudio.server.routes` loads the caller's own profile row (404 if it is not theirs) and runs
 the scorer wrapped for that run only; the shared engine is never mutated.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -47,10 +48,14 @@ class ProfileScorer:
         n = len(hits)
         desc = res.descriptors.model_copy(update={"alerts": res.descriptors.alerts + n})
         comps = {**res.components, "user_avoid": max(0.0, 1.0 - 0.2 * n)}
-        return res.model_copy(update={
-            "descriptors": desc, "components": comps, "alerts": [*res.alerts, *hits],
-            "composite": max(0.0, res.composite * (USER_PENALTY ** n)),
-        })
+        return res.model_copy(
+            update={
+                "descriptors": desc,
+                "components": comps,
+                "alerts": [*res.alerts, *hits],
+                "composite": max(0.0, res.composite * (USER_PENALTY**n)),
+            }
+        )
 
     def score_many(self, smiles: Sequence[str], config: RunConfig) -> list[ScoreResult]:
         return [self.score(s, config) for s in smiles]

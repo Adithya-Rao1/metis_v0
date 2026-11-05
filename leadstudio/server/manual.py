@@ -6,6 +6,7 @@ Nothing is written to disk and no SMILES are logged. Transitions are exported in
 {parent_smiles, edit_id, site, child_smiles, reward} with chosen_by="user"; `reward` is the change in the RDKit
 composite, not binding.
 """
+
 from __future__ import annotations
 
 import json
@@ -38,10 +39,18 @@ MAX_LOCKED = 60
 
 
 def transition(sess: ManualSession, st: ManualStep) -> dict:
-    return {"parent_smiles": st.parent_smiles, "edit_id": st.edit_id, "site": list(st.site),
-            "child_smiles": st.child_smiles, "reward": st.reward_delta, "chosen_by": "user",
-            "t": round(st.t, 3), "session_id": sess.session_id, "seed_smiles": sess.seed_smiles,
-            "target_id": sess.target_id}
+    return {
+        "parent_smiles": st.parent_smiles,
+        "edit_id": st.edit_id,
+        "site": list(st.site),
+        "child_smiles": st.child_smiles,
+        "reward": st.reward_delta,
+        "chosen_by": "user",
+        "t": round(st.t, 3),
+        "session_id": sess.session_id,
+        "seed_smiles": sess.seed_smiles,
+        "target_id": sess.target_id,
+    }
 
 
 def export_jsonl(sess: ManualSession) -> str:
@@ -103,6 +112,7 @@ class ManualService:
         with self._lock:
             if self._scorer is None:
                 from leadstudio.scoring import RDKitScorer
+
                 self._scorer = RDKitScorer()
             return self._scorer
 
@@ -138,8 +148,15 @@ class ManualService:
             raise HTTPException(422, "too many locked atoms")
         out: list[dict] = []
         for op, site in self.registry().applicable(smiles, lock):
-            out.append({"edit_id": op.id, "name": op.name, "category": op.category, "site": list(site),
-                        "rationale": op.rationale})
+            out.append(
+                {
+                    "edit_id": op.id,
+                    "name": op.name,
+                    "category": op.category,
+                    "site": list(site),
+                    "rationale": op.rationale,
+                }
+            )
             if len(out) >= MAX_APPLICABLE:
                 break
         return out
@@ -170,24 +187,49 @@ class ManualService:
             if bs is not None:
                 try:
                     bcfg = RunConfig(seed_smiles=req.smiles, stage="binding", target_id=req.target_id)
-                    c_score = c_score.model_copy(update={"extras": {**c_score.extras, **bs.score(child, bcfg).extras}})
-                    p_score = p_score.model_copy(update={"extras": {**p_score.extras, **bs.score(req.smiles, bcfg).extras}})
+                    c_score = c_score.model_copy(
+                        update={"extras": {**c_score.extras, **bs.score(child, bcfg).extras}}
+                    )
+                    p_score = p_score.model_copy(
+                        update={"extras": {**p_score.extras, **bs.score(req.smiles, bcfg).extras}}
+                    )
                 except Exception as exc:  # binding is optional decoration on the preview
                     log.warning("binding extras failed: %s", type(exc).__name__)
-        rec = EditRecord(edit_id=op.id, name=op.name, category=op.category, site=list(req.site),
-                         chosen_by="user", parents=[req.smiles])
+        rec = EditRecord(
+            edit_id=op.id,
+            name=op.name,
+            category=op.category,
+            site=list(req.site),
+            chosen_by="user",
+            parents=[req.smiles],
+        )
         expl = self.svc.explainer().explain(req.smiles, child, rec, p_score, c_score, op)
 
         from leadstudio.engine import geometry
+
         try:
             _, pmol = geometry.embed_3d(req.smiles)
             block, cmol = geometry.embed_3d(child, pmol)
             amap = geometry.atom_map(pmol, cmol)
         except ValueError:
-            return ManualPreview(ok=False, child_smiles=child, score=c_score, explanation=expl, sane=sane,
-                                 reason="could not build a 3D structure for the product")
-        return ManualPreview(ok=True, child_smiles=child, molblock=block, atom_map=amap, score=c_score,
-                             explanation=expl, sane=sane, reason=why)
+            return ManualPreview(
+                ok=False,
+                child_smiles=child,
+                score=c_score,
+                explanation=expl,
+                sane=sane,
+                reason="could not build a 3D structure for the product",
+            )
+        return ManualPreview(
+            ok=True,
+            child_smiles=child,
+            molblock=block,
+            atom_map=amap,
+            score=c_score,
+            explanation=expl,
+            sane=sane,
+            reason=why,
+        )
 
     def create_session(self, owner: uuid.UUID, seed_smiles: str, target_id: str | None) -> ManualSession:
         try:
@@ -205,8 +247,12 @@ class ManualService:
         self.check_smiles(step.child_smiles)
         if step.reward_delta is None:  # server-side RDKit composite delta
             sc, cfg = self.rdkit_scorer(), RunConfig(seed_smiles=step.parent_smiles)
-            step = step.model_copy(update={
-                "reward_delta": sc.score(step.child_smiles, cfg).composite - sc.score(step.parent_smiles, cfg).composite})
+            step = step.model_copy(
+                update={
+                    "reward_delta": sc.score(step.child_smiles, cfg).composite
+                    - sc.score(step.parent_smiles, cfg).composite
+                }
+            )
         s = self.sessions.append(session_id, owner, step)
         if s is None:
             raise HTTPException(404, "unknown session")

@@ -7,6 +7,7 @@ the calibration set (scaffold-split, disjoint from training) gives normalised sc
 Tanimoto similarity. Scores use cross-fitted sigma so sigma never sees the point it scores.
 Interval = mean +/- q * sigma(sim), q = finite-sample-corrected (1 - alpha) quantile.
 """
+
 from __future__ import annotations
 
 import math
@@ -32,12 +33,28 @@ def _conformal_q(scores: np.ndarray, alpha: float) -> float:
 class SplitConformal:
     """One calibrated regressor for a fixed N. scaled=False gives plain constant-width split conformal."""
 
-    def __init__(self, q: float, err_model: SimilarityErrorModel | None, alpha: float, n_cal: int, median_width: float):
-        self.q, self.err_model, self.alpha, self.n_cal, self.median_width = q, err_model, alpha, n_cal, median_width
+    def __init__(
+        self, q: float, err_model: SimilarityErrorModel | None, alpha: float, n_cal: int, median_width: float
+    ):
+        self.q, self.err_model, self.alpha, self.n_cal, self.median_width = (
+            q,
+            err_model,
+            alpha,
+            n_cal,
+            median_width,
+        )
 
     @classmethod
-    def fit(cls, pred, y, sim, alpha: float = 1 - TARGET_COVERAGE, scaled: bool = True,
-            n_folds: int = 5, seed: int = 0) -> "SplitConformal":
+    def fit(
+        cls,
+        pred,
+        y,
+        sim,
+        alpha: float = 1 - TARGET_COVERAGE,
+        scaled: bool = True,
+        n_folds: int = 5,
+        seed: int = 0,
+    ) -> "SplitConformal":
         pred, y, sim = (np.asarray(a, float) for a in (pred, y, sim))
         n = len(y)
         if n < 10:
@@ -69,8 +86,13 @@ class SplitConformal:
         return pred - h, pred + h
 
     def to_dict(self) -> dict:
-        return {"q": self.q, "alpha": self.alpha, "n_cal": self.n_cal, "median_width": self.median_width,
-                "err_model": self.err_model.to_dict() if self.err_model else None}
+        return {
+            "q": self.q,
+            "alpha": self.alpha,
+            "n_cal": self.n_cal,
+            "median_width": self.median_width,
+            "err_model": self.err_model.to_dict() if self.err_model else None,
+        }
 
     @classmethod
     def from_dict(cls, d: dict) -> "SplitConformal":
@@ -85,8 +107,16 @@ class ConformalByN:
         self.by_n = by_n
 
     @classmethod
-    def fit(cls, member_preds, y, sim, alpha: float = 1 - TARGET_COVERAGE, ns=N_VALUES, seed: int = 0,
-            scaled: bool = True) -> "ConformalByN":
+    def fit(
+        cls,
+        member_preds,
+        y,
+        sim,
+        alpha: float = 1 - TARGET_COVERAGE,
+        ns=N_VALUES,
+        seed: int = 0,
+        scaled: bool = True,
+    ) -> "ConformalByN":
         member_preds = np.asarray(member_preds, float)  # (M, n_cal)
         out = {}
         for N in ns:
@@ -116,13 +146,25 @@ def coverage_report(y, low, high, sim, edges=SIM_BIN_EDGES) -> dict:
     bins = []
     for lo_e, hi_e in zip(edges[:-1], edges[1:]):
         m = (sim >= lo_e) & (sim < hi_e)
-        bins.append({"sim_low": lo_e, "sim_high": min(hi_e, 1.0), "n": int(m.sum()),
-                     "coverage": float(hit[m].mean()) if m.any() else None,
-                     "mean_width": float((high - low)[m].mean()) if m.any() else None})
-    return {"n": int(len(y)), "coverage": float(hit.mean()), "mean_width": float((high - low).mean()), "by_similarity_bin": bins}
+        bins.append(
+            {
+                "sim_low": lo_e,
+                "sim_high": min(hi_e, 1.0),
+                "n": int(m.sum()),
+                "coverage": float(hit[m].mean()) if m.any() else None,
+                "mean_width": float((high - low)[m].mean()) if m.any() else None,
+            }
+        )
+    return {
+        "n": int(len(y)),
+        "coverage": float(hit.mean()),
+        "mean_width": float((high - low).mean()),
+        "by_similarity_bin": bins,
+    }
 
 
 # ---------------------------------------------------------------- classification
+
 
 def reliability_data(prob, y, n_bins: int = 10) -> dict:
     """Reliability-diagram data: per equal-width bin, count, mean predicted probability, observed fraction positive."""
@@ -131,9 +173,15 @@ def reliability_data(prob, y, n_bins: int = 10) -> dict:
     bins = []
     for b in range(n_bins):
         m = idx == b
-        bins.append({"lo": b / n_bins, "hi": (b + 1) / n_bins, "count": int(m.sum()),
-                     "mean_pred": float(prob[m].mean()) if m.any() else None,
-                     "frac_pos": float(y[m].mean()) if m.any() else None})
+        bins.append(
+            {
+                "lo": b / n_bins,
+                "hi": (b + 1) / n_bins,
+                "count": int(m.sum()),
+                "mean_pred": float(prob[m].mean()) if m.any() else None,
+                "frac_pos": float(y[m].mean()) if m.any() else None,
+            }
+        )
     return {"bins": bins, "ece": ece(prob, y, n_bins), "n": int(len(prob))}
 
 

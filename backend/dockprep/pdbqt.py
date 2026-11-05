@@ -1,26 +1,46 @@
-# ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """PDBQT line formatting and a structural validator (own implementation; no Meeko/AutoDockTools)."""
+
 from __future__ import annotations
 
 
-def pdbqt_atom_line(serial: int, name: str, resname: str, chain: str, resseq: int, xyz: tuple[float, float, float],
-                    charge: float, adtype: str, record: str = "ATOM", occ: float = 1.0, bfac: float = 0.0,
-                    icode: str = "") -> str:
+def pdbqt_atom_line(
+    serial: int,
+    name: str,
+    resname: str,
+    chain: str,
+    resseq: int,
+    xyz: tuple[float, float, float],
+    charge: float,
+    adtype: str,
+    record: str = "ATOM",
+    occ: float = 1.0,
+    bfac: float = 0.0,
+    icode: str = "",
+) -> str:
     nm = name if len(name) >= 4 else " " + name
-    return (f"{record:<6}{serial % 100000:5d} {nm:<4} {resname[:3]:>3} {(chain or ' ')[:1]}{resseq % 10000:4d}"
-            f"{icode[:1] or ' '}   {xyz[0]:8.3f}{xyz[1]:8.3f}{xyz[2]:8.3f}{occ:6.2f}{bfac:6.2f}    "
-            f"{charge:6.3f} {adtype:<2}")
+    return (
+        f"{record:<6}{serial % 100000:5d} {nm:<4} {resname[:3]:>3} {(chain or ' ')[:1]}{resseq % 10000:4d}"
+        f"{icode[:1] or ' '}   {xyz[0]:8.3f}{xyz[1]:8.3f}{xyz[2]:8.3f}{occ:6.2f}{bfac:6.2f}    "
+        f"{charge:6.3f} {adtype:<2}"
+    )
 
 
 def parse_pdbqt_atoms(text: str) -> list[dict]:
     atoms = []
     for ln in text.splitlines():
         if ln.startswith(("ATOM", "HETATM")):
-            atoms.append({
-                "serial": int(ln[6:11]), "name": ln[12:16].strip(), "resname": ln[17:20].strip(),
-                "x": float(ln[30:38]), "y": float(ln[38:46]), "z": float(ln[46:54]),
-                "charge": float(ln[70:76]), "type": ln[77:79].strip(),
-            })
+            atoms.append(
+                {
+                    "serial": int(ln[6:11]),
+                    "name": ln[12:16].strip(),
+                    "resname": ln[17:20].strip(),
+                    "x": float(ln[30:38]),
+                    "y": float(ln[38:46]),
+                    "z": float(ln[46:54]),
+                    "charge": float(ln[70:76]),
+                    "type": ln[77:79].strip(),
+                }
+            )
     return atoms
 
 

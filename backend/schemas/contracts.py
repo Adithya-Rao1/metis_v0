@@ -2,6 +2,7 @@
 
 Spec refs: 3 (10-compound cap), 5 (uncertainty fields), 6.6 (ensemble sizes), 7 (ranking).
 """
+
 from __future__ import annotations
 
 import re
@@ -28,6 +29,7 @@ class Strict(BaseModel):
 
 class UncertaintyBreakdown(Strict):
     """Shares of predicted uncertainty by source; sums to 1 (spec 6.3)."""
+
     ensemble_disagreement: float = Field(ge=0, le=1)
     similarity_to_training: float = Field(ge=0, le=1)
     assay_noise: float = Field(ge=0, le=1)
@@ -43,6 +45,7 @@ class UncertaintyBreakdown(Strict):
 class Prediction(Strict):
     """Every prediction carries value, interval or calibrated probability, method note, N,
     coverage and sample size. No verdict field exists by design (spec 5)."""
+
     endpoint: Endpoint
     kind: Literal["regression", "classification"]
     model_version_id: UUID
@@ -59,7 +62,11 @@ class Prediction(Strict):
     @model_validator(mode="after")
     def _kind_fields(self):
         if self.kind == "regression":
-            if self.interval_low is None or self.interval_high is None or self.interval_low > self.interval_high:
+            if (
+                self.interval_low is None
+                or self.interval_high is None
+                or self.interval_low > self.interval_high
+            ):
                 raise ValueError("regression requires an ordered interval")
             if not self.interval_low <= self.value <= self.interval_high:
                 raise ValueError("value must lie inside its interval")
@@ -129,7 +136,9 @@ class RankingConfig(Strict):
     def _some_weight(self):
         if sum(w.weight for w in self.weights) <= 0:
             raise ValueError("at least one weight must be positive")
-        if len({w.endpoint for w in self.weights}) != len(self.weights) or len({l.endpoint for l in self.limits}) != len(self.limits):
+        if len({w.endpoint for w in self.weights}) != len(self.weights) or len(
+            {l.endpoint for l in self.limits}
+        ) != len(self.limits):
             raise ValueError("duplicate endpoints")
         return self
 

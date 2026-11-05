@@ -3,6 +3,7 @@
 The numbers are whatever they are: nothing here is tuned to make them look good. Small n is flagged in `note`.
 Ties (e.g. UniformPolicy scores everything 0) count as the expected hit under random tie-breaking.
 """
+
 from __future__ import annotations
 
 import time
@@ -55,29 +56,45 @@ def summarise(rows: dict, n_total: int, method: str, n_folds_done: int) -> dict:
             a = arr[f"{key}{k}"]
             out[name][f"top{k}"] = round(float(a.mean()), 4)
             out[name][f"top{k}_ci95"] = _boot(a, None, idx)
-    out["delta_top1"] = {"value": round(float((arr["adapted1"] - arr["base1"]).mean()), 4),
-                         "ci95": _boot(arr["adapted1"] - arr["base1"], None, idx)}
-    out["delta_top3"] = {"value": round(float((arr["adapted3"] - arr["base3"]).mean()), 4),
-                         "ci95": _boot(arr["adapted3"] - arr["base3"], None, idx)}
+    out["delta_top1"] = {
+        "value": round(float((arr["adapted1"] - arr["base1"]).mean()), 4),
+        "ci95": _boot(arr["adapted1"] - arr["base1"], None, idx),
+    }
+    out["delta_top3"] = {
+        "value": round(float((arr["adapted3"] - arr["base3"]).mean()), 4),
+        "ci95": _boot(arr["adapted3"] - arr["base3"], None, idx),
+    }
     out["mean_candidates"] = round(float(np.mean(rows["ncand"])), 1)
     return out
 
 
 def note_for(res: dict, base: BaseInfo) -> str:
-    parts = [f"Evaluated on n={res['n']} held-out edits ({res['method']}); intervals are bootstrap 95% over those edits."]
+    parts = [
+        f"Evaluated on n={res['n']} held-out edits ({res['method']}); intervals are bootstrap 95% over those edits."
+    ]
     if res["n"] < SMALL_N:
         parts.append("Small sample: the intervals are wide and the result is indicative, not conclusive.")
     if res["n_total"] != res["n"]:
         parts.append(f"Only {res['n']} of {res['n_total']} evaluations finished inside the time budget.")
     if base.kind == "uniform_fallback":
-        parts.append("No trained base checkpoint is loaded, so 'base' is the uniform fallback (no preference).")
-    parts.append("Hit rates measure agreement with this user's past choices on this user's data; they are not a claim "
-                 "that the edits are better chemistry.")
+        parts.append(
+            "No trained base checkpoint is loaded, so 'base' is the uniform fallback (no preference)."
+        )
+    parts.append(
+        "Hit rates measure agreement with this user's past choices on this user's data; they are not a claim "
+        "that the edits are better chemistry."
+    )
     return " ".join(parts)
 
 
-def evaluate(examples: Sequence[Example], base: BaseInfo, *, steps: int, deadline: float | None = None,
-             progress: Callable[[float], None] | None = None) -> dict:
+def evaluate(
+    examples: Sequence[Example],
+    base: BaseInfo,
+    *,
+    steps: int,
+    deadline: float | None = None,
+    progress: Callable[[float], None] | None = None,
+) -> dict:
     n = len(examples)
     rows = {k: [] for k in ("base1", "base3", "adapted1", "adapted3", "random1", "random3", "ncand")}
 
