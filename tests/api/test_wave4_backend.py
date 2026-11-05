@@ -261,3 +261,8 @@ def test_get_job_route_still_works_through_the_override(client, loaded):
     jid = client.post(f"/projects/{pid}/predict", json={"endpoints": ["logd"]}, headers=H("a")).json()["job_id"]
     assert client.get(f"/jobs/{jid}", headers=H("a")).status_code == 200
     assert deps.get_queue is not None
+
+
+def test_ligand_depiction_is_also_served_at_the_short_path(client):
+    r = client.post("/dockprep/depiction", json={"smiles": "CCO"}, headers=H("a"))
+    assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg+xml")
