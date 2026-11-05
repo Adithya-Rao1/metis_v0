@@ -109,6 +109,7 @@ body[data-run="1"] #card-target .btn.big{padding:4px 14px}
 .stage-hud.badge.fine{border-color:#6aa5e6} .stage-hud.badge.fine .d{color:#6aa5e6}
 .stage-hud.badge.caution{border-color:#e0a94a} .stage-hud.badge.caution .d{color:#e0a94a}
 .stage-hud.badge.unfav{border-color:#e09a62} .stage-hud.badge.unfav .d{color:#e09a62}
+body:not([data-stage="pose"]) #hud-pose,body:not([data-stage="pose"]) #hud-progress{display:none !important} /* pose metrics belong to the Pose stage only */
 .stage-hud.tiles{right:14px;top:12px;display:grid;grid-template-columns:repeat(3,auto);gap:8px;max-width:min(640px,62%);text-align:left}
 .tile{background:#1b2026;border:1px solid #3a434d;border-radius:4px;padding:8px 12px}
 .tile .k{font-size:12px;color:#a3adb8}

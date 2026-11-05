@@ -354,6 +354,7 @@ export class PoseView {
 
   _finish({ main, ghost, moved, disp, ligModel, ligText, predText, my }) {
     this._posePlaying = false;
+    if (this.run !== my || !this._active) return { result: this.result, ligandBlock: ligText, proteinPdb: predText, moved: moved.slice(0, 5), disp }; // user already left the Pose stage
     this.main = main; this.ghost = ghost; this.moved = moved; this.disp = disp;
     this.pocket.style(main, { dispByResi: this.opts.disp ? disp : null });
     this.pocket.addPocketSurface(main);

@@ -337,3 +337,11 @@ def test_headers_file_has_a_lead_entry_no_looser_than_the_metis_pages():
     for path in ("/lead/", "/lead/index.html", "/lead/js/*", "/lead/css/*"):
         assert h[h.index(path) + 1] == metis, path
     assert "'unsafe-inline'" not in CSP and "'unsafe-eval'" not in CSP and "connect-src 'self'" in CSP
+
+
+def test_pose_metrics_hud_is_only_visible_on_the_pose_stage(lead_page):
+    pg = lead_page()
+    open_lead(pg)
+    for stage, shown in (("binding", False), ("pharmacology", False), ("pose", True)):
+        pg.evaluate("s => { document.body.dataset.stage = s; const h = document.getElementById('hud-pose'); h.hidden = false; h.textContent = 'Pose confidence 0.66' }", stage)
+        assert pg.evaluate("getComputedStyle(document.getElementById('hud-pose')).display !== 'none'") is shown, stage
