@@ -135,7 +135,7 @@ export class PoseView {
     this.pocket.showMain?.();
     this.pocket.fit(700);
     $("hud-pose").hidden = true;
-    this._progress(0, "Requesting pose…");
+    this._progress(0, "Requesting pose… (known drugs are instant; a new molecule needs a live DynamicBind run, about 1-2 min)");
     this._startOrbit(smiles, my);
     let job;
     try {
@@ -188,14 +188,17 @@ export class PoseView {
       const c = centroid(lig.base);
       const t0 = performance.now();
       const startPos = this._startPos();
+      let last = 0;
       const loop = (now) => {
         if (this.orbit !== lig) return;
+        this.orbitRaf = requestAnimationFrame(loop);
+        // Each render draws the whole protein: cap this decorative wait animation at ~8 fps and pause it in a hidden tab.
+        if (document.hidden || now - last < 125) return;
+        last = now;
         const t = (now - t0) / 1000;
         const R = rotAxis([0.3, 0.8, 0.52], t * 0.9);
         setLigandPose(lig, (p) => { const v = mul(R, [p.x - c[0], p.y - c[1], p.z - c[2]]); return [startPos[0] + v[0], startPos[1] + v[1] + Math.sin(t * 1.6) * 0.8, startPos[2] + v[2]]; });
-        this.viewer.rotate(0.15, "y");
         this.viewer.render();
-        this.orbitRaf = requestAnimationFrame(loop);
       };
       this.orbitRaf = requestAnimationFrame(loop);
     } catch (e) { console.warn("orbit preview failed", e); }

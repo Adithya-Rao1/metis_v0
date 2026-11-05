@@ -189,5 +189,9 @@ table.deltas td.d{text-align:right;font-weight:600;font-variant-numeric:tabular-
 /* ------------------------------------------------------------------ Metis integration: Beta label, note, footer */
 .beta-tag{border:1px solid var(--note-line);color:var(--note-line);background:var(--note-bg);border-radius:3px;padding:0 6px;font-size:12px;font-weight:600}
 #back-metis{text-decoration:none;color:var(--fg)}
+.metis-nav{display:flex;gap:12px;font-size:13px}
+.metis-nav a{color:var(--fg);text-decoration:none}
+.metis-nav a:hover{text-decoration:underline}
+@media (max-width:900px){.metis-nav{display:none}}
 .site-foot{border-top:1px solid var(--line);padding:10px 16px;color:var(--muted);font-size:12px}
 .topbar h1.product{margin:0;font-size:inherit;font-weight:inherit}
