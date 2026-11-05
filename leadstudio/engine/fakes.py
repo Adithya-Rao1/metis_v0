@@ -146,17 +146,17 @@ class FakeRegistry:
 # ----------------------------------------------------------------------------- scorer
 def _descriptors(mol: Chem.Mol) -> Descriptors:
     lip = (
-        int(RDDescriptors.MolWt(mol) > 500)
-        + int(Crippen.MolLogP(mol) > 5)
+        int(RDDescriptors.MolWt(mol) > 500)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
+        + int(Crippen.MolLogP(mol) > 5)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         + int(rdMolDescriptors.CalcNumHBD(mol) > 5)
         + int(rdMolDescriptors.CalcNumHBA(mol) > 10)
     )
     return Descriptors(
         qed=QED.qed(mol),
         sa=None,
-        logp=Crippen.MolLogP(mol),
+        logp=Crippen.MolLogP(mol),  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         tpsa=rdMolDescriptors.CalcTPSA(mol),
-        mw=RDDescriptors.MolWt(mol),
+        mw=RDDescriptors.MolWt(mol),  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         hbd=rdMolDescriptors.CalcNumHBD(mol),
         hba=rdMolDescriptors.CalcNumHBA(mol),
         rotb=rdMolDescriptors.CalcNumRotatableBonds(mol),

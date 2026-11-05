@@ -29,7 +29,7 @@ SEEDS = [
 
 def _tpsa(smiles: str) -> float:
     m = Chem.MolFromSmiles(smiles)
-    return Descriptors.TPSA(m) if m else float("-inf")
+    return Descriptors.TPSA(m) if m else float("-inf")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 
 def make_transitions(registry, n: int, chain: int = 4) -> list[dict]:

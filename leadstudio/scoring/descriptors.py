@@ -29,8 +29,8 @@ _SA_FN, SA_SOURCE = _load_sascorer()  # SA_SOURCE reports which scorer/data file
 
 def compute_descriptors(mol: Chem.Mol) -> tuple[Descriptors, list[AlertHit]]:
     alerts = find_alerts(mol)
-    mw = D.MolWt(mol)
-    logp = Crippen.MolLogP(mol)
+    mw = D.MolWt(mol)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
+    logp = Crippen.MolLogP(mol)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
     hbd = rdMolDescriptors.CalcNumHBD(mol)
     hba = rdMolDescriptors.CalcNumHBA(mol)
     lip = int(mw > 500) + int(logp > 5) + int(hbd > 5) + int(hba > 10)

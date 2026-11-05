@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import numpy as np
 import torch
@@ -49,7 +50,7 @@ def summarise(rows: dict, n_total: int, method: str, n_folds_done: int) -> dict:
     n = len(rows["base1"])
     arr = {k: np.array(v, dtype=float) for k, v in rows.items()}
     idx = np.random.default_rng(SEED).integers(0, n, size=(N_BOOT, n))
-    out = {"method": method, "n": n, "n_total": n_total}
+    out: dict[str, Any] = {"method": method, "n": n, "n_total": n_total}
     for name, key in (("base", "base"), ("adapted", "adapted"), ("random", "random")):
         out[name] = {}
         for k in (1, 3):
@@ -96,7 +97,9 @@ def evaluate(
     progress: Callable[[float], None] | None = None,
 ) -> dict:
     n = len(examples)
-    rows = {k: [] for k in ("base1", "base3", "adapted1", "adapted3", "random1", "random3", "ncand")}
+    rows: dict[str, list[float]] = {
+        k: [] for k in ("base1", "base3", "adapted1", "adapted3", "random1", "random3", "ncand")
+    }
 
     def record(ex: Example, adapted):
         b, a = scores_for(base.eval_policy, ex), scores_for(adapted, ex)

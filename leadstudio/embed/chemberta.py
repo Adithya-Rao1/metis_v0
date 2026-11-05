@@ -38,7 +38,7 @@ class ChemBERTaEmbedder:
 
     def __init__(self, checkpoints=CHECKPOINTS) -> None:
         """Loads the model eagerly; raises ChemBERTaUnavailable if no checkpoint loads."""
-        RDLogger.DisableLog("rdApp.*")
+        RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         try:
             import torch
             from transformers import AutoModel, AutoTokenizer

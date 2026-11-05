@@ -25,6 +25,7 @@ import os
 import random
 from collections import deque
 from collections.abc import Sequence
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -67,6 +68,8 @@ class QNet(nn.Module):
 
 
 class DQNPolicy:
+    adapter_info: dict[str, Any] | None = None  # set by leadstudio.adapt.policy_factory
+
     def __init__(
         self,
         op_ids: Sequence[str],

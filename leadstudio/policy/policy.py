@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from leadstudio.policy.dqn import DQNPolicy
 
 CKPT_DIR = os.path.join(os.path.dirname(__file__), "checkpoints")
 DEFAULT_CKPT = os.path.join(CKPT_DIR, "policy.pt")
@@ -18,6 +22,10 @@ DEFAULT_CKPT = os.path.join(CKPT_DIR, "policy.pt")
 class UniformPolicy:
     """Always-available fallback: every candidate equally preferred."""
 
+    adapter_info: dict[str, Any] | None = (
+        None  # set by leadstudio.adapt.policy_factory when an adapter was asked for
+    )
+
     def rank(self, smiles: str, candidates: Sequence[tuple]) -> list[float]:
         return [0.0] * len(candidates)
 
@@ -25,7 +33,7 @@ class UniformPolicy:
         return None
 
 
-def load_policy(op_ids: Sequence[str], checkpoint: str = "auto") -> object:
+def load_policy(op_ids: Sequence[str], checkpoint: str = "auto") -> UniformPolicy | DQNPolicy:
     """DQNPolicy if torch + a checkpoint are usable, else UniformPolicy."""
     path = DEFAULT_CKPT if checkpoint == "auto" else checkpoint
     if not path or not os.path.exists(path):

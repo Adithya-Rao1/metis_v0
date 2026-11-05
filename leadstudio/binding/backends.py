@@ -13,11 +13,11 @@ import threading
 from collections import OrderedDict
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from rdkit import Chem, RDLogger
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 log = logging.getLogger("leadstudio.binding")
 
 UNIT = "neg_log10_affinity_M"  # pKd-like
@@ -42,7 +42,11 @@ def seq_hash(sequence: str) -> str:
 
 @runtime_checkable
 class BindingBackend(Protocol):
-    name: str  # recorded in cache keys and shown in the UI
+    @property
+    def name(self) -> str:
+        """Recorded in cache keys and shown in the UI."""
+        ...
+
     unit: str
 
     def predict(self, sequence: str, smiles_list: Sequence[str]) -> list[float]:
@@ -90,8 +94,10 @@ class PlaptBackend:
     def __init__(self, embedding_cache_dir: str | None = None, device: str = "cuda"):
         self._dir = embedding_cache_dir or str(cache_dir() / "plapt_embeddings")
         self._device = device
-        self._plapt = None
-        self._prot: dict[str, object] = {}
+        self._plapt: Any = (
+            None  # the Plapt model once loaded (its class lives in the external binding_module)
+        )
+        self._prot: dict[str, Any] = {}
         self._lock = threading.Lock()
         self.name = "PLAPT(prot_bert+ChemBERTa+onnx)"
 

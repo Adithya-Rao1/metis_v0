@@ -11,7 +11,7 @@ from rdkit import Chem, RDLogger
 from leadstudio.schema import AlertHit, Descriptors, ObjectiveSpec, RunConfig, ScoreResult
 from leadstudio.scoring.descriptors import LRU, compute_descriptors
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 # Drug-like defaults used when config.objectives is empty.
 DEFAULT_OBJECTIVES: dict[str, ObjectiveSpec] = {
@@ -60,16 +60,18 @@ def desirability(name: str, value: float, spec: ObjectiveSpec) -> float:
         if high is not None and value > high:
             return math.exp(-0.5 * ((value - high) / scale) ** 2)
         return 1.0
-    if low is None and high is None:
-        low, high = 0.0, scale
-    elif low is None:
-        low = high - scale
-    elif high is None:
-        high = low + scale
-    if high <= low:
-        high = low + scale
-    mid = 0.5 * (low + high)
-    k = 4.0 / (high - low)  # sigmoid(2) ~ 0.88 at the far bound
+    if low is not None and high is not None:
+        lo, hi = low, high
+    elif high is not None:  # no lower bound
+        lo, hi = high - scale, high
+    elif low is not None:  # no upper bound
+        lo, hi = low, low + scale
+    else:
+        lo, hi = 0.0, scale
+    if hi <= lo:
+        hi = lo + scale
+    mid = 0.5 * (lo + hi)
+    k = 4.0 / (hi - lo)  # sigmoid(2) ~ 0.88 at the far bound
     z = k * (value - mid)
     return _sigmoid(z) if spec.direction == "maximize" else _sigmoid(-z)
 

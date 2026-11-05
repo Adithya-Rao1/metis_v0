@@ -14,7 +14,7 @@ from pathlib import Path
 import yaml
 from rdkit import Chem, RDLogger
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 PATTERNS_PATH = Path(__file__).with_name("patterns.yaml")
 

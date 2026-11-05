@@ -10,15 +10,23 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from sqlalchemy import CursorResult
 
 MAX_RUNS = 200
 MAX_MANUAL = 100
 MAX_PROFILES = 20
 LIST_LIMIT = 500
+
+
+def _removed(result: Any) -> bool:
+    """Whether a DELETE statement's result says it removed a row (the stubs type `execute` as a generic Result)."""
+    return cast("CursorResult[Any]", result).rowcount > 0
 
 
 def lock_owner(s: Session, uid: uuid.UUID, kind: str) -> None:
@@ -99,11 +107,8 @@ def get_run(s: Session, uid: uuid.UUID, rid: uuid.UUID) -> dict[str, Any] | None
 
 
 def delete_run(s: Session, uid: uuid.UUID, rid: uuid.UUID) -> bool:
-    return (
-        s.execute(
-            text("DELETE FROM lead_saved_run WHERE id = :i AND owner_id = :u"), {"i": rid, "u": uid}
-        ).rowcount
-        > 0
+    return _removed(
+        s.execute(text("DELETE FROM lead_saved_run WHERE id = :i AND owner_id = :u"), {"i": rid, "u": uid})
     )
 
 
@@ -200,11 +205,10 @@ def get_manual(s: Session, uid: uuid.UUID, sid: uuid.UUID) -> dict[str, Any] | N
 
 
 def delete_manual(s: Session, uid: uuid.UUID, sid: uuid.UUID) -> bool:
-    return (
+    return _removed(
         s.execute(
             text("DELETE FROM lead_manual_session WHERE id = :i AND owner_id = :u"), {"i": sid, "u": uid}
-        ).rowcount
-        > 0
+        )
     )
 
 
@@ -274,9 +278,6 @@ def update_profile(
 
 
 def delete_profile(s: Session, uid: uuid.UUID, pid: uuid.UUID) -> bool:
-    return (
-        s.execute(
-            text("DELETE FROM lead_profile WHERE id = :i AND owner_id = :u"), {"i": pid, "u": uid}
-        ).rowcount
-        > 0
+    return _removed(
+        s.execute(text("DELETE FROM lead_profile WHERE id = :i AND owner_id = :u"), {"i": pid, "u": uid})
     )

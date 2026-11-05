@@ -26,7 +26,7 @@ from leadstudio.molmods.functional_group_optimization import (
     ModifyFunctionalGroup,
 )
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 # The wrapped edit classes log f-strings that can contain SMILES. Policy: structures are never logged, so they get a
 # logger that is never enabled (not registered with the logging tree, level above CRITICAL).
@@ -106,7 +106,7 @@ class _BaseOp:
 
     def __init__(self, id: str, name: str, category: str, tags: Sequence[str] = (), rationale: str = ""):
         self.id, self.name, self.category = id, name, category
-        self.tags = list(tags)
+        self.tags: Sequence[str] = list(tags)
         self.rationale = rationale
         self.rationale_reviewed = False
         self.demo_safe = True  # overwritten from demo_safe.yaml by the registry

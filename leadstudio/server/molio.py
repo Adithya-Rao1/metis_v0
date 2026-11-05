@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from rdkit import Chem, RDLogger
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 MAX_HEAVY_ATOMS = 60
 MAX_SMILES_CHARS = 2000

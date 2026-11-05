@@ -83,7 +83,7 @@ def test_ci_and_makefile_run_same_scope():
     ):
         assert cmd in ci and cmd in mk, cmd
     assert "mypy" in ci and "mypy" in mk
-    assert 'files = ["backend", "ml"]' in (ROOT / "pyproject.toml").read_text()
+    assert 'files = ["backend", "ml", "leadstudio"]' in (ROOT / "pyproject.toml").read_text()  # mypy scope
 
 
 def test_numpy_pinned_everywhere():

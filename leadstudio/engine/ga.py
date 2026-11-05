@@ -19,6 +19,7 @@ import math
 import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import Any, Literal
 
 from deap import base
 from rdkit import Chem, DataStructs
@@ -54,6 +55,21 @@ class Individual:
     def set_score(self, score: ScoreResult) -> None:
         self.score = score
         self.fitness.values = (score.composite,)
+
+
+def evolved(ind: Individual) -> tuple[Individual, EditRecord, str]:
+    """(parent, edit, candidate id) of an individual the GA produced. The seed has none of them: asking for them is a
+    programming error, not a data condition, so it raises instead of returning None."""
+    if ind.parent is None or ind.edit is None or ind.cid is None:
+        raise ValueError("individual was not produced by an edit")
+    return ind.parent, ind.edit, ind.cid
+
+
+def scored(ind: Individual) -> ScoreResult:
+    """The individual's score; every individual the engine handles has been scored."""
+    if ind.score is None:
+        raise ValueError("individual has no score")
+    return ind.score
 
 
 @dataclass
@@ -109,6 +125,10 @@ class Locks:
         mapped = tuple(amap[i] for i in parent.locked)
         child = Chem.MolFromSmiles(child_smiles)
         want = set(mapped)
+        if (
+            child is None or self._patt is None
+        ):  # unreachable: the child is valid and a pattern exists when active
+            return None
         res = match_under_limit(child, self._patt, seconds=1.0, max_matches=2000, uniquify=False)
         for found in res.matches:
             if set(found) == want:
@@ -180,12 +200,13 @@ class Operators:
         cands = self._candidates(ind)
         if not cands:
             return None
-        chosen_by, probs = "random", None
+        chosen_by: Literal["random", "policy"] = "random"
+        probs = None
         if self.rng.random() < self.config.policy_guidance:
             probs = self._policy_probs(ind, cands)
             if probs:
                 chosen_by = "policy"
-        idx = self._sample(probs) if chosen_by == "policy" else self.rng.randrange(len(cands))
+        idx = self._sample(probs) if probs and chosen_by == "policy" else self.rng.randrange(len(cands))
         op, site = cands[idx]
         products = op.apply(ind.smiles, site)
         valid = [s for s in (canonical_valid(p) for p in products) if s and s != ind.smiles]
@@ -286,7 +307,7 @@ class Niching:
         ranked = sorted(pool, key=lambda i: (-i.composite, i.smiles))
         kept: list[Individual] = []
         deferred: list[Individual] = []
-        kept_fps = []
+        kept_fps: list[Any] = []  # RDKit fingerprints
         for ind in ranked:
             if len(kept) >= size:
                 break

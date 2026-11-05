@@ -99,7 +99,7 @@ def validate_dock_url(url: str | None, allowed: str | None = None) -> str:
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *a, **k):  # type: ignore[override]
+    def redirect_request(self, *a, **k):
         return None
 
 

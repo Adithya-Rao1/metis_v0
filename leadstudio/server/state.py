@@ -12,7 +12,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Request
 
@@ -49,7 +49,7 @@ class LeadState:
     presets: list[Any]
 
     @property
-    def source(self) -> str:
+    def source(self) -> Literal["live", "mock"]:
         return "live" if self.engine is not None else "mock"
 
     def shutdown(self) -> None:

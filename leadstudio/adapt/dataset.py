@@ -14,7 +14,7 @@ from typing import Any
 
 from rdkit import Chem, RDLogger
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 MIN_VALID_STEPS = 5
 MAX_TRANSITIONS = 2000

@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Callable, Sequence
+from typing import Any
 
 from rdkit import Chem, DataStructs, RDLogger
 from rdkit.Chem import AllChem
@@ -19,12 +20,13 @@ from leadstudio.binding.backends import BindingBackend, canon
 from leadstudio.schema import RunConfig, ScoreResult
 from leadstudio.scoring import RDKitScorer
 
-RDLogger.DisableLog("rdApp.*")
+RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 BINDING_SCALE = 0.75  # pKd units over which desirability goes 0.5 -> 0.73 (one scale above the seed)
 DEFAULT_MW_HEADROOM = 120.0
 NEW_ALERT_FACTOR = 0.5
 
+_check_child: Callable[[str | None, str], tuple[bool, str]] | None
 try:  # sanity module lives on another branch; fall back to a small local check, labelled as such
     from leadstudio.sanity.checks import check_child as _check_child
 
@@ -55,7 +57,7 @@ def sanity(parent: str, child: str) -> tuple[bool, str]:
 
 
 def morgan_fp(smiles: str):
-    return AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smiles), 2, 2048)
+    return AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smiles), 2, 2048)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
 
 
 def tanimoto(a: str, b: str) -> float:
@@ -78,7 +80,8 @@ class BindingScorer:
     def __init__(
         self,
         backend: BindingBackend,
-        target_provider: Callable[[str], object] | None = None,
+        target_provider: Callable[[str], Any]
+        | None = None,  # returns a TargetInfo-like object (has .sequence),
         base: RDKitScorer | None = None,
     ):
         self.backend = backend

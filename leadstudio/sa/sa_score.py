@@ -52,10 +52,11 @@ class SyntheticAccessibility:
 
         score1 = 0.0
         nf = 0
+        fscores = _fscores if _fscores is not None else {}  # loaded above
         for bitId, v in fps.items():
             nf += v
             sfp = bitId
-            score1 += _fscores.get(sfp, -4) * v
+            score1 += fscores.get(sfp, -4) * v
         score1 /= nf
 
         # features score

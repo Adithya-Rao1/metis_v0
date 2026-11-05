@@ -39,8 +39,8 @@ def match(
         return True
 
     params = Chem.SubstructMatchParameters()
-    params.maxMatches = max_matches
-    params.uniquify = uniquify
+    params.maxMatches = max_matches  # type: ignore[assignment]  # rdkit stubs type this attribute wrongly
+    params.uniquify = uniquify  # type: ignore[assignment]  # rdkit stubs type this attribute wrongly
     params.setExtraAtomCheckFunc(_check)
     found = mol.GetSubstructMatches(query, params)
     return MatchResult(tuple(found), state["expired"])

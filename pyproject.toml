@@ -79,12 +79,19 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["backend", "ml"]
+files = ["backend", "ml", "leadstudio"]
 ignore_missing_imports = true
 warn_unused_ignores = true
 check_untyped_defs = true
 no_implicit_optional = true
 # Narrow per-module overrides below: modules owned by other agents with pre-existing findings (F-110).
+
+# leadstudio.molmods is the vendored edit-search research code (37 findings: Optional values passed as str/Mol, an int
+# passed where a tuple is expected, tuple unpacking of mixed-shape returns). Typing it means changing behaviour of code
+# the registry wraps and the tests only cover through the registry, so it is excluded until it is reworked (BACKLOG).
+[[tool.mypy.overrides]]
+module = "leadstudio.molmods.*"
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "backend.accounts.hardening"

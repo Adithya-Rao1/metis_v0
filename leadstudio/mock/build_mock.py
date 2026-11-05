@@ -21,6 +21,7 @@ from leadstudio.schema import (
     AtomContributions,
     Candidate,
     Descriptors,
+    EditCategory,
     EditRecord,
     Explanation,
     GenerationPayload,
@@ -36,7 +37,7 @@ RUN_ID = "mock-run-1"
 SEED = "CCOC(=O)c1ccc(cc1)[N+](=O)[O-]"  # ethyl 4-nitrobenzoate: a nitro alert + a labile ester
 
 # (smiles, edit_id, name, category, rationale)
-PATH = [
+PATH: list[tuple[str, str, str, EditCategory, str]] = [
     (
         "CCOC(=O)c1ccc(cc1)C#N",
         "nitro_to_nitrile",
@@ -76,17 +77,17 @@ def _alerts(m):
 
 def _desc(m, alerts) -> Descriptors:
     lip = (
-        int(D.MolWt(m) > 500)
-        + int(Crippen.MolLogP(m) > 5)
+        int(D.MolWt(m) > 500)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
+        + int(Crippen.MolLogP(m) > 5)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         + int(rdMolDescriptors.CalcNumHBD(m) > 5)
         + int(rdMolDescriptors.CalcNumHBA(m) > 10)
     )
     return Descriptors(
         qed=QED.qed(m),
         sa=None,
-        logp=Crippen.MolLogP(m),
+        logp=Crippen.MolLogP(m),  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         tpsa=rdMolDescriptors.CalcTPSA(m),
-        mw=D.MolWt(m),
+        mw=D.MolWt(m),  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         hbd=rdMolDescriptors.CalcNumHBD(m),
         hba=rdMolDescriptors.CalcNumHBA(m),
         rotb=rdMolDescriptors.CalcNumRotatableBonds(m),
@@ -112,15 +113,15 @@ def score(smiles: str) -> ScoreResult:
 
 def molblock_3d(smiles: str, ref=None) -> tuple[str, Chem.Mol]:
     m = Chem.AddHs(Chem.MolFromSmiles(smiles))
-    AllChem.EmbedMolecule(m, randomSeed=7)
-    AllChem.MMFFOptimizeMolecule(m)
+    AllChem.EmbedMolecule(m, randomSeed=7)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
+    AllChem.MMFFOptimizeMolecule(m)  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
     m = Chem.RemoveHs(m)
     if ref is not None:  # rigid-align on the MCS so the morph is smooth
         mcs = rdFMCS.FindMCS([ref, m], timeout=2)
         patt = Chem.MolFromSmarts(mcs.smartsString)
         a, b = ref.GetSubstructMatch(patt), m.GetSubstructMatch(patt)
         if a and b:
-            AllChem.AlignMol(m, ref, atomMap=list(zip(b, a)))
+            AllChem.AlignMol(m, ref, atomMap=list(zip(b, a)))  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
     return Chem.MolToMolBlock(m), m
 
 
@@ -136,7 +137,7 @@ def contributions(m) -> AtomContributions:
         crippen_logp=[c[0] for c in rdMolDescriptors._CalcCrippenContribs(m)],
         tpsa=list(rdMolDescriptors._CalcTPSAContribs(m)),
         gasteiger=[
-            (AllChem.ComputeGasteigerCharges(m) or 0) or float(a.GetProp("_GasteigerCharge"))
+            (AllChem.ComputeGasteigerCharges(m) or 0) or float(a.GetProp("_GasteigerCharge"))  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
             for a in m.GetAtoms()
         ],
     )

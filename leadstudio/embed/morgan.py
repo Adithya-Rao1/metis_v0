@@ -118,14 +118,14 @@ def _map(
     if anchor_c:  # anchor sits at the origin so "distance from seed" reads off the map
         off = pos[anchor_c]
         pos = {k: v - off for k, v in pos.items()}
-    return [tuple(float(t) for t in pos[c]) if c is not None else (0.0, 0.0) for c in canon_list]
+    return [(float(pos[c][0]), float(pos[c][1])) if c is not None else (0.0, 0.0) for c in canon_list]
 
 
 class MorganEmbedder:
     method = "morgan_pca"
 
     def __init__(self) -> None:
-        RDLogger.DisableLog("rdApp.*")
+        RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
         self._proj = StableProjector()
 
     def features(self, keys: Sequence[str]) -> dict[str, np.ndarray]:
