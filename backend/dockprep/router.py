@@ -185,6 +185,7 @@ def _depict_svg(smiles: str) -> str:
     return str(out["svg"])
 
 
+@router.post("/depiction")
 @router.post("/ligands/depiction")
 async def post_ligand_depiction(request: Request, user=Depends(current_user)):
     """SVG of the ligand SMILES the user typed (stateless; the SMILES travels in the body, never in a URL or a log)."""
