@@ -11,9 +11,11 @@ CSRF double-submit and the current terms version on every mutation). Anonymous -
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import logging
 import secrets
+import threading
 import time
 import uuid
 from typing import Any, Literal
@@ -26,6 +28,8 @@ from sqlalchemy.orm import Session
 from backend.accounts import security
 from backend.accounts.deps import rate_limit
 from backend.jobs.deps import Scope, current_user, not_found, scope
+from leadstudio.adapt.dataset import MAX_TRANSITIONS, MIN_VALID_STEPS
+from leadstudio.adapt.jobs import QueueFull
 from leadstudio.profiles import MAX_SMARTS, ProfileBody, check_smarts
 from leadstudio.schema import (
     SCHEMA_VERSION,
@@ -308,6 +312,74 @@ def export(session_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user
                     headers={"Content-Disposition": 'attachment; filename="manual_session.jsonl"'})
 
 
+# ================================================================================================= adapt
+# "Adapt to my edits": fine-tunes a small policy on the caller's own logged manual edits. Needs the optional torch
+# dependency; without it (or in mock mode) job creation answers 503. Jobs are owner-scoped, one active per user.
+_adapt_lock = threading.Lock()
+
+
+class AdaptJobIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    transitions: list[dict[str, Any]] | None = Field(default=None, max_length=MAX_TRANSITIONS)
+    manual_session_id: uuid.UUID | None = None  # a session saved in the caller's library
+
+
+def _adapt_manager(request: Request) -> Any:
+    st = request.app.state
+    mgr = getattr(st, "lead_adapt", None)
+    if mgr is None:
+        with _adapt_lock:
+            mgr = getattr(st, "lead_adapt", None)
+            if mgr is None:
+                from leadstudio.adapt.jobs import JobManager
+
+                def runner(transitions: Any, owner: str, progress: Any = None) -> dict:
+                    from leadstudio.adapt import pipeline
+                    from leadstudio.registry import get_registry
+                    return pipeline.run(transitions, owner, registry=get_registry(), progress=progress)
+
+                mgr = st.lead_adapt = JobManager(runner)
+    return mgr
+
+
+@api.post("/adapt/jobs", status_code=202)
+def create_adapt_job(body: AdaptJobIn, request: Request, sc: Scope = Depends(scope),
+                     st: LeadState = Depends(get_state)) -> dict:
+    throttle(sc, "adapt", 5)
+    if (body.transitions is None) == (body.manual_session_id is None):
+        raise HTTPException(422, "Send exactly one of transitions or manual_session_id")
+    if st.source != "live" or importlib.util.find_spec("torch") is None:
+        raise Rejected(503, "Policy adaptation is not available on this server")
+    if body.manual_session_id is not None:
+        with sc.session() as s:
+            m = store.get_manual(s, sc.user.id, body.manual_session_id)
+        if m is None:
+            raise not_found()
+        trans = [{"parent_smiles": x["parent_smiles"], "edit_id": x["edit_id"], "site": list(x["site"] or []),
+                  "child_smiles": x["child_smiles"], "reward": float(x["reward_delta"] or 0.0)} for x in m["steps"]]
+    else:
+        trans = body.transitions or []
+    if len(trans) < MIN_VALID_STEPS:
+        raise HTTPException(422, f"Need at least {MIN_VALID_STEPS} logged edits to adapt")
+    mgr = _adapt_manager(request)
+    owner = str(sc.user.id)
+    if any(j["owner"] == owner and j["status"] in ("queued", "running") for j in list(mgr.jobs.values())):
+        raise Rejected(429, "You already have an adaptation in progress", 30)
+    try:
+        return {"job_id": mgr.submit(owner, trans), "source": st.source}
+    except QueueFull as exc:
+        raise Rejected(429, str(exc), 30) from None
+
+
+@api.get("/adapt/jobs/{job_id}")
+def get_adapt_job(request: Request, job_id: str = Path(pattern=ID_PATTERN), user=Depends(current_user),
+                  st: LeadState = Depends(get_state)) -> dict:
+    j = _adapt_manager(request).get(job_id, str(user.id))
+    if j is None:
+        raise HTTPException(404, "unknown job")
+    return {**j, "source": st.source}
+
+
 # ================================================================================================= library
 def _cap(n: int, limit: int, what: str) -> None:
     if n >= limit:
@@ -491,10 +563,12 @@ class SmartsCheck(BaseModel):
 
 
 @profiles.post("/check-smarts")
-def check_smarts_route(body: SmartsCheck, sc: Scope = Depends(scope)) -> dict:
-    """Live validation for the editor: [{ok, error}] per pattern. Stores nothing."""
+def check_smarts_route(body: SmartsCheck, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> dict:
+    """Live validation for the editor: [{ok, error}] per pattern. Stores nothing. At most MAX_SMARTS patterns of
+    MAX_SMARTS_LEN characters each, parsed under the process-wide heavy-operation gate (busy -> 429)."""
     throttle(sc, "smarts", 120)
-    return {"results": [{"ok": (e := check_smarts(p)) is None, "error": e} for p in body.patterns]}
+    with st.heavy:
+        return {"results": [{"ok": (e := check_smarts(p)) is None, "error": e} for p in body.patterns]}
 
 
 @profiles.get("")

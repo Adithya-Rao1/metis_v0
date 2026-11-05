@@ -210,7 +210,7 @@ class Operators:
                 try:
                     Chem.SanitizeMol(m)
                     raw.append(Chem.MolToSmiles(m))
-                except Exception:  # noqa: S112  # nosec B112 - an unsanitizable product is simply not a candidate
+                except Exception:  # noqa: S112  # nosec B112
                     continue
         except Exception:
             return None

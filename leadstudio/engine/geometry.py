@@ -36,7 +36,7 @@ def embed_raw(smiles: str, seed: int = EMBED_SEED) -> Chem.Mol | None:
             AllChem.MMFFOptimizeMolecule(mh, maxIters=200)
         else:
             AllChem.UFFOptimizeMolecule(mh, maxIters=200)
-    except Exception:  # noqa: S110  # nosec B110 - optimization is a refinement; ETKDG coordinates are already usable
+    except Exception:  # noqa: S110  # nosec B110
         pass
     return Chem.RemoveHs(mh)
 
