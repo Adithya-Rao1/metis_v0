@@ -40,11 +40,12 @@ async function parse(resp) {
   return null;
 }
 
+// `base` (default "/api") lets a sibling app on the same origin, Lead Studio under "/lead", reuse this client (CSRF, retry, errors).
 // api("POST", "/projects", { json: {...} }) -> parsed JSON. { blob: true } returns the response body as a Blob
 // (downloads); { text: true } returns text. Throws ApiError for every non-2xx answer.
 export async function api(method, path, opts = {}) {
-  const { json, query, blob, text, retry = true } = opts;
-  let url = `${API_BASE}${path}`;
+  const { json, query, blob, text, retry = true, base = API_BASE } = opts;
+  let url = `${base}${path}`;
   if (query) {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) if (v != null) q.set(k, String(v));
@@ -137,14 +138,21 @@ export function formatWait(seconds) {
 }
 
 // Where an unauthenticated visitor goes. Only same-site page names are ever allowed as `next`.
-const NEXT_OK = /^[a-z_]+\.html(\?[A-Za-z0-9=&_.-]*)?$/;
+const NEXT_OK = /^(lead\/)?[a-z_]+\.html(\?[A-Za-z0-9=&_.-]*)?$/;
 export function safeNext(v) { return v && NEXT_OK.test(v) ? v : "app.html"; }
 
-export function redirectToSignIn(reason) {
-  const here = location.pathname.split("/").pop() + location.search;
-  const q = new URLSearchParams({ next: safeNext(here) });
+// Pages under /lead/ (Lead Studio) live one level down: `next` is "lead/index.html" and auth.html is "../auth.html".
+const inLead = () => /\/lead\/[^/]*$/.test(location.pathname);
+function signInUrl(next, reason) {
+  const q = new URLSearchParams({ next });
   if (reason) q.set("why", reason);
-  location.replace(`auth.html?${q}`);
+  return `${inLead() ? "../" : ""}auth.html?${q}`;
+}
+
+export function redirectToSignIn(reason) {
+  const file = location.pathname.split("/").pop();
+  const here = (inLead() ? `lead/${file || "index.html"}` : file) + location.search;
+  location.replace(signInUrl(safeNext(here), reason));
 }
 
 // Call on every signed-in screen. Resolves with the user, or redirects (and never resolves) when signed out.

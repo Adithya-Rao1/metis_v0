@@ -5,7 +5,7 @@
 # 3.18.0) gets its own policy because its React UI sets inline style attributes; it is loaded only in a same-origin iframe
 # and cannot reach the API with credentials beyond what any same-origin page can (it makes no network requests).
 # 3Dmol.js (vendor/) contains one eval( call site and creates blob workers; see README.md before tightening script-src further.
-# connect-src 'self' covers the API: it is served on the same origin under /api (see docs/WEB_WIRING.md).
+# connect-src 'self' covers the API: it is served on the same origin under /api.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
@@ -45,6 +45,18 @@
 /fonts/*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 /fixtures/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+
+# Lead Studio (Beta) under /lead/. Same strict policy as the Metis pages, nothing looser: its API (/lead/api, /lead/library,
+# /lead/profiles) and the run event stream (EventSource) are same-origin, so connect-src 'self' covers them; 3Dmol's blob workers need worker-src blob:.
+# No inline script or style anywhere in /lead/: markup that needs a computed style carries data-style="..." which js/dynstyle.js applies through the CSSOM.
+/lead/
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+/lead/index.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+/lead/js/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+/lead/css/*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
 
 /vendor/ketcher/*

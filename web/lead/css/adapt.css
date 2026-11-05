@@ -1,0 +1,23 @@
+/* Adapt-to-my-edits panel (self-injected by js/adapt/adapt.js). Metis v1 tokens; series colours for the three bars, direct labels. */
+.adapt-panel{margin:12px 0 0;padding:12px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--fg);font:14px/1.45 var(--sans)}
+.adapt-panel h4{margin:0 0 4px;font-size:15px;font-weight:600;color:var(--fg)}
+.adapt-panel .adapt-sub{color:var(--muted);margin:0 0 10px}
+.adapt-btn{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);border-radius:4px;padding:5px 12px;font:inherit;cursor:pointer;min-height:30px}
+.adapt-btn:disabled{background:var(--soft);border-color:var(--line);color:var(--muted);cursor:not-allowed}
+.adapt-btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.adapt-bar{height:6px;border-radius:2px;background:var(--soft);border:1px solid var(--line);overflow:hidden;margin:10px 0 4px}
+.adapt-bar>i{display:block;height:100%;width:0;background:var(--accent)}
+.adapt-err{color:var(--err);margin-top:8px}
+.adapt-chart{margin:12px 0 6px}
+.adapt-row{display:grid;grid-template-columns:70px minmax(0,1fr) minmax(0,150px);align-items:center;gap:8px;margin:5px 0}
+.adapt-row .track{position:relative;height:16px;background:var(--soft);border:1px solid var(--line);border-radius:2px}
+.adapt-row .fill{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+.adapt-row .ci{position:absolute;top:50%;height:2px;background:var(--fg);transform:translateY(-50%)}
+.adapt-row .ci::before,.adapt-row .ci::after{content:"";position:absolute;top:-4px;width:2px;height:10px;background:var(--fg)}
+.adapt-row .ci::before{left:0}.adapt-row .ci::after{right:0}
+.adapt-row .v{font-variant-numeric:tabular-nums;color:var(--fg)}
+.adapt-grp{margin:10px 0 2px;color:var(--muted);font-weight:600}
+.fill.base{background:var(--s6)}.fill.adapted{background:var(--s1)}.fill.random{background:var(--s2)}
+.adapt-note{margin-top:10px;padding:6px 10px;border:1px solid var(--note-line);background:var(--note-bg);color:var(--fg);font-size:12px;border-radius:3px}
+.adapt-toggle{display:flex;gap:8px;align-items:center;margin-top:12px}
+.adapt-meta{color:var(--muted);font-size:12px;margin-top:6px}
