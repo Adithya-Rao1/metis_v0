@@ -537,7 +537,6 @@ def test_images_and_pip_are_immutable():
     assert "--require-hashes" in DOCKERFILE
 
 
-@defect("F-20", "LOW", "no HEALTHCHECK in the image or healthcheck on the app/redis/minio services")
 def test_runtime_healthchecks_present():
     assert "HEALTHCHECK" in DOCKERFILE or "healthcheck" in COMPOSE["services"]["app"]
 
@@ -559,7 +558,6 @@ def test_ci_actions_pinned_to_commit_sha():
     assert uses and all(re.search(r"@[0-9a-f]{40}$", u) for u in uses), uses
 
 
-@defect("F-23", "LOW", "gitleaks binary is fetched with curl|tar and never checksum-verified")
 def test_ci_downloaded_binaries_are_verified():
     assert "sha256sum" in CI_TEXT or "cosign" in CI_TEXT or "shasum" in CI_TEXT
 

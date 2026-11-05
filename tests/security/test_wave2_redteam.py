@@ -313,7 +313,7 @@ class TestDomain:
     def test_authz_sweep_every_route(self, mk):
         app = mk()
         anon = Cl(app)
-        public = {"/health", "/auth/csrf", "/auth/terms", "/auth/register", "/auth/verify", "/auth/login", "/models",
+        public = {"/health", "/health/ready", "/auth/csrf", "/auth/terms", "/auth/register", "/auth/verify", "/auth/login", "/models",
                   "/models/{name}", "/auth/logout", "/auth/resend-verification", "/auth/forgot", "/auth/reset"}
         n = 0
         for path, ops in app.openapi()["paths"].items():

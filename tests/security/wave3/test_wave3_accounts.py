@@ -475,7 +475,7 @@ def test_register_answers_are_uniform_even_when_the_mailer_is_slow_because_both_
 
 
 # ============================================================================================ route sweep
-PUBLIC = {("GET", "/health"), ("GET", "/auth/csrf"), ("GET", "/auth/terms"), ("POST", "/auth/register"), ("POST", "/auth/login"), ("POST", "/auth/verify"),
+PUBLIC = {("GET", "/health"), ("GET", "/health/ready"), ("GET", "/auth/csrf"), ("GET", "/auth/terms"), ("POST", "/auth/register"), ("POST", "/auth/login"), ("POST", "/auth/verify"),
           ("POST", "/auth/resend-verification"), ("POST", "/auth/forgot"), ("POST", "/auth/reset"), ("POST", "/auth/logout"), ("GET", "/models"), ("GET", "/models/{name}")}
 
 
