@@ -77,8 +77,7 @@ def test_lead_page_loads_with_title_beta_label_and_note(lead_page):
     assert pg.title() == "Metis Lead Studio (Beta)"
     assert pg.locator("h1:visible").count() == 1 and "Metis Lead Studio" in pg.inner_text("h1")
     assert pg.inner_text("[data-testid=beta]").strip() == "Beta"
-    note = pg.inner_text("[data-testid=beta-note]")
-    assert "Metis Lead Studio (Beta)" in note and "model outputs, not measurements" in note
+    assert pg.locator("[data-testid=beta-note]").count() == 0  # the disclaimer banner was removed on the owner's instruction (BACKLOG)
     assert pg.get_attribute("#back-metis", "href") == "../app.html" and "Back to Metis projects" in pg.inner_text("#back-metis")
     assert pg.locator(".logo").count() == 1 and "benzene.svg" in pg.evaluate("getComputedStyle(document.querySelector('.logo')).webkitMaskImage")
     assert pg.evaluate("document.fonts.check('500 14px \"IBM Plex Sans\"')")

@@ -19,3 +19,6 @@ Licences: record Ketcher NOTICE (LGPL-2.1 listed) and dockprep tools (pdb2pqr BS
 
 ## Before launch: legal review
 The Terms of Service, Privacy Policy and Disclaimer linked from sign-up are drafts. They are not legal advice and need lawyer review before launch. (The warning box was removed from the sign-up page on the owner's instruction; the DRAFT notes on the three pages under web/legal/ remain.)
+
+## Before launch: Lead Studio disclaimer
+The banner on Metis Lead Studio (Beta) ("Generated molecules, binding scores and poses are model outputs, not measurements. Treat them as hypotheses to test.") was removed from the page on the owner's instruction. Restore a model-output disclaimer before launch (the terms/disclaimer drafts still need lawyer review).
