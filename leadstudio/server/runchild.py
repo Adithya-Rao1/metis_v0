@@ -1,0 +1,71 @@
+"""Child-process side of one Lead Studio run: `python -m leadstudio.server.runchild`.
+
+Started by `RunManager` through `procutil.Child.spawn` with a minimal environment. The first line on stdin is the
+run specification {run_id, config, profile, mem_mb, max_seconds}; the events go back as JSON lines on file
+descriptor 3. The process builds its own engine (nothing is inherited from the API process), runs the GA and exits.
+It never logs and never prints SMILES; stdout and stderr are /dev/null.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from collections.abc import Callable
+from typing import Any
+
+from leadstudio.server import procutil
+
+
+def default_builder() -> Any:
+    from leadstudio.wiring import build_engine
+
+    return build_engine()
+
+
+def _send(obj: dict) -> None:
+    procutil.write_event_line(json.dumps(obj, separators=(",", ":")).encode())
+
+
+def serve(builder: Callable[[], Any] | None = None) -> None:
+    """Run one specification to completion. `builder` returns the engine (tests substitute stand-ins)."""
+    line = procutil.read_stdin_line()
+    if line is None:
+        os._exit(70)
+    spec = json.loads(line)
+    procutil.disable_core_dumps()
+    procutil.limit_address_space(int(spec.get("mem_mb") or 0))
+    procutil.hard_deadline(float(spec.get("max_seconds") or 0))
+    procutil.exit_when_parent_gone()
+    code = 0
+    try:
+        from leadstudio.schema import RunConfig
+        from leadstudio.server.stages import Services, StageEngine
+
+        engine = StageEngine((builder or default_builder)(), Services())
+        if spec.get("profile") is not None:
+            from leadstudio.profile_scorer import ProfileScorer
+            from leadstudio.profiles import ProfileBody
+
+            prof = ProfileBody.model_validate(spec["profile"])
+            engine = engine.with_scorer(lambda base: ProfileScorer(base, prof))
+        cfg = RunConfig.model_validate(spec["config"])
+        for ev in engine.run(spec["run_id"], cfg):
+            d = ev if isinstance(ev, dict) else ev.model_dump(mode="json")
+            _send({"type": d["type"], "payload": d["payload"]})
+            if d["type"] in ("run_end", "error"):
+                break
+    except MemoryError:
+        _send({"fail": "memory"})
+        code = 3
+    except BrokenPipeError:
+        code = 70
+    except Exception as exc:
+        _send({"fail": type(exc).__name__})
+        code = 2
+    sys.stdout = sys.stderr = None  # type: ignore[assignment]
+    os._exit(code)
+
+
+if __name__ == "__main__":
+    serve()

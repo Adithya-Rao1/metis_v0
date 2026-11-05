@@ -2,7 +2,9 @@
 
 Every run belongs to one Metis user (`owner`); every lookup takes the caller's user id and answers "unknown" for
 anyone else's run, so user B can never read, stream or cancel user A's run. State is in memory of THIS process
-(the service is single-process by design; see docs/OPERATIONS.md). Rate limiting of the HTTP routes is done by the
+(the service is single-process by design; see docs/OPERATIONS.md). Every live run executes in its own child process
+(`runchild`), killed on timeout, cancel, client stop and shutdown; this module only supervises it and relays its
+events. Rate limiting of the HTTP routes is done by the
 shared database limiter in `backend.accounts.deps.rate_limit`, not here.
 """
 
@@ -14,6 +16,7 @@ import logging
 import os
 import threading
 import time
+import typing
 import uuid
 from collections import OrderedDict, deque
 from collections.abc import Callable
@@ -22,11 +25,14 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from leadstudio.schema import RunConfig
+from leadstudio.profiles import ProfileBody
+from leadstudio.schema import EventType, RunConfig
+from leadstudio.server import procutil
 
 log = logging.getLogger("leadstudio.server")
 
-MAX_ABANDONED = 4  # timed-out runs whose thread has not returned yet; beyond this new runs are refused
+EVENT_TYPES = frozenset(typing.get_args(EventType))
+CHILD_MODULE = "leadstudio.server.runchild"
 
 
 def _env(name: str, default, cast=float):
@@ -42,7 +48,16 @@ class Settings:
     max_queue: int = 4  # waiting runs; beyond max_concurrent + max_queue active runs -> 429
     per_user_active: int = 2  # queued + running runs one user may hold
     per_user_streams: int = 4  # open SSE connections one user may hold
-    run_timeout: float = 90.0  # wall-clock seconds from execution start
+    run_timeout: float = (
+        90.0  # wall-clock seconds from execution start; the run's child process is killed then
+    )
+    child_mem_mb: int = (
+        6144  # address-space limit of a run's child process (RLIMIT_AS, where the OS has it); 0 = none
+    )
+    max_run_events: int = 5000  # events one run may produce; beyond this the child is killed
+    heavy_workers: int = 2  # processes of the validate / preview / SMARTS worker pool
+    heavy_timeout: float = 20.0  # seconds one such job may take before its worker is killed
+    heavy_recycle: int = 200  # jobs after which a pool worker is replaced
     max_generations: int = 15
     max_population: int = 40
     max_heavy_atoms: int = 60
@@ -68,6 +83,10 @@ class Settings:
             max_queue=max(0, _env("STUDIO_MAX_QUEUE", d.max_queue, int)),
             per_user_active=max(1, _env("STUDIO_PER_USER_RUNS", d.per_user_active, int)),
             run_timeout=_env("STUDIO_RUN_TIMEOUT", d.run_timeout),
+            child_mem_mb=max(0, _env("STUDIO_CHILD_MEM_MB", d.child_mem_mb, int)),
+            heavy_workers=max(1, _env("STUDIO_HEAVY_WORKERS", d.heavy_workers, int)),
+            heavy_timeout=max(1.0, _env("STUDIO_HEAVY_TIMEOUT", d.heavy_timeout)),
+            heavy_recycle=max(1, _env("STUDIO_HEAVY_RECYCLE", d.heavy_recycle, int)),
             max_generations=_env("STUDIO_MAX_GENERATIONS", d.max_generations, int),
             max_population=_env("STUDIO_MAX_POPULATION", d.max_population, int),
             runs_per_minute=_env("STUDIO_RUNS_PER_MIN", d.runs_per_minute, int),
@@ -92,42 +111,22 @@ class Rejected(HTTPException):
         self.message = message
 
 
-class HeavyGate:
-    """Bounds how many CPU-heavy request handlers (validate, preview, applicable) run at once in this process, so a
-    burst cannot starve the thread pool that serves every other Metis route. Non-blocking: busy -> 429."""
-
-    def __init__(self, limit: int):
-        self._sem = threading.BoundedSemaphore(max(1, limit))
-
-    def __enter__(self) -> HeavyGate:
-        if not self._sem.acquire(blocking=False):
-            raise Rejected(429, "Lead Studio is busy, try again in a moment", 2)
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        self._sem.release()
-
-
-@dataclass
 class SlotPool:
-    """Runs at most `workers` tasks at once, each on its own daemon thread.
-
-    Unlike a ThreadPoolExecutor a slot can be taken back from a task that no longer answers (`Slot.abandon`): the
-    stuck thread keeps running (Python cannot kill it) but no longer counts against the concurrency limit. The
-    number of such abandoned threads is bounded by the caller (`abandoned`), which refuses new work beyond it."""
+    """Runs at most `workers` supervisor tasks at once, each on its own daemon thread. A task is one run's
+    supervisor: it spends its life waiting for the run's child process, which is killed on timeout, cancel, client
+    stop and shutdown, so a thread never outlives its run by more than a poll interval."""
 
     def __init__(self, workers: int, name: str = "lead-run"):
         self.workers, self.name = max(1, workers), name
         self._lock = threading.Lock()
         self._free = self.workers
-        self._waiting: deque[tuple[Slot, Callable[..., None], tuple]] = deque()
+        self._waiting: deque[tuple[Callable[..., None], tuple]] = deque()
         self._threads: set[threading.Thread] = set()
-        self.abandoned = 0
         self._closed = False
 
-    def submit(self, slot: Slot, fn: Callable[..., None], *args: Any) -> None:
+    def submit(self, fn: Callable[..., None], *args: Any) -> None:
         with self._lock:
-            self._waiting.append((slot, fn, args))
+            self._waiting.append((fn, args))
         self._pump()
 
     def _pump(self) -> None:
@@ -135,26 +134,20 @@ class SlotPool:
             with self._lock:
                 if self._closed or self._free <= 0 or not self._waiting:
                     return
-                slot, fn, args = self._waiting.popleft()
+                fn, args = self._waiting.popleft()
                 self._free -= 1
-                t = threading.Thread(target=self._run, args=(slot, fn, args), name=self.name, daemon=True)
+                t = threading.Thread(target=self._run, args=(fn, args), name=self.name, daemon=True)
                 self._threads.add(t)
             t.start()
 
-    def _run(self, slot: Slot, fn: Callable[..., None], args: tuple) -> None:
+    def _run(self, fn: Callable[..., None], args: tuple) -> None:
         try:
             fn(*args)
         finally:
             with self._lock:
                 self._threads.discard(threading.current_thread())
-                if slot.abandoned:
-                    self.abandoned = max(0, self.abandoned - 1)
-            slot.release()
+                self._free += 1
             self._pump()
-
-    def _give_back(self) -> None:
-        with self._lock:
-            self._free += 1
 
     def shutdown(self, wait: bool = True) -> None:
         with self._lock:
@@ -166,34 +159,6 @@ class SlotPool:
                 t.join(timeout=5)
 
 
-class Slot:
-    """One run's claim on a pool worker; released exactly once, either when the task ends or when it is abandoned."""
-
-    def __init__(self, pool: SlotPool):
-        self._pool = pool
-        self._lock = threading.Lock()
-        self._released = False
-        self.abandoned = False
-
-    def release(self) -> None:
-        with self._lock:
-            if self._released:
-                return
-            self._released = True
-        self._pool._give_back()
-
-    def abandon(self) -> None:
-        """The task is stuck: free its worker now. The thread counts as abandoned until it finally ends."""
-        with self._lock:
-            if self._released or self.abandoned:
-                return
-            self.abandoned = True
-        with self._pool._lock:
-            self._pool.abandoned += 1
-        self.release()
-        self._pool._pump()
-
-
 @dataclass
 class Run:
     run_id: str
@@ -202,8 +167,8 @@ class Run:
     source: str  # live | mock | replay
     cache_key: str | None = None
     pace: float = 0.0  # delay applied by the SSE writer (replays only)
-    scorer_wrap: Callable[[Any], Any] | None = (
-        None  # per-run scorer wrapper (a saved profile), live runs only
+    profile: ProfileBody | None = (
+        None  # the caller's saved scoring profile, live runs only (sent to the child)
     )
     events: list[dict] = field(default_factory=list)
     finished: bool = False
@@ -214,7 +179,7 @@ class Run:
     timer: threading.Timer | None = None
     streams: int = 0  # open SSE connections reading this run
     orphan: threading.Timer | None = None  # armed while nobody reads the run (see RunManager.detach)
-    slot: Slot | None = None  # the worker slot of a live/mock run
+    child: procutil.Child | None = None  # the run's process while it executes (live runs)
 
     def push(self, type_: str, payload: dict) -> bool:
         with self.lock:
@@ -255,8 +220,13 @@ def config_key(owner: uuid.UUID, seed_canonical: str, cfg: RunConfig) -> str:
 
 
 class RunManager:
-    def __init__(self, settings: Settings, engine: Any, mock_events: list[dict]):
+    def __init__(
+        self, settings: Settings, engine: Any, mock_events: list[dict], child_module: str = CHILD_MODULE
+    ):
+        """`engine` only decides live vs mock (the API process never runs it); live runs execute in a child
+        process started from `child_module` (a module with the `runchild.serve` protocol; tests substitute one)."""
         self.s, self.engine, self.mock_events = settings, engine, mock_events
+        self.child_module = child_module
         self.pool = SlotPool(settings.max_concurrent)
         self.runs: OrderedDict[str, Run] = OrderedDict()
         self.cache: OrderedDict[str, list[dict]] = OrderedDict()
@@ -269,11 +239,11 @@ class RunManager:
         return [r for r in self.runs.values() if not r.finished and r.source != "replay"]
 
     def submit(
-        self, owner: uuid.UUID, cfg: RunConfig, run_id: str, scorer_wrap: Callable[[Any], Any] | None = None
+        self, owner: uuid.UUID, cfg: RunConfig, run_id: str, profile: ProfileBody | None = None
     ) -> Run:
         key = config_key(owner, cfg.seed_smiles, cfg)
         cacheable = (
-            scorer_wrap is None and cfg.profile_id is None
+            profile is None and cfg.profile_id is None
         )  # a profile can change between runs: never replay
         with self.lock:
             cached = self.cache.get(key) if cacheable else None
@@ -289,8 +259,6 @@ class RunManager:
                 run.finished, run.status = True, "done"
                 self._register(run)
                 return run
-            if self.pool.abandoned >= MAX_ABANDONED:
-                raise Rejected(503, "Lead Studio is recovering from stuck runs, try again later", 30)
             active = self._active()
             if sum(r.owner == owner for r in active) >= self.s.per_user_active:
                 raise Rejected(
@@ -307,11 +275,10 @@ class RunManager:
                 cfg,
                 source,
                 cache_key=key if source == "live" and cacheable else None,
-                scorer_wrap=scorer_wrap if source == "live" else None,
+                profile=profile if source == "live" else None,
             )
             self._register(run)
-        run.slot = Slot(self.pool)
-        self.pool.submit(run.slot, self._execute, run)
+        self.pool.submit(self._execute, run)
         self._arm_orphan(run)  # released again if the client never opens (or leaves) the event stream
         return run
 
@@ -353,11 +320,32 @@ class RunManager:
             self._streams.pop(owner, None)
         for r in dropped:
             r.finish("cancelled", "Run cancelled", recoverable=True)
+            self._kill(r)
             r.events.clear()
         return len(dropped)
 
     def cancel(self, run: Run) -> bool:
-        return run.finish("cancelled", "Run cancelled", recoverable=True)
+        done = run.finish("cancelled", "Run cancelled", recoverable=True)
+        self._kill(run)
+        return done
+
+    @staticmethod
+    def _kill(run: Run) -> None:
+        """Stop the run's process now (the supervisor would also notice a finished run within a poll interval)."""
+        child = run.child
+        if child is not None:
+            child.kill()
+
+    def shutdown(self) -> None:
+        """Cancel every run, kill every child process, stop the supervisors. No process outlives this call."""
+        with self.lock:
+            runs = list(self.runs.values())
+        for r in runs:
+            r.finish("cancelled", "Run cancelled", recoverable=True)
+            self._kill(r)
+        self.pool.shutdown(wait=True)
+        for r in runs:
+            self._kill(r)
 
     # ------------------------------------------------------------ streams
     def _arm_orphan(self, run: Run) -> None:
@@ -381,6 +369,7 @@ class RunManager:
         if not listening and run.finish(
             "cancelled", "Run cancelled: no client was listening", recoverable=True
         ):
+            self._kill(run)
             log.info("run %s cancelled: client gone", run.run_id[:6])
 
     def attach(self, run: Run) -> None:
@@ -415,13 +404,7 @@ class RunManager:
     def _on_timeout(self, run: Run) -> None:
         if run.finish("error", f"Run exceeded the {self.s.run_timeout:g}s time limit", recoverable=True):
             log.warning("run %s timed out", run.run_id[:6])
-            if run.slot is not None:
-                run.slot.abandon()  # the engine may be stuck in one step: hand its worker back
-
-    def _engine_for(self, run: Run) -> Any:
-        if run.scorer_wrap is not None and hasattr(self.engine, "with_scorer"):
-            return self.engine.with_scorer(run.scorer_wrap)
-        return self.engine
+        self._kill(run)  # a native call stuck inside the engine dies with its process
 
     def _execute(self, run: Run) -> None:
         if run.finished:  # cancelled while queued
@@ -430,23 +413,12 @@ class RunManager:
         run.timer = threading.Timer(self.s.run_timeout, self._on_timeout, args=(run,))
         run.timer.daemon = True
         run.timer.start()
+        ended = "Engine ended without a result"
         try:
-            gen = (
-                self._mock_iter(run)
-                if run.source == "mock"
-                else self._engine_for(run).run(run.run_id, run.config)
-            )
-            try:
-                for ev in gen:
-                    d = ev if isinstance(ev, dict) else ev.model_dump(mode="json")
-                    if not run.push(d["type"], d["payload"]):
-                        break  # timed out / cancelled
-                    if d["type"] in ("run_end", "error"):
-                        break
-            finally:
-                close = getattr(gen, "close", None)
-                if close:
-                    close()
+            if run.source == "mock":
+                self._run_mock(run)
+            else:
+                ended = self._run_child(run) or ended
             with run.lock:
                 kinds = [e["type"] for e in run.events]
             if "run_end" in kinds and "error" not in kinds:
@@ -455,13 +427,14 @@ class RunManager:
             elif "error" in kinds:
                 run.finish("error")
             else:
-                run.finish("error", "Engine ended without a result", recoverable=True)
-        except Exception as exc:  # engine bugs must not kill the worker
+                run.finish("error", ended, recoverable=True)
+        except Exception as exc:  # supervisor bugs must not kill the worker
             log.error("run %s failed: %s", run.run_id[:6], type(exc).__name__)
             run.finish("error", f"Engine failure: {type(exc).__name__}", recoverable=True)
         finally:
             if run.timer:
                 run.timer.cancel()
+            self._kill(run)
             log.info(
                 "run %s source=%s status=%s events=%d secs=%.1f",
                 run.run_id[:6],
@@ -470,6 +443,68 @@ class RunManager:
                 len(run.events),
                 time.monotonic() - (run.started or run.created),
             )
+
+    def _run_mock(self, run: Run) -> None:
+        for ev in self._mock_iter(run):
+            if not run.push(ev["type"], ev["payload"]):
+                break  # timed out / cancelled
+            if ev["type"] in ("run_end", "error"):
+                break
+
+    def _run_child(self, run: Run) -> str | None:
+        """Run the GA in its own process and relay its events. Returns the message to use if the stream ends
+        without a result (the process crashed, ran out of memory or was killed by its limits)."""
+        spec = {
+            "run_id": run.run_id,
+            "config": run.config.model_dump(mode="json"),
+            "profile": run.profile.model_dump(mode="json") if run.profile else None,
+            "mem_mb": self.s.child_mem_mb,
+            "max_seconds": self.s.run_timeout + 5,
+        }
+        try:
+            child = procutil.Child.spawn(self.child_module)
+        except OSError:
+            log.error("run %s: the run process could not be started", run.run_id[:6])
+            return "The run could not be started, please try again"
+        run.child = child
+        if run.finished:  # cancelled while the process was starting
+            child.kill()
+            return None
+        crashed = "The run stopped unexpectedly, please try again"
+        try:
+            child.send(json.dumps(spec).encode() + b"\n", 5.0)
+            while not run.finished:
+                try:
+                    line = child.read_line(0.1)
+                except procutil.ChildGone:
+                    return crashed
+                except procutil.ChildMisbehaved:
+                    return "The run produced an invalid result"
+                if line is None:
+                    continue
+                try:
+                    msg = json.loads(line)
+                    if "fail" in msg:
+                        return (
+                            "The run needed more memory than allowed"
+                            if msg["fail"] == "memory"
+                            else f"Engine failure: {str(msg['fail'])[:40]}"
+                        )
+                    kind, payload = msg["type"], msg["payload"]
+                    if kind not in EVENT_TYPES or not isinstance(payload, dict):
+                        raise ValueError
+                except (ValueError, KeyError, TypeError):
+                    return "The run produced an invalid result"
+                if len(run.events) >= self.s.max_run_events:
+                    return "The run produced too many results"
+                if not run.push(kind, payload) or kind in ("run_end", "error"):
+                    break
+        except (procutil.ChildGone, TimeoutError):
+            return crashed
+        finally:
+            child.kill()
+            run.child = None
+        return None
 
     def _mock_iter(self, run: Run):
         for ev in self.mock_events:
