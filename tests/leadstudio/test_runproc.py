@@ -356,3 +356,26 @@ def test_the_pool_refuses_work_beyond_its_bound_at_once(pool, monkeypatch):
 def test_a_hostile_smarts_cannot_hang_the_api_through_the_routes(live):
     r = live.post("/lead/profiles/check-smarts", json={"patterns": ["[N+](=O)[O-]", "((("]}, headers=H("a")).json()["results"]
     assert [x["ok"] for x in r] == [True, False]
+
+
+# ---------------------------------------------------------------------------------------------------- lifespan
+def test_a_clean_app_stop_shuts_the_lead_state_down_and_kills_the_workers(factory, users):
+    """Leaving the app's lifespan (a clean stop) calls LeadState.shutdown(): no heavy worker outlives the app."""
+    app = make_app(factory, users)
+    calls: list[str] = []
+    st = app.state.lead
+    real_shutdown = st.shutdown
+    st.shutdown = lambda: (calls.append("shutdown"), real_shutdown())  # type: ignore[method-assign]  # test spy
+    with TestClient(app) as c:
+        r = c.post("/lead/api/molecules/validate", json={"smiles": NITRO}, headers=H("a"))
+        assert r.status_code == 200
+        assert extra_children() >= 1  # the heavy worker that parsed the molecule
+    assert calls == ["shutdown"]
+    assert extra_children() == 0
+
+
+def test_a_clean_stop_without_lead_state_is_a_no_op():
+    from backend.main import create_app
+
+    with TestClient(create_app()) as c:
+        assert c.get("/health").status_code == 200

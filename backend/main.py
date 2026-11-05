@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import text
@@ -14,8 +17,22 @@ from backend.accounts.hardening import install as install_hardening
 ROUTERS = ("backend.accounts", "backend.projects", "backend.dockprep", "leadstudio.server")
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """On a clean stop, end the Lead Studio run children and heavy workers (no process may outlive the app).
+    The state exists only if a Lead Studio request built it; nothing is built here."""
+    try:
+        yield
+    finally:
+        state = getattr(app.state, "lead", None)
+        if state is not None:
+            # shutdown must not mask the server's own exit; nothing to log
+            with contextlib.suppress(Exception):
+                state.shutdown()
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="Metis", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="Metis", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
 
     install_hardening(app)
 
