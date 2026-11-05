@@ -5,6 +5,7 @@ which is NOT a runtime dependency of the public service: `load_policy` imports i
 exists, and falls back to `UniformPolicy` if torch or the checkpoint is unusable. No checkpoint ships with this repo, so
 the service runs the uniform policy (the health endpoint says so).
 """
+
 from __future__ import annotations
 
 import os

@@ -80,7 +80,9 @@ class BodyGuardMiddleware:
                 break
         body = b"".join(chunks)
         if body and _is_json(headers) and has_non_finite_json(body):
-            await self._reply(send, 422, [{"type": "json_invalid", "loc": ["body"], "msg": "NaN/Infinity not allowed"}])
+            await self._reply(
+                send, 422, [{"type": "json_invalid", "loc": ["body"], "msg": "NaN/Infinity not allowed"}]
+            )
             return
         sent = False
 

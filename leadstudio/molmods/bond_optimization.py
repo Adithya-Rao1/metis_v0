@@ -1,53 +1,49 @@
 from leadstudio.molmods.modification_imports import *
 from leadstudio.molmods.logger import setup_molecule_logger
 
+
 class ModifyBond:
     def __init__(self, logger, log: bool = False):
         self.logger = logger
         self.log = log
 
-        self.bond_types = [Chem.BondType.SINGLE,
-                      Chem.BondType.DOUBLE,
-                      Chem.BondType.TRIPLE,
-                      Chem.BondType.AROMATIC]
+        self.bond_types = [
+            Chem.BondType.SINGLE,
+            Chem.BondType.DOUBLE,
+            Chem.BondType.TRIPLE,
+            Chem.BondType.AROMATIC,
+        ]
 
-    def _optimize_bond_core(self, mol, action, bond_site=None, target_bond_type=None, batch=False) -> Optional[Chem.Mol]:
+    def _optimize_bond_core(
+        self, mol, action, bond_site=None, target_bond_type=None, batch=False
+    ) -> Optional[Chem.Mol]:
         rwmol = Chem.RWMol(mol)
 
-        action_map = {
-            0: 'add',
-            1: 'remove',
-            2: 'modify',
-            3: 'random'
-        }
+        action_map = {0: "add", 1: "remove", 2: "modify", 3: "random"}
         chosen_action = action_map.get(action)
 
         if bond_site is not None:
             atom_idx_pair = tuple(bond_site)
-            if chosen_action == 'add':
+            if chosen_action == "add":
                 if target_bond_type is None:
                     return None
                 return self._add_bond_of_type(mol, rwmol, atom_idx_pair, target_bond_type)
-            if chosen_action == 'remove':
+            if chosen_action == "remove":
                 return self._remove_bond_at_pair(mol, rwmol, atom_idx_pair)
-            if chosen_action == 'modify':
+            if chosen_action == "modify":
                 if target_bond_type is None:
                     return None
                 return self._modify_bond_to_type(rwmol, atom_idx_pair, target_bond_type)
             return None
 
         modification_strategies = {
-            'modify': self._modify_bond,
-            'add': self._addbond,
-            'remove': self._removebond,
-            'random': random.choice([
-                self._modify_bond,
-                self._addbond,
-                self._removebond
-            ])
+            "modify": self._modify_bond,
+            "add": self._addbond,
+            "remove": self._removebond,
+            "random": random.choice([self._modify_bond, self._addbond, self._removebond]),
         }
 
-        strategy = modification_strategies.get(chosen_action, modification_strategies['random'])
+        strategy = modification_strategies.get(chosen_action, modification_strategies["random"])
 
         atom_indices = self.get_optimal_bond_sites(rwmol)
         bond_indices = self.get_bond_indices(rwmol)
@@ -64,21 +60,29 @@ class ModifyBond:
                     return Chem.Mol(modified_mol)
             except Exception as e:
                 if self.log:
-                    self.logger.warning(f"{chosen_action.capitalize()} failed for atom_idx_pair {atom_idx_pair}: {e}")
+                    self.logger.warning(
+                        f"{chosen_action.capitalize()} failed for atom_idx_pair {atom_idx_pair}: {e}"
+                    )
                 continue
 
         if self.log:
             self.logger.error("All bond modification attempts failed.")
         return None
 
-    def optimize_bond(self, mol, action, batch=False, bond_site=None, target_bond_type=None) -> Optional[Chem.Mol]:
-        result_mol = self._optimize_bond_core(mol, action, bond_site=bond_site,
-                                               target_bond_type=target_bond_type, batch=batch)
+    def optimize_bond(
+        self, mol, action, batch=False, bond_site=None, target_bond_type=None
+    ) -> Optional[Chem.Mol]:
+        result_mol = self._optimize_bond_core(
+            mol, action, bond_site=bond_site, target_bond_type=target_bond_type, batch=batch
+        )
         return Chem.MolToSmiles(result_mol) if result_mol is not None else None
 
-    def optimize_bond_mol(self, mol, action, batch=False, bond_site=None, target_bond_type=None) -> Optional[Chem.Mol]:
-        return self._optimize_bond_core(mol, action, bond_site=bond_site,
-                                         target_bond_type=target_bond_type, batch=batch)
+    def optimize_bond_mol(
+        self, mol, action, batch=False, bond_site=None, target_bond_type=None
+    ) -> Optional[Chem.Mol]:
+        return self._optimize_bond_core(
+            mol, action, bond_site=bond_site, target_bond_type=target_bond_type, batch=batch
+        )
 
     def _modify_bond(self, mol, rwmol, atom_idx_pair, bond_indices, batch):
         bond = self._get_bond_by_indices(rwmol, atom_idx_pair)
@@ -108,9 +112,7 @@ class ModifyBond:
                 candidate.UpdatePropertyCache(strict=False)
                 Chem.SanitizeMol(candidate)
 
-                new_bond = candidate.GetBondBetweenAtoms(
-                    atom_idx_pair[0], atom_idx_pair[1]
-                )
+                new_bond = candidate.GetBondBetweenAtoms(atom_idx_pair[0], atom_idx_pair[1])
 
                 if new_bond is not None and self.bond_rule_fn and not self.bond_rule_fn(new_bond):
                     continue
@@ -119,7 +121,9 @@ class ModifyBond:
 
             except Exception as e:
                 if self.log:
-                    self.logger.warning(f"Modification to bond {bond.GetIdx()} caused an error: {e}. Candidate rejected.")
+                    self.logger.warning(
+                        f"Modification to bond {bond.GetIdx()} caused an error: {e}. Candidate rejected."
+                    )
 
         return None
 
@@ -214,12 +218,7 @@ class ModifyBond:
             return None
         return Chem.Mol(result)
 
-    def get_optimal_bond_sites(
-    self,
-    mol,
-    allowed_bond_types=None,
-    exclude_hydrogens=True
-    ):
+    def get_optimal_bond_sites(self, mol, allowed_bond_types=None, exclude_hydrogens=True):
         if allowed_bond_types is None:
             allowed_bond_types = self.bond_types
 
@@ -247,12 +246,17 @@ class ModifyBond:
                     valence_j = VALENCE_ELECTRON_COUNTS.get(atom_j.GetSymbol(), None)
 
                     if valence_i and valence_j:
-                        if (atom_i.GetExplicitValence() < valence_i and atom_j.GetExplicitValence() < valence_j):
+                        if (
+                            atom_i.GetExplicitValence() < valence_i
+                            and atom_j.GetExplicitValence() < valence_j
+                        ):
                             optimal_sites.append((atom_i.GetIdx(), atom_j.GetIdx()))
 
         return optimal_sites
 
-    def get_bond_indices(self, mol, atom_indices=None, bond_order=None, atom_types=None, aromatic=None, rule_fn=None):
+    def get_bond_indices(
+        self, mol, atom_indices=None, bond_order=None, atom_types=None, aromatic=None, rule_fn=None
+    ):
         if not mol or not isinstance(mol, Chem.Mol):
             if self.log:
                 self.logger.error("Invalid molecule object provided.")
@@ -364,19 +368,13 @@ class ModifyBond:
 
         except Exception as e:
             if self.log:
-                self.logger.error(
-                    f"Failed to add bond between atoms "
-                    f"{atom1_idx} and {atom2_idx}: {e}"
-                )
+                self.logger.error(f"Failed to add bond between atoms {atom1_idx} and {atom2_idx}: {e}")
             return None
-
 
     def _remove_bond(self, mol, rwmol, bond_idx):
         if bond_idx < 0 or bond_idx >= rwmol.GetNumBonds():
             if self.log:
-                self.logger.error(
-                    f"Bond index {bond_idx} is out of bounds for the molecule."
-                )
+                self.logger.error(f"Bond index {bond_idx} is out of bounds for the molecule.")
             return mol
 
         bond = rwmol.GetBondWithIdx(bond_idx)
@@ -390,28 +388,21 @@ class ModifyBond:
 
         try:
             bond = candidate.GetBondWithIdx(bond_idx)
-            candidate.RemoveBond(
-                bond.GetBeginAtomIdx(),
-                bond.GetEndAtomIdx()
-            )
+            candidate.RemoveBond(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
 
             candidate.UpdatePropertyCache(strict=False)
             Chem.SanitizeMol(candidate)
 
             if len(Chem.GetMolFrags(candidate, asMols=False)) > 1:
                 if self.log:
-                    self.logger.warning(
-                        f"Removing bond {bond_idx} would disconnect the molecule; rejecting."
-                    )
+                    self.logger.warning(f"Removing bond {bond_idx} would disconnect the molecule; rejecting.")
                 return None
 
             return candidate
 
         except Exception as e:
             if self.log:
-                self.logger.error(
-                    f"Failed to remove bond with index {bond_idx}: {e}"
-                )
+                self.logger.error(f"Failed to remove bond with index {bond_idx}: {e}")
             return None
 
     @staticmethod
@@ -453,7 +444,7 @@ class ModifyBond:
             hybridization_factor = {
                 HybridizationType.SP: 1.2,
                 HybridizationType.SP2: 1.1,
-                HybridizationType.SP3: 1.0
+                HybridizationType.SP3: 1.0,
             }
 
             h1_factor = hybridization_factor.get(atom1.GetHybridization())
@@ -471,15 +462,18 @@ class ModifyBond:
                 return True
 
             ring_info = mol.GetRingInfo()
-            ring_size = max(len(ring) for ring in ring_info.AtomRings()
-                            if atom1.GetIdx() in ring and atom2.GetIdx() in ring)
+            ring_size = max(
+                len(ring)
+                for ring in ring_info.AtomRings()
+                if atom1.GetIdx() in ring and atom2.GetIdx() in ring
+            )
 
             ring_strain_limits = {
-                3: 60,   # Cyclopropane (very strained)
-                4: 45,   # Cyclobutane (high strain)
-                5: 15,   # Cyclopentane (moderate strain)
-                6: 5,    # Cyclohexane (minimal strain)
-                7: 10    # Cycloheptane (slight strain)
+                3: 60,  # Cyclopropane (very strained)
+                4: 45,  # Cyclobutane (high strain)
+                5: 15,  # Cyclopentane (moderate strain)
+                6: 5,  # Cyclohexane (minimal strain)
+                7: 10,  # Cycloheptane (slight strain)
             }
 
             return ring_size > 4 or ring_strain_limits.get(ring_size, 100) < 30
@@ -498,10 +492,10 @@ class ModifyBond:
                 return False
 
             forbidden_bonds = {
-                frozenset(['H', 'H']): True,
-                frozenset(['H', 'F']): True,
-                frozenset(['F', 'F']): True,
-                frozenset(['O', 'O']): True
+                frozenset(["H", "H"]): True,
+                frozenset(["H", "F"]): True,
+                frozenset(["F", "F"]): True,
+                frozenset(["O", "O"]): True,
             }
 
             return not forbidden_bonds.get(frozenset([symbol1, symbol2]), False)
@@ -511,7 +505,7 @@ class ModifyBond:
             _steric_hindrance_check(),
             _ring_strain_analysis(),
             _valence_compliance(),
-            _bond_type_compatibility()
+            _bond_type_compatibility(),
         ]
 
         return all(rule_checks)

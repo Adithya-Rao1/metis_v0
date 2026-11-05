@@ -64,7 +64,9 @@ class Scope:
             yield s
 
 
-def scope(user: UserCtx = Depends(current_user), factory: sessionmaker[Session] = Depends(get_factory)) -> Scope:
+def scope(
+    user: UserCtx = Depends(current_user), factory: sessionmaker[Session] = Depends(get_factory)
+) -> Scope:
     return Scope(user, factory)
 
 
@@ -92,7 +94,9 @@ def require_project(session: Session, user_id: uuid.UUID, project_id: uuid.UUID)
     return dict(row)
 
 
-def require_compound(session: Session, user_id: uuid.UUID, project_id: uuid.UUID, compound_id: uuid.UUID) -> dict[str, Any]:
+def require_compound(
+    session: Session, user_id: uuid.UUID, project_id: uuid.UUID, compound_id: uuid.UUID
+) -> dict[str, Any]:
     row = (
         session.execute(
             text(
@@ -124,4 +128,3 @@ def row_to_prediction(row: Any) -> Prediction:
         method_note=row["method_note"],
         breakdown=row["uncertainty_breakdown"],
     )
-

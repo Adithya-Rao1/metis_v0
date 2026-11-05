@@ -168,7 +168,9 @@ def records_from_sdf(text: str, max_records: int) -> list[dict[str, Any]]:
     return out
 
 
-def standardize_request(fmt: str, smiles: list[str] | None, content: str | None, max_records: int) -> list[dict[str, Any]]:
+def standardize_request(
+    fmt: str, smiles: list[str] | None, content: str | None, max_records: int
+) -> list[dict[str, Any]]:
     if fmt == "smiles":
         items = smiles or []
         if not items:

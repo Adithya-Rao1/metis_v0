@@ -1,4 +1,5 @@
 """Adapter files: $STUDIO_CACHE_DIR/adapters/<owner>/<adapter_id>.pt + <adapter_id>.json sidecar."""
+
 from __future__ import annotations
 
 import hashlib
@@ -29,20 +30,37 @@ def op_hash(op_ids: Sequence[str]) -> str:
     return hashlib.sha256("\n".join(op_ids).encode()).hexdigest()[:16]
 
 
-def save(owner: str, policy, *, n_steps: int, base_checkpoint: str, base_kind: str, evaluation: dict,
-         training: dict) -> dict:
+def save(
+    owner: str,
+    policy,
+    *,
+    n_steps: int,
+    base_checkpoint: str,
+    base_kind: str,
+    evaluation: dict,
+    training: dict,
+) -> dict:
     op_ids = list(policy.net.op_ids)
     aid = secrets.token_hex(8)
     d = owner_dir(owner)
     d.mkdir(parents=True, exist_ok=True)
     existing = list_adapters(owner)
-    for old in existing[MAX_ADAPTERS_PER_OWNER - 1:]:  # keep the newest MAX-1, then add this one
+    for old in existing[MAX_ADAPTERS_PER_OWNER - 1 :]:  # keep the newest MAX-1, then add this one
         delete(owner, old["adapter_id"])
     torch.save({"op_ids": op_ids, "state": policy.net.state_dict()}, d / f"{aid}.pt")
-    meta = {"adapter_id": aid, "owner": owner, "created_at": time.time(), "n_steps": n_steps,
-            "op_id_hash": op_hash(op_ids), "base_checkpoint": base_checkpoint, "base_kind": base_kind,
-            "hit_rates": {k: evaluation.get(k) for k in ("base", "adapted", "random")},
-            "eval_n": evaluation.get("n"), "eval_method": evaluation.get("method"), "training": training}
+    meta = {
+        "adapter_id": aid,
+        "owner": owner,
+        "created_at": time.time(),
+        "n_steps": n_steps,
+        "op_id_hash": op_hash(op_ids),
+        "base_checkpoint": base_checkpoint,
+        "base_kind": base_kind,
+        "hit_rates": {k: evaluation.get(k) for k in ("base", "adapted", "random")},
+        "eval_n": evaluation.get("n"),
+        "eval_method": evaluation.get("method"),
+        "training": training,
+    }
     (d / f"{aid}.json").write_text(json.dumps(meta))
     return meta
 

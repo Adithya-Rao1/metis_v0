@@ -3,6 +3,7 @@
 
 Only the first model is read. All numeric fields are validated; errors carry fixed messages.
 """
+
 from __future__ import annotations
 
 import math
@@ -14,13 +15,42 @@ from .limits import MAX_ATOMS, MAX_LINE_LEN
 
 WATER = frozenset({"HOH", "WAT", "H2O", "DOD", "TIP", "TIP3"})
 STD_AA = frozenset(
-    ["ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "PHE", "PRO", "SER", "THR", "TRP", "TYR", "VAL", "HID", "HIE", "HIP", "ASH", "GLH", "CYX", "CYM", "LYN"]
+    [
+        "ALA",
+        "ARG",
+        "ASN",
+        "ASP",
+        "CYS",
+        "GLN",
+        "GLU",
+        "GLY",
+        "HIS",
+        "ILE",
+        "LEU",
+        "LYS",
+        "MET",
+        "PHE",
+        "PRO",
+        "SER",
+        "THR",
+        "TRP",
+        "TYR",
+        "VAL",
+        "HID",
+        "HIE",
+        "HIP",
+        "ASH",
+        "GLH",
+        "CYX",
+        "CYM",
+        "LYN",
+    ]
 )
 
 
 @dataclass(slots=True)
 class Atom:
-    record: str            # ATOM | HETATM
+    record: str  # ATOM | HETATM
     serial: int
     name: str
     altloc: str
@@ -49,12 +79,12 @@ class Structure:
     atoms: list[Atom] = field(default_factory=list)
     pdb_id: str = ""
     expdta: str = ""
-    method_class: str = "unknown"        # xray | cryoem | nmr | other | unknown
+    method_class: str = "unknown"  # xray | cryoem | nmr | other | unknown
     resolution: float | None = None
     resolution_source: str = ""
-    missing_residues: list[tuple[str, str, int]] = field(default_factory=list)   # chain, resname, resseq
+    missing_residues: list[tuple[str, str, int]] = field(default_factory=list)  # chain, resname, resseq
     het_names: dict[str, str] = field(default_factory=dict)
-    sites: list[dict] = field(default_factory=list)       # id, residues[(resname,chain,resseq)], description
+    sites: list[dict] = field(default_factory=list)  # id, residues[(resname,chain,resseq)], description
     links: list[dict] = field(default_factory=list)
     remark800: list[str] = field(default_factory=list)
     n_models_seen: int = 1
@@ -121,19 +151,31 @@ def parse_pdb(text: str) -> Structure:
         elif rec == "SITE":
             _site(st, raw)
         elif rec == "LINK":
-            st.links.append({"a": _res_from(raw, 12, 17, 21, 22, 26), "b": _res_from(raw, 42, 47, 51, 52, 56)})
+            st.links.append(
+                {"a": _res_from(raw, 12, 17, 21, 22, 26), "b": _res_from(raw, 42, 47, 51, 52, 56)}
+            )
         elif rec in ("ATOM", "HETATM") and in_model1:
             try:
                 a = Atom(
-                    record=rec, serial=int(raw[6:11] or 0), name=raw[12:16].strip(), altloc=raw[16:17].strip(),
-                    resname=raw[17:20].strip(), chain=raw[21:22].strip() or "_", resseq=int(raw[22:26]),
-                    icode=raw[26:27].strip(), x=_f(raw[30:38]), y=_f(raw[38:46]), z=_f(raw[46:54]),
+                    record=rec,
+                    serial=int(raw[6:11] or 0),
+                    name=raw[12:16].strip(),
+                    altloc=raw[16:17].strip(),
+                    resname=raw[17:20].strip(),
+                    chain=raw[21:22].strip() or "_",
+                    resseq=int(raw[22:26]),
+                    icode=raw[26:27].strip(),
+                    x=_f(raw[30:38]),
+                    y=_f(raw[38:46]),
+                    z=_f(raw[46:54]),
                     occ=_f(raw[54:60]) if raw[54:60].strip() else 1.0,
                     bfac=_f(raw[60:66]) if raw[60:66].strip() else 0.0,
                     element=_element_from(raw[12:16], raw[76:78], raw[17:20].strip(), rec),
                 )
             except ValueError:
-                raise DockprepError("bad_structure", "Structure file has a malformed atom record.", 422) from None
+                raise DockprepError(
+                    "bad_structure", "Structure file has a malformed atom record.", 422
+                ) from None
             st.atoms.append(a)
             if len(st.atoms) > MAX_ATOMS:
                 raise DockprepError("too_large", "Structure has too many atoms.", 413)
@@ -143,7 +185,7 @@ def parse_pdb(text: str) -> Structure:
 
 def _res_from(raw: str, n0: int, n1: int, c: int, s0: int, s1: int) -> tuple[str, str, int]:
     try:
-        return (raw[n0:n1].strip(), raw[c:c + 1].strip() or "_", int(raw[s0:s1]))
+        return (raw[n0:n1].strip(), raw[c : c + 1].strip() or "_", int(raw[s0:s1]))
     except ValueError:
         return ("", "_", 0)
 
@@ -158,10 +200,12 @@ def _site(st: Structure, raw: str) -> None:
         st.sites.append(site)
     for i in range(4):
         s = 18 + 11 * i
-        if len(raw) < s + 9 or not raw[s:s + 3].strip():
+        if len(raw) < s + 9 or not raw[s : s + 3].strip():
             continue
         try:
-            site["residues"].append((raw[s:s + 3].strip(), raw[s + 4:s + 5].strip() or "_", int(raw[s + 5:s + 9])))
+            site["residues"].append(
+                (raw[s : s + 3].strip(), raw[s + 4 : s + 5].strip() or "_", int(raw[s + 5 : s + 9]))
+            )
         except ValueError:
             continue
 
@@ -178,7 +222,13 @@ def _remark(st: Structure, raw: str) -> None:
             st.resolution, st.resolution_source = float(tok), "REMARK 2"
         except ValueError:
             pass
-    elif num == 3 and st.resolution is None and "RESOLUTION" in body and ":" in body and "RANGE LOW" not in body:
+    elif (
+        num == 3
+        and st.resolution is None
+        and "RESOLUTION" in body
+        and ":" in body
+        and "RANGE LOW" not in body
+    ):
         # X-ray refinement "RESOLUTION RANGE HIGH (ANGSTROMS) : 2.60"
         if "HIGH" in body or body.startswith("RESOLUTION"):
             try:
@@ -227,7 +277,7 @@ def _cif_tokens(line: str) -> list[str]:
             j = i + 1
             while j < n and not (line[j] == c and (j + 1 == n or line[j + 1].isspace())):
                 j += 1
-            out.append(line[i + 1:j])
+            out.append(line[i + 1 : j])
             i = j + 1
         elif c == "#":
             break
@@ -264,7 +314,7 @@ def parse_mmcif(text: str) -> Structure:
                 t = lines[i].strip()
                 if t.startswith(("loop_", "_", "data_")) and not buf:
                     break
-                if t.startswith(";"):          # multi-line text values are skipped as one token
+                if t.startswith(";"):  # multi-line text values are skipped as one token
                     i += 1
                     while i < n and not lines[i].startswith(";"):
                         i += 1
@@ -273,8 +323,8 @@ def parse_mmcif(text: str) -> Structure:
                     buf.extend(_cif_tokens(lines[i]))
                 i += 1
                 while cols and len(buf) >= len(cols):
-                    rows.append(buf[:len(cols)])
-                    buf = buf[len(cols):]
+                    rows.append(buf[: len(cols)])
+                    buf = buf[len(cols) :]
                     if cols and cols[0] == "_atom_site.group_PDB" and len(rows) > MAX_ATOMS:
                         raise DockprepError("too_large", "Structure has too many atoms.", 413)
             if cols:
@@ -294,9 +344,11 @@ def parse_mmcif(text: str) -> Structure:
         i += 1
     st.expdta = scalars.get("_exptl.method", "")
     st.method_class = classify_method(st.expdta)
-    for key, src in (("_em_3d_reconstruction.resolution", "_em_3d_reconstruction.resolution"),
-                     ("_refine.ls_d_res_high", "_refine.ls_d_res_high"),
-                     ("_reflns.d_resolution_high", "_reflns.d_resolution_high")):
+    for key, src in (
+        ("_em_3d_reconstruction.resolution", "_em_3d_reconstruction.resolution"),
+        ("_refine.ls_d_res_high", "_refine.ls_d_res_high"),
+        ("_reflns.d_resolution_high", "_reflns.d_resolution_high"),
+    ):
         v = scalars.get(key)
         if v and v not in "?.":
             try:
@@ -326,16 +378,24 @@ def parse_mmcif(text: str) -> Structure:
         if model != first_model:
             continue
         try:
-            st.atoms.append(Atom(
-                record="HETATM" if g(row, "group_PDB") == "HETATM" else "ATOM",
-                serial=int(g(row, "id", default="0")), name=g(row, "auth_atom_id", "label_atom_id").strip('"'),
-                altloc=g(row, "label_alt_id"), resname=g(row, "auth_comp_id", "label_comp_id"),
-                chain=g(row, "auth_asym_id", "label_asym_id", default="_"),
-                resseq=int(g(row, "auth_seq_id", "label_seq_id", default="0")),
-                icode=g(row, "pdbx_PDB_ins_code"), x=_f(g(row, "Cartn_x")), y=_f(g(row, "Cartn_y")),
-                z=_f(g(row, "Cartn_z")), occ=_f(g(row, "occupancy", default="1")),
-                bfac=_f(g(row, "B_iso_or_equiv", default="0")), element=g(row, "type_symbol", default="C").capitalize(),
-            ))
+            st.atoms.append(
+                Atom(
+                    record="HETATM" if g(row, "group_PDB") == "HETATM" else "ATOM",
+                    serial=int(g(row, "id", default="0")),
+                    name=g(row, "auth_atom_id", "label_atom_id").strip('"'),
+                    altloc=g(row, "label_alt_id"),
+                    resname=g(row, "auth_comp_id", "label_comp_id"),
+                    chain=g(row, "auth_asym_id", "label_asym_id", default="_"),
+                    resseq=int(g(row, "auth_seq_id", "label_seq_id", default="0")),
+                    icode=g(row, "pdbx_PDB_ins_code"),
+                    x=_f(g(row, "Cartn_x")),
+                    y=_f(g(row, "Cartn_y")),
+                    z=_f(g(row, "Cartn_z")),
+                    occ=_f(g(row, "occupancy", default="1")),
+                    bfac=_f(g(row, "B_iso_or_equiv", default="0")),
+                    element=g(row, "type_symbol", default="C").capitalize(),
+                )
+            )
         except ValueError:
             raise DockprepError("bad_structure", "Structure file has a malformed atom record.", 422) from None
     if "_pdbx_unobs_or_zero_occ_residues" in loops:
@@ -345,7 +405,9 @@ def parse_mmcif(text: str) -> Structure:
             try:
                 if row[j.get("polymer_flag", 0)] != "Y" and "polymer_flag" in j:
                     continue
-                st.missing_residues.append((row[j["auth_asym_id"]], row[j["auth_comp_id"]], int(row[j["auth_seq_id"]])))
+                st.missing_residues.append(
+                    (row[j["auth_asym_id"]], row[j["auth_comp_id"]], int(row[j["auth_seq_id"]]))
+                )
             except (KeyError, ValueError, IndexError):
                 continue
     return st
@@ -374,9 +436,11 @@ def parse_structure(data: bytes) -> Structure:
 
 def fmt_pdb_atom(a: Atom, serial: int, altloc: str = "") -> str:
     name = a.name if len(a.name) >= 4 or len(a.element) > 1 else " " + a.name
-    return (f"{a.record:<6}{serial % 100000:5d} {name:<4}{altloc[:1] or ' '}{a.resname:>3} {a.chain[:1]}"
-            f"{a.resseq:4d}{a.icode[:1] or ' '}   {a.x:8.3f}{a.y:8.3f}{a.z:8.3f}{a.occ:6.2f}{a.bfac:6.2f}"
-            f"          {a.element:>2}")
+    return (
+        f"{a.record:<6}{serial % 100000:5d} {name:<4}{altloc[:1] or ' '}{a.resname:>3} {a.chain[:1]}"
+        f"{a.resseq:4d}{a.icode[:1] or ' '}   {a.x:8.3f}{a.y:8.3f}{a.z:8.3f}{a.occ:6.2f}{a.bfac:6.2f}"
+        f"          {a.element:>2}"
+    )
 
 
 def write_pdb(atoms: Iterable[Atom], remarks: Iterable[str] = ()) -> str:

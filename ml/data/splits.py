@@ -1,4 +1,5 @@
 """Leakage-safe splits. No random-only split is offered (spec: never quote random-split results)."""
+
 from __future__ import annotations
 
 import numpy as np

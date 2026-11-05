@@ -7,6 +7,7 @@ No pose is ever synthesised. Security properties:
     validated before they are placed in a URL path;
   * every job belongs to one Metis user; another user's job id is indistinguishable from an unknown one.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -31,13 +32,15 @@ from leadstudio.server.core import Rejected
 log = logging.getLogger("leadstudio.server")
 
 DATA = Path(__file__).resolve().parents[1] / "data"
-MAX_ACTIVE = 8            # queued + running dock jobs, whole process
+MAX_ACTIVE = 8  # queued + running dock jobs, whole process
 MAX_ACTIVE_PER_USER = 2
 MAX_JOBS_PER_USER = 50
 MAX_RESPONSE_BYTES = 8_000_000
 REMOTE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 DEFAULT_URL = "http://127.0.0.1:8100"
-UNAVAILABLE = "The docking service is not available right now. Precomputed poses still work for the bundled drugs."
+UNAVAILABLE = (
+    "The docking service is not available right now. Precomputed poses still work for the bundled drugs."
+)
 
 
 def smiles_hash(canonical_smiles: str) -> str:
@@ -88,7 +91,9 @@ def validate_dock_url(url: str | None, allowed: str | None = None) -> str:
     if not _is_loopback(o[1]):
         a = _origin(allowed) if allowed else None
         if a is None or a != o:
-            raise PoseServiceError("docking service URL is neither loopback nor allow-listed (METIS_LEAD_DOCK_URL)")
+            raise PoseServiceError(
+                "docking service URL is neither loopback nor allow-listed (METIS_LEAD_DOCK_URL)"
+            )
     return url.rstrip("/")
 
 
@@ -104,13 +109,19 @@ class HttpDynamicBind:
     """Client for the tiny DynamicBind service contract (POSES.md). stdlib only; URL fixed at construction."""
 
     def __init__(self, url: str | None = None, allowed: str | None = None, timeout: float = 10.0):
-        self.url = validate_dock_url(url if url is not None else os.environ.get("STUDIO_DYNAMICBIND_URL"), allowed)
+        self.url = validate_dock_url(
+            url if url is not None else os.environ.get("STUDIO_DYNAMICBIND_URL"), allowed
+        )
         self.timeout = timeout
 
     def _call(self, method: str, path: str, body: dict | None = None) -> dict:
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(self.url + path, data=data, method=method,  # noqa: S310 - scheme/host validated above
-                                     headers={"Content-Type": "application/json"})
+        req = urllib.request.Request(  # noqa: S310 - scheme/host validated above
+            self.url + path,
+            data=data,
+            method=method,
+            headers={"Content-Type": "application/json"},
+        )
         try:
             with _OPENER.open(req, timeout=self.timeout) as r:  # noqa: S310
                 raw = r.read(MAX_RESPONSE_BYTES + 1)
@@ -145,8 +156,15 @@ class HttpDynamicBind:
 
 
 class PoseManager:
-    def __init__(self, svc, client=None, allowed_url: str | None = None, ttl: float = 3600.0, poll: float = 2.0,
-                 timeout: float = 900.0):
+    def __init__(
+        self,
+        svc,
+        client=None,
+        allowed_url: str | None = None,
+        ttl: float = 3600.0,
+        poll: float = 2.0,
+        timeout: float = 900.0,
+    ):
         self.svc, self.ttl, self.poll, self.timeout = svc, ttl, poll, timeout
         self._client = client or getattr(svc, "pose_client", None)
         self._allowed = allowed_url
@@ -213,7 +231,9 @@ class PoseManager:
             try:
                 self.jobs[job_id] = PoseResult.model_validate({**cur.model_dump(), **upd})
             except ValueError:
-                self.jobs[job_id] = cur.model_copy(update={"status": "failed", "note": "DynamicBind sent an invalid result"})
+                self.jobs[job_id] = cur.model_copy(
+                    update={"status": "failed", "note": "DynamicBind sent an invalid result"}
+                )
 
     def _precomputed(self, target_id: str, smi: str) -> PoseResult | None:
         p = precomputed_dir() / target_id / f"{smiles_hash(smi)}.json"
@@ -249,16 +269,30 @@ class PoseManager:
                 self.stamp.pop(oldest, None)
             job_id = secrets.token_urlsafe(9)
             if pre is not None:
-                job = pre.model_copy(update={"job_id": job_id, "status": "done", "progress": 1.0,
-                                             "target_id": target_id, "smiles": smi, "source": "precomputed"})
+                job = pre.model_copy(
+                    update={
+                        "job_id": job_id,
+                        "status": "done",
+                        "progress": 1.0,
+                        "target_id": target_id,
+                        "smiles": smi,
+                        "source": "precomputed",
+                    }
+                )
             else:
                 active = [k for k, j in self.jobs.items() if j.status in ("queued", "running")]
                 if sum(self.owners.get(k) == owner for k in active) >= MAX_ACTIVE_PER_USER:
                     raise Rejected(429, "You already have docking jobs in progress", 30)
                 if len(active) >= MAX_ACTIVE:
                     raise Rejected(429, "Pose queue is full, try again shortly", 30)
-                job = PoseResult(job_id=job_id, status="queued", target_id=target_id, smiles=smi,
-                                 source="dynamicbind", note="queued for DynamicBind")
+                job = PoseResult(
+                    job_id=job_id,
+                    status="queued",
+                    target_id=target_id,
+                    smiles=smi,
+                    source="dynamicbind",
+                    note="queued for DynamicBind",
+                )
             self.jobs[job_id], self.owners[job_id], self.stamp[job_id] = job, owner, time.monotonic()
         if pre is None:
             self.pool.submit(self._execute, job_id, target_id, smi)
@@ -284,23 +318,43 @@ class PoseManager:
                 d = client.job(remote)
                 st = d.get("status")
                 if st == "done":
-                    fields = {k: d.get(k) for k in ("ligand_sdf", "protein_pdb", "apo_pdb", "pose_confidence",
-                                                    "affinity") if d.get(k) is not None}
+                    fields = {
+                        k: d.get(k)
+                        for k in ("ligand_sdf", "protein_pdb", "apo_pdb", "pose_confidence", "affinity")
+                        if d.get(k) is not None
+                    }
                     fields.setdefault("apo_pdb", self._apo(target_id))
-                    self._set(job_id, status="done", progress=1.0, source="dynamicbind",
-                              note=str(d.get("note") or "DynamicBind prediction")[:300], **fields)
+                    self._set(
+                        job_id,
+                        status="done",
+                        progress=1.0,
+                        source="dynamicbind",
+                        note=str(d.get("note") or "DynamicBind prediction")[:300],
+                        **fields,
+                    )
                     return
                 if st == "failed":
-                    self._set(job_id, status="failed", note=f"DynamicBind failed: {str(d.get('note') or 'no detail')[:200]}")
+                    self._set(
+                        job_id,
+                        status="failed",
+                        note=f"DynamicBind failed: {str(d.get('note') or 'no detail')[:200]}",
+                    )
                     return
                 if time.monotonic() > deadline:
-                    self._set(job_id, status="failed", note=f"DynamicBind did not finish within {self.timeout:g}s")
+                    self._set(
+                        job_id, status="failed", note=f"DynamicBind did not finish within {self.timeout:g}s"
+                    )
                     return
                 try:
                     prog = min(1.0, max(0.0, float(d.get("progress") or 0.0)))
                 except (TypeError, ValueError):
                     prog = 0.0
-                self._set(job_id, status="running", progress=prog, note=str(d.get("note") or "DynamicBind running")[:300])
+                self._set(
+                    job_id,
+                    status="running",
+                    progress=prog,
+                    note=str(d.get("note") or "DynamicBind running")[:300],
+                )
                 time.sleep(self.poll)
         except PoseServiceError as exc:
             self._set(job_id, status="failed", note=str(exc))

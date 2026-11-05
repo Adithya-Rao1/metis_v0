@@ -3,6 +3,7 @@
 Everything is constructed lazily and falls back honestly: a missing policy checkpoint
 means UniformPolicy (the UI/health report it), a missing ChemBERTa means Morgan.
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,6 +33,7 @@ class FrozenPolicy:
 
 def build_scorer():
     from leadstudio.scoring import RDKitScorer
+
     return RDKitScorer()
 
 
@@ -42,9 +44,15 @@ def build_engine(scorer=None):
     from leadstudio.explain.explainer import RDKitExplainer
     from leadstudio.policy.policy import load_policy
     from leadstudio.registry import get_registry
+
     registry = get_registry()
     policy = FrozenPolicy.wrap(load_policy([op.id for op in registry.all()]))
-    log.info("policy=%s embedder=%s ops=%d", type(policy._inner).__name__, get_embedder().method, len(registry.all()))
+    log.info(
+        "policy=%s embedder=%s ops=%d",
+        type(policy._inner).__name__,
+        get_embedder().method,
+        len(registry.all()),
+    )
     return Engine(registry, scorer or build_scorer(), RDKitExplainer(), get_embedder(), policy)
 
 
@@ -55,8 +63,15 @@ def describe(engine=None) -> dict:
     stand-in engine are reported as absent, never guessed.
     """
     if engine is None:
-        return {"engine_source": "mock", "registry_ops": 0, "scorer": None, "explainer": None,
-                "embedder": None, "policy": None, "demo_safe": False}
+        return {
+            "engine_source": "mock",
+            "registry_ops": 0,
+            "scorer": None,
+            "explainer": None,
+            "embedder": None,
+            "policy": None,
+            "demo_safe": False,
+        }
     registry, policy = getattr(engine, "registry", None), getattr(engine, "policy", None)
     policy = getattr(policy, "_inner", policy)  # see FrozenPolicy
     ckpt = getattr(policy, "checkpoint_loaded", None)

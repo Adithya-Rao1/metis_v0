@@ -1,4 +1,5 @@
 """Upload validation and 3D helpers for the server (RDKit only, no network)."""
+
 from __future__ import annotations
 
 from rdkit import Chem, RDLogger

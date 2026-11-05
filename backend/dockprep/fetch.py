@@ -1,6 +1,7 @@
 # ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """PDB fetch behind an interface. Tests use MockFetcher; the real client is injected and enforces a host allowlist,
 HTTPS, a size limit, a timeout and no cross-host redirects."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -10,7 +11,7 @@ from urllib.parse import urlparse
 from .errors import DockprepError
 from .limits import FETCH_HOST_ALLOWLIST, MAX_FETCH_BYTES, PDB_ID_RE
 
-HttpGet = Callable[[str, int, float], bytes]     # (url, max_bytes, timeout_s) -> body
+HttpGet = Callable[[str, int, float], bytes]  # (url, max_bytes, timeout_s) -> body
 
 
 class StructureFetcher(Protocol):
@@ -57,7 +58,9 @@ class RcsbFetcher:
         return body
 
 
-def urllib_http_get(url: str, max_bytes: int, timeout: float) -> bytes:  # pragma: no cover - real network, not used in tests
+def urllib_http_get(
+    url: str, max_bytes: int, timeout: float
+) -> bytes:  # pragma: no cover - real network, not used in tests
     import urllib.error
     import urllib.request
 
@@ -71,10 +74,16 @@ def urllib_http_get(url: str, max_bytes: int, timeout: float) -> bytes:  # pragm
 
     opener = urllib.request.build_opener(_NoRedirect)
     try:
-        with opener.open(urllib.request.Request(url, headers={"User-Agent": "metis-dockprep"}), timeout=timeout) as r:  # nosec B310 - https + allowlisted host checked above
+        with opener.open(
+            urllib.request.Request(url, headers={"User-Agent": "metis-dockprep"}), timeout=timeout
+        ) as r:  # nosec B310 - https + allowlisted host checked above
             body = r.read(max_bytes + 1)
     except urllib.error.HTTPError as e:
-        raise DockprepError("not_found" if e.code == 404 else "fetch_failed", "Structure could not be fetched.", 404 if e.code == 404 else 502) from None
+        raise DockprepError(
+            "not_found" if e.code == 404 else "fetch_failed",
+            "Structure could not be fetched.",
+            404 if e.code == 404 else 502,
+        ) from None
     except Exception:  # noqa: BLE001
         raise DockprepError("fetch_failed", "Structure could not be fetched.", 502) from None
     if len(body) > max_bytes:

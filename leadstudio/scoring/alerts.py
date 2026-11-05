@@ -1,4 +1,5 @@
 """Structural alerts via RDKit FilterCatalog (PAINS, BRENK, NIH)."""
+
 from __future__ import annotations
 
 from rdkit import Chem

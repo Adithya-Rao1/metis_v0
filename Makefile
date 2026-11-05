@@ -6,7 +6,7 @@ install:
 test:
 	$(PY) -m pytest -q
 lint:
-	ruff check backend ml leadstudio tests/foundation && ruff format --check backend/core tests/foundation
+	ruff check backend ml leadstudio tests/foundation && ruff format --check backend ml leadstudio tests/foundation
 type:
 	mypy
 sec:

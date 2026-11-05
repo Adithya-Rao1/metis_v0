@@ -1,4 +1,5 @@
 """Read-only access to the verified target repository under studio/data/."""
+
 from __future__ import annotations
 
 import json

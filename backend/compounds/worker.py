@@ -26,7 +26,9 @@ def _limit() -> None:
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location("metis_standardize", pathlib.Path(__file__).with_name("standardize.py"))
+    spec = importlib.util.spec_from_file_location(
+        "metis_standardize", pathlib.Path(__file__).with_name("standardize.py")
+    )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -43,7 +45,11 @@ def main() -> int:
         std = _load()
         op = req["op"]
         if op == "standardize":
-            out = {"records": std.standardize_request(req["format"], req.get("smiles"), req.get("content"), int(req["max_records"]))}
+            out = {
+                "records": std.standardize_request(
+                    req["format"], req.get("smiles"), req.get("content"), int(req["max_records"])
+                )
+            }
         elif op == "conformers":
             smi = req["smiles"]
             if not isinstance(smi, list) or len(smi) > 10:
@@ -55,7 +61,14 @@ def main() -> int:
             out = {"error": "bad_op"}
     except Exception as exc:  # noqa: BLE001 - reply with a class name only, never content
         kind = type(exc).__name__
-        out = {"error": "too_many" if kind == "TooManyRecords" else "format" if kind == "InputFormatError" else "failed", "detail": str(exc)[:100] if kind == "InputFormatError" else ""}
+        out = {
+            "error": "too_many"
+            if kind == "TooManyRecords"
+            else "format"
+            if kind == "InputFormatError"
+            else "failed",
+            "detail": str(exc)[:100] if kind == "InputFormatError" else "",
+        }
     sys.stdout.write(json.dumps(out))
     return 0
 

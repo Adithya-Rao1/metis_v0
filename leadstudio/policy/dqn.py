@@ -18,6 +18,7 @@ Transition tuple accepted by update():
     (parent_smiles, edit_id, site, child_smiles, reward)   or
     (parent_smiles, edit_id, site, reward)
 """
+
 from __future__ import annotations
 
 import os
@@ -38,8 +39,12 @@ class QNet(nn.Module):
         self.op_ids = list(op_ids)
         self.hidden = hidden
         self.inp = nn.Linear(ATOM_DIM, hidden)
-        self.msg = nn.ModuleList([nn.Sequential(nn.Linear(hidden + BOND_DIM, hidden), nn.ReLU()) for _ in range(layers)])
-        self.upd = nn.ModuleList([nn.Sequential(nn.Linear(2 * hidden, hidden), nn.ReLU()) for _ in range(layers)])
+        self.msg = nn.ModuleList(
+            [nn.Sequential(nn.Linear(hidden + BOND_DIM, hidden), nn.ReLU()) for _ in range(layers)]
+        )
+        self.upd = nn.ModuleList(
+            [nn.Sequential(nn.Linear(2 * hidden, hidden), nn.ReLU()) for _ in range(layers)]
+        )
         self.norms = nn.ModuleList([nn.LayerNorm(hidden) for _ in range(layers)])
         self.op_emb = nn.Embedding(len(self.op_ids) + 1, op_dim)  # last row = unknown op
         self.head = nn.Sequential(nn.Linear(2 * hidden + op_dim, hidden), nn.ReLU(), nn.Linear(hidden, 1))
@@ -62,8 +67,15 @@ class QNet(nn.Module):
 
 
 class DQNPolicy:
-    def __init__(self, op_ids: Sequence[str], checkpoint: str | None = "auto", lr: float = 1e-3,
-                 buffer_size: int = 20_000, batch_size: int = 32, seed: int = 0):
+    def __init__(
+        self,
+        op_ids: Sequence[str],
+        checkpoint: str | None = "auto",
+        lr: float = 1e-3,
+        buffer_size: int = 20_000,
+        batch_size: int = 32,
+        seed: int = 0,
+    ):
         torch.manual_seed(seed)
         self._rng = random.Random(seed)
         self.net = QNet(op_ids)

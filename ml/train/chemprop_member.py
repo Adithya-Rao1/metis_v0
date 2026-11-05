@@ -1,5 +1,6 @@
 """Chemprop v2 ensemble-member adapter (D-MPNN). Imports chemprop/torch lazily so the rest of Metis
 works without them. NOT exercised on real data in Wave 2 (owner instruction); see tests for what is checked."""
+
 from __future__ import annotations
 
 import json
@@ -9,13 +10,21 @@ import numpy as np
 
 from ml.train.member import MemberModel
 
-DEFAULTS = {"max_epochs": 50, "batch_size": 64, "hidden_dim": 300, "depth": 3, "dropout": 0.0, "accelerator": "cpu"}
+DEFAULTS = {
+    "max_epochs": 50,
+    "batch_size": 64,
+    "hidden_dim": 300,
+    "depth": 3,
+    "dropout": 0.0,
+    "accelerator": "cpu",
+}
 
 
 def _imports():
     import torch
     from lightning import pytorch as pl
     from chemprop import data, featurizers, models, nn
+
     return torch, pl, data, featurizers, models, nn
 
 
@@ -36,25 +45,40 @@ class ChempropMember(MemberModel):
     def _loader(self, smiles, y, shuffle: bool, seed: int):
         _, _, data, featurizers, _, _ = _imports()
         feat = featurizers.SimpleMoleculeMolGraphFeaturizer()
-        pts = [data.MoleculeDatapoint.from_smi(s, None if y is None else [float(v)]) for s, v in
-               zip(smiles, y if y is not None else [None] * len(smiles))]
+        pts = [
+            data.MoleculeDatapoint.from_smi(s, None if y is None else [float(v)])
+            for s, v in zip(smiles, y if y is not None else [None] * len(smiles))
+        ]
         ds = data.MoleculeDataset(pts, feat)
-        return data.build_dataloader(ds, batch_size=self._hp()["batch_size"], num_workers=0, shuffle=shuffle, seed=seed)
+        return data.build_dataloader(
+            ds, batch_size=self._hp()["batch_size"], num_workers=0, shuffle=shuffle, seed=seed
+        )
 
     def _trainer(self, max_epochs: int):
         _, pl, *_ = _imports()
-        return pl.Trainer(logger=False, enable_checkpointing=False, enable_progress_bar=False,
-                          accelerator=self._hp()["accelerator"], devices=1, max_epochs=max_epochs,
-                          enable_model_summary=False, deterministic=True)
+        return pl.Trainer(
+            logger=False,
+            enable_checkpointing=False,
+            enable_progress_bar=False,
+            accelerator=self._hp()["accelerator"],
+            devices=1,
+            max_epochs=max_epochs,
+            enable_model_summary=False,
+            deterministic=True,
+        )
 
     def fit(self, smiles, y, seed):
         _, pl, *_ = _imports()
         pl.seed_everything(seed, workers=True)
         hp = self._hp()
         y = np.asarray(y, float)
-        self.y_mean, self.y_std = (float(y.mean()), float(y.std() or 1.0)) if self.kind == "regression" else (0.0, 1.0)
+        self.y_mean, self.y_std = (
+            (float(y.mean()), float(y.std() or 1.0)) if self.kind == "regression" else (0.0, 1.0)
+        )
         self.model = self._build(hp)
-        self._trainer(hp["max_epochs"]).fit(self.model, self._loader(smiles, (y - self.y_mean) / self.y_std, True, seed))
+        self._trainer(hp["max_epochs"]).fit(
+            self.model, self._loader(smiles, (y - self.y_mean) / self.y_std, True, seed)
+        )
         return self
 
     def predict(self, smiles):
@@ -67,8 +91,9 @@ class ChempropMember(MemberModel):
         torch, *_ = _imports()
         path = Path(path)
         torch.save(self.model.state_dict(), path)
-        path.with_suffix(".json").write_text(json.dumps({"kind": self.kind, "params": self.params,
-                                                         "y_mean": self.y_mean, "y_std": self.y_std}))
+        path.with_suffix(".json").write_text(
+            json.dumps({"kind": self.kind, "params": self.params, "y_mean": self.y_mean, "y_std": self.y_std})
+        )
 
     @classmethod
     def load(cls, path):

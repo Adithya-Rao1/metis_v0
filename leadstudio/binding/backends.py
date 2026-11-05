@@ -3,6 +3,7 @@
 Unit of every backend: `neg_log10_affinity_M` (pKd-like, higher = tighter predicted binding), the model's own
 output unit (see `PredictionModule.convert_to_affinity` in binding_module/binding_affinity/plapt.py).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -23,7 +24,9 @@ UNIT = "neg_log10_affinity_M"  # pKd-like
 
 
 def cache_dir() -> Path:
-    return Path(os.environ.get("STUDIO_CACHE_DIR", "./.cache/studio"))  # PLAPT's own embedding cache (optional model)
+    return Path(
+        os.environ.get("STUDIO_CACHE_DIR", "./.cache/studio")
+    )  # PLAPT's own embedding cache (optional model)
 
 
 def canon(smiles: str) -> str:
@@ -52,6 +55,7 @@ class FakeBackend:
 
     For tests and offline dev only. `overrides` pins specific canonical SMILES to chosen values.
     """
+
     name = "FakeBackend(deterministic-hash, not PLAPT)"
     unit = UNIT
 
@@ -80,6 +84,7 @@ class PlaptBackend:
     Models are fetched from the official Hugging Face Hub on first use. The protein embedding is computed once per
     sequence and kept in memory (and in Plapt's own disk cache). Device: CUDA if available, else CPU.
     """
+
     unit = UNIT
 
     def __init__(self, embedding_cache_dir: str | None = None, device: str = "cuda"):
@@ -93,6 +98,7 @@ class PlaptBackend:
     def _load(self):
         if self._plapt is None:
             from binding_module.binding_affinity.plapt import Plapt  # heavy: torch, transformers, onnxruntime
+
             Path(self._dir).mkdir(parents=True, exist_ok=True)
             self._plapt = Plapt(device=self._device, cache_dir=self._dir)
             self.name = f"PLAPT(prot_bert+ChemBERTa+onnx, {self._plapt.device.type})"
@@ -101,6 +107,7 @@ class PlaptBackend:
 
     def predict(self, sequence: str, smiles_list: Sequence[str]) -> list[float]:
         import torch
+
         if not smiles_list:
             return []
         with self._lock:

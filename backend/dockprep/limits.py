@@ -1,11 +1,12 @@
 # ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Size, time and name limits for hostile-input handling (threat model: hostile uploads)."""
+
 from __future__ import annotations
 
 import re
 
-MAX_UPLOAD_BYTES = 15 * 1024 * 1024        # decoded structure file
-MAX_BODY_BYTES = 22 * 1024 * 1024          # JSON request body (base64 inflates by 4/3)
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # decoded structure file
+MAX_BODY_BYTES = 22 * 1024 * 1024  # JSON request body (base64 inflates by 4/3)
 MAX_ATOMS = 250_000
 MAX_LINE_LEN = 400
 MAX_SMILES_LEN = 2000
@@ -15,12 +16,12 @@ MAX_FETCH_BYTES = MAX_UPLOAD_BYTES
 SANDBOX_TIMEOUT_S = 120
 SANDBOX_CPU_S = 100
 SANDBOX_MEM_BYTES = 3 * 1024**3
-SUBPROCESS_TIMEOUT_S = 90                   # pdb2pqr / fpocket inside the sandbox
+SUBPROCESS_TIMEOUT_S = 90  # pdb2pqr / fpocket inside the sandbox
 FETCH_HOST_ALLOWLIST = frozenset({"files.rcsb.org"})
 MAX_CONCURRENT_JOBS = 2
-MAX_POCKET_GRID_CELLS = 6_000_000           # geometric pocket grid (1 A cells); ~180 A cube
-QUEUE_WAIT_S = 3.0                          # max wait for a sandbox slot before 503
-OVERSIZE_BYTES = 2 * 1024 * 1024            # decoded structure above this gets the smaller budget
+MAX_POCKET_GRID_CELLS = 6_000_000  # geometric pocket grid (1 A cells); ~180 A cube
+QUEUE_WAIT_S = 3.0  # max wait for a sandbox slot before 503
+OVERSIZE_BYTES = 2 * 1024 * 1024  # decoded structure above this gets the smaller budget
 OVERSIZE_CPU_S = 30
 OVERSIZE_TIMEOUT_S = 40
 

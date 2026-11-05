@@ -88,7 +88,15 @@ JobFn = Callable[[Progress], None]
 
 
 class JobQueue(Protocol):
-    def submit(self, owner_id: uuid.UUID, project_id: uuid.UUID, total: int, estimate_seconds: float, fn: JobFn, max_active: Optional[int] = None) -> JobRecord: ...
+    def submit(
+        self,
+        owner_id: uuid.UUID,
+        project_id: uuid.UUID,
+        total: int,
+        estimate_seconds: float,
+        fn: JobFn,
+        max_active: Optional[int] = None,
+    ) -> JobRecord: ...
     def get(self, owner_id: uuid.UUID, job_id: uuid.UUID) -> Optional[JobRecord]: ...
 
 
@@ -96,7 +104,7 @@ def _error_text(code: Optional[str]) -> Optional[str]:
     if code is None:
         return None
     if code.startswith(_ERR_FAILED_PREFIX):
-        return f"job failed ({code[len(_ERR_FAILED_PREFIX):]})"
+        return f"job failed ({code[len(_ERR_FAILED_PREFIX) :]})"
     return _ERR_TEXT.get(code, "job failed")
 
 
@@ -121,14 +129,24 @@ class InProcessJobQueue:
 
     def _reap(self, s: Session, owner_id: uuid.UUID) -> None:
         """Caller holds the lock. Fail this owner's queued/running rows that no thread of THIS process is tracking."""
-        live = [j for j, r in self._jobs.items() if r.owner_id == owner_id and r.state in ("queued", "running")]
+        live = [
+            j for j, r in self._jobs.items() if r.owner_id == owner_id and r.state in ("queued", "running")
+        ]
         stmt = text(
             "UPDATE job SET state = 'failed', error_code = :code, finished_at = now() "
             "WHERE owner_id = :u AND state IN ('queued','running') AND NOT (id = ANY(CAST(:live AS uuid[])))"
         )
         s.execute(stmt, {"code": ERR_INTERRUPTED, "u": owner_id, "live": live})
 
-    def submit(self, owner_id: uuid.UUID, project_id: uuid.UUID, total: int, estimate_seconds: float, fn: JobFn, max_active: Optional[int] = None) -> JobRecord:
+    def submit(
+        self,
+        owner_id: uuid.UUID,
+        project_id: uuid.UUID,
+        total: int,
+        estimate_seconds: float,
+        fn: JobFn,
+        max_active: Optional[int] = None,
+    ) -> JobRecord:
         rec = JobRecord(uuid.uuid4(), owner_id, project_id, total, estimate_seconds=estimate_seconds)
         with self._lock:
             if self._factory is not None:
@@ -136,7 +154,9 @@ class InProcessJobQueue:
                     self._reap(s, owner_id)
                     if max_active is not None:
                         active = s.execute(
-                            text("SELECT count(*) FROM job WHERE owner_id = :u AND state IN ('queued','running')"),
+                            text(
+                                "SELECT count(*) FROM job WHERE owner_id = :u AND state IN ('queued','running')"
+                            ),
                             {"u": owner_id},
                         ).scalar_one()
                         if active >= max_active:
@@ -146,9 +166,22 @@ class InProcessJobQueue:
                             "INSERT INTO job (id, owner_id, project_id, kind, estimated_seconds) "
                             "VALUES (:id, :u, :p, 'predict', :est)"
                         ),
-                        {"id": rec.id, "u": owner_id, "p": project_id, "est": max(0.0, float(estimate_seconds))},
+                        {
+                            "id": rec.id,
+                            "u": owner_id,
+                            "p": project_id,
+                            "est": max(0.0, float(estimate_seconds)),
+                        },
                     )
-            elif max_active is not None and sum(1 for j in self._jobs.values() if j.owner_id == owner_id and j.state in ("queued", "running")) >= max_active:
+            elif (
+                max_active is not None
+                and sum(
+                    1
+                    for j in self._jobs.values()
+                    if j.owner_id == owner_id and j.state in ("queued", "running")
+                )
+                >= max_active
+            ):
                 raise QuotaExceeded()
             self._jobs[rec.id] = rec
             self._evict()
@@ -157,8 +190,13 @@ class InProcessJobQueue:
             if rec.state == "failed":  # dropped while queued (overload)
                 return
             rec.state = "running"
-            self._write(owner_id, "UPDATE job SET state = 'running', started_at = now() WHERE id = :id AND owner_id = :u", {"id": rec.id, "u": owner_id})
+            self._write(
+                owner_id,
+                "UPDATE job SET state = 'running', started_at = now() WHERE id = :id AND owner_id = :u",
+                {"id": rec.id, "u": owner_id},
+            )
             try:
+
                 def progress(pid: uuid.UUID) -> None:
                     rec.done += 1
                     rec.prediction_ids.append(pid)
@@ -167,12 +205,21 @@ class InProcessJobQueue:
                             owner_id,
                             "WITH link AS (UPDATE prediction SET job_id = :id WHERE id = :pid AND owner_id = :u RETURNING 1) "
                             "UPDATE job SET progress = LEAST(1.0, :frac) WHERE id = :id AND owner_id = :u",
-                            {"id": rec.id, "pid": pid, "u": owner_id, "frac": rec.done / rec.total if rec.total > 0 else 0.0},
+                            {
+                                "id": rec.id,
+                                "pid": pid,
+                                "u": owner_id,
+                                "frac": rec.done / rec.total if rec.total > 0 else 0.0,
+                            },
                         )
 
                 fn(progress)
                 rec.state = "done"
-                self._write(owner_id, "UPDATE job SET state = 'succeeded', progress = 1, finished_at = now() WHERE id = :id AND owner_id = :u", {"id": rec.id, "u": owner_id})
+                self._write(
+                    owner_id,
+                    "UPDATE job SET state = 'succeeded', progress = 1, finished_at = now() WHERE id = :id AND owner_id = :u",
+                    {"id": rec.id, "u": owner_id},
+                )
             except Exception as exc:  # noqa: BLE001 - class name only: messages may carry structure content
                 rec.state = "failed"
                 rec.error = f"job failed ({type(exc).__name__})"
@@ -239,7 +286,9 @@ class InProcessJobQueue:
             return None
         pids = list(
             s.execute(
-                text("SELECT id FROM prediction WHERE job_id = :id AND owner_id = :u ORDER BY created_at, id"),
+                text(
+                    "SELECT id FROM prediction WHERE job_id = :id AND owner_id = :u ORDER BY created_at, id"
+                ),
                 {"id": job_id, "u": owner_id},
             ).scalars()
         )

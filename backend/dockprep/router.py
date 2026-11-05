@@ -1,6 +1,7 @@
 # ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """POST /dockprep/ligands, /dockprep/proteins, /dockprep/sites. Stateless: nothing is stored; the result is returned
 as JSON (files base64) or as a zip with ?bundle=zip. Auth is required on every route; rate limits belong to Accounts."""
+
 from __future__ import annotations
 
 import base64
@@ -34,7 +35,11 @@ def get_fetcher() -> StructureFetcher:
     import os
 
     if os.environ.get("METIS_DOCKPREP_FETCH") != "1":
-        raise DockprepError("fetch_disabled", "Fetching by PDB ID is not enabled on this server; upload the file instead.", 503)
+        raise DockprepError(
+            "fetch_disabled",
+            "Fetching by PDB ID is not enabled on this server; upload the file instead.",
+            503,
+        )
     return RcsbFetcher(urllib_http_get)
 
 
@@ -55,7 +60,7 @@ class LigandReq(_Base):
 class _StructReq(_Base):
     pdb_id: str | None = Field(default=None, max_length=8)
     file_b64: str | None = Field(default=None, max_length=MAX_BODY_BYTES)
-    filename: str | None = Field(default=None, max_length=200)   # sanitized and never used as a path
+    filename: str | None = Field(default=None, max_length=200)  # sanitized and never used as a path
 
 
 class ProteinReq(_StructReq):
@@ -74,7 +79,9 @@ class BoxReq(_Base):
 
 
 class SitesReq(_StructReq):
-    modes: list[Literal["residues", "ligand", "box", "detect", "literature"]] = Field(min_length=1, max_length=5)
+    modes: list[Literal["residues", "ligand", "box", "detect", "literature"]] = Field(
+        min_length=1, max_length=5
+    )
     residues: list[str] | None = Field(default=None, max_length=200)
     ligand_id: str | None = Field(default=None, max_length=20)
     box: BoxReq | None = None
@@ -125,10 +132,19 @@ def _respond(res: dict, bundle: str | None, extra: dict | None = None) -> Respon
     extra = extra or {}
     if bundle == "zip":
         z = make_zip(res["files"], res["change_log"], res["report"], extra.get("files"))
-        return Response(z, media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="metis_dockprep.zip"'})
+        return Response(
+            z,
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="metis_dockprep.zip"'},
+        )
     files = {**res["files"], **extra.get("files", {})}
-    return {"files": files_b64(files), "change_log": res["change_log"], "change_log_text": change_log_text(res["change_log"]),
-            "report": res["report"], **{k: v for k, v in extra.items() if k != "files"}}
+    return {
+        "files": files_b64(files),
+        "change_log": res["change_log"],
+        "change_log_text": change_log_text(res["change_log"]),
+        "report": res["report"],
+        **{k: v for k, v in extra.items() if k != "files"},
+    }
 
 
 def _handle(e: DockprepError) -> HTTPException:
@@ -146,12 +162,20 @@ async def post_ligands(request: Request, bundle: Literal["zip"] | None = None, u
 
 
 @router.post("/proteins")
-async def post_proteins(request: Request, bundle: Literal["zip"] | None = None, user=Depends(current_user),
-                        fetcher=Depends(fetcher_provider)):
+async def post_proteins(
+    request: Request,
+    bundle: Literal["zip"] | None = None,
+    user=Depends(current_user),
+    fetcher=Depends(fetcher_provider),
+):
     try:
         req = await _read_model(request, ProteinReq)
         raw, pid = await anyio.to_thread.run_sync(_structure_bytes, req, fetcher)
-        payload = {**req.model_dump(exclude={"file_b64", "filename", "pdb_id"}), "data_b64": base64.b64encode(raw).decode(), "pdb_id": pid}
+        payload = {
+            **req.model_dump(exclude={"file_b64", "filename", "pdb_id"}),
+            "data_b64": base64.b64encode(raw).decode(),
+            "pdb_id": pid,
+        }
         res = await anyio.to_thread.run_sync(run_sandboxed, "protein", payload)
         return _respond(res, bundle)
     except DockprepError as e:
@@ -159,31 +183,80 @@ async def post_proteins(request: Request, bundle: Literal["zip"] | None = None, 
 
 
 @router.post("/sites")
-async def post_sites(request: Request, bundle: Literal["zip"] | None = None, user=Depends(current_user),
-                     fetcher=Depends(fetcher_provider)):
+async def post_sites(
+    request: Request,
+    bundle: Literal["zip"] | None = None,
+    user=Depends(current_user),
+    fetcher=Depends(fetcher_provider),
+):
     try:
         req = await _read_model(request, SitesReq)
         raw, _pid = await anyio.to_thread.run_sync(_structure_bytes, req, fetcher)
-        payload = {"data_b64": base64.b64encode(raw).decode(), "modes": req.modes, "residues": req.residues, "ligand_id": req.ligand_id,
-                   "box": req.box.model_dump() if req.box else None, "padding": req.padding, "chains": req.chains}
+        payload = {
+            "data_b64": base64.b64encode(raw).decode(),
+            "modes": req.modes,
+            "residues": req.residues,
+            "ligand_id": req.ligand_id,
+            "box": req.box.model_dump() if req.box else None,
+            "padding": req.padding,
+            "chains": req.chains,
+        }
         res = await anyio.to_thread.run_sync(run_sandboxed, "sites", payload)
         sites = res["sites"]
         cfg_files: dict[str, str] = {}
         chosen = None
         if sites:
-            chosen = next((s for s in sites if s["id"] == req.config_site), sites[0]) if req.config_site else sites[0]
-            kw = dict(exhaustiveness=req.exhaustiveness, num_modes=req.num_modes, receptor=sanitize_name(req.receptor_file, "receptor.pdbqt", 80))
+            chosen = (
+                next((s for s in sites if s["id"] == req.config_site), sites[0])
+                if req.config_site
+                else sites[0]
+            )
+            kw = dict(
+                exhaustiveness=req.exhaustiveness,
+                num_modes=req.num_modes,
+                receptor=sanitize_name(req.receptor_file, "receptor.pdbqt", 80),
+            )
             if req.engine == "vina":
-                cfg_files["vina.conf"] = configs.vina_config(chosen["center"], chosen["size"], ligand=sanitize_name(req.ligand_file or "ligand.pdbqt", "ligand.pdbqt", 80), **kw)
+                cfg_files["vina.conf"] = configs.vina_config(
+                    chosen["center"],
+                    chosen["size"],
+                    ligand=sanitize_name(req.ligand_file or "ligand.pdbqt", "ligand.pdbqt", 80),
+                    **kw,
+                )
             else:
-                cfg_files["gnina.conf"] = configs.gnina_config(chosen["center"], chosen["size"], ligand=sanitize_name(req.ligand_file or "ligand.sdf", "ligand.sdf", 80),
-                                                              cnn_scoring=req.cnn_scoring, **kw)
-            cfg_files["box.txt"] = (f"center_x = {chosen['center'][0]:.3f}\ncenter_y = {chosen['center'][1]:.3f}\ncenter_z = {chosen['center'][2]:.3f}\n"
-                                    f"size_x = {chosen['size'][0]:.3f}\nsize_y = {chosen['size'][1]:.3f}\nsize_z = {chosen['size'][2]:.3f}\n")
-        site_log = [{"step": "site", "action": "site defined", "target": s["id"], "detail": f"{s['label']} via {s['method']}",
-                     "params": {"center": s["center"], "size": s["size"]}} for s in sites]
-        out = {"files": cfg_files, "change_log": site_log, "report": {"structure": res["structure"], "sites": sites, "notes": res["notes"], "detection": res["detection"],
-                                                                        "config_site": chosen["id"] if chosen else None, "engine": req.engine}}
+                cfg_files["gnina.conf"] = configs.gnina_config(
+                    chosen["center"],
+                    chosen["size"],
+                    ligand=sanitize_name(req.ligand_file or "ligand.sdf", "ligand.sdf", 80),
+                    cnn_scoring=req.cnn_scoring,
+                    **kw,
+                )
+            cfg_files["box.txt"] = (
+                f"center_x = {chosen['center'][0]:.3f}\ncenter_y = {chosen['center'][1]:.3f}\ncenter_z = {chosen['center'][2]:.3f}\n"
+                f"size_x = {chosen['size'][0]:.3f}\nsize_y = {chosen['size'][1]:.3f}\nsize_z = {chosen['size'][2]:.3f}\n"
+            )
+        site_log = [
+            {
+                "step": "site",
+                "action": "site defined",
+                "target": s["id"],
+                "detail": f"{s['label']} via {s['method']}",
+                "params": {"center": s["center"], "size": s["size"]},
+            }
+            for s in sites
+        ]
+        out = {
+            "files": cfg_files,
+            "change_log": site_log,
+            "report": {
+                "structure": res["structure"],
+                "sites": sites,
+                "notes": res["notes"],
+                "detection": res["detection"],
+                "config_site": chosen["id"] if chosen else None,
+                "engine": req.engine,
+            },
+        }
         return _respond(out, bundle, {"sites": sites, "notes": res["notes"]})
     except DockprepError as e:
         raise _handle(e) from None

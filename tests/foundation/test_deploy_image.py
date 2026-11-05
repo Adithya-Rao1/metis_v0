@@ -77,7 +77,7 @@ def test_ci_and_makefile_run_same_scope():
     mk = (ROOT / "Makefile").read_text()
     for cmd in (
         "ruff check backend ml leadstudio tests/foundation",
-        "ruff format --check backend/core tests/foundation",
+        "ruff format --check backend ml leadstudio tests/foundation",
         "bandit -c pyproject.toml -r backend ml leadstudio",
         "pip-audit -r requirements.txt -r ml/requirements.txt",
     ):

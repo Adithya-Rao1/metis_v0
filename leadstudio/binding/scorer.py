@@ -5,6 +5,7 @@ improvements show up. Hard guards (composite 0, PLAPT not even called): Tanimoto
 MW > cap, failed sanity. Soft guard: 0.5 ** (number of NEW structural alerts vs the seed).
 Everything is PREDICTED; `extras` carries the raw model outputs.
 """
+
 from __future__ import annotations
 
 import math
@@ -20,12 +21,13 @@ from leadstudio.scoring import RDKitScorer
 
 RDLogger.DisableLog("rdApp.*")
 
-BINDING_SCALE = 0.75   # pKd units over which desirability goes 0.5 -> 0.73 (one scale above the seed)
+BINDING_SCALE = 0.75  # pKd units over which desirability goes 0.5 -> 0.73 (one scale above the seed)
 DEFAULT_MW_HEADROOM = 120.0
 NEW_ALERT_FACTOR = 0.5
 
 try:  # sanity module lives on another branch; fall back to a small local check, labelled as such
     from leadstudio.sanity.checks import check_child as _check_child
+
     SANITY_SOURCE = "leadstudio.sanity.checks"
 except Exception:  # pragma: no cover - depends on branch
     _check_child = None
@@ -73,8 +75,12 @@ def _alert_counts(alerts) -> Counter:
 class BindingScorer:
     """Scorer whose fitness is PLAPT-predicted binding to `config.target_id` (guarded)."""
 
-    def __init__(self, backend: BindingBackend, target_provider: Callable[[str], object] | None = None,
-                 base: RDKitScorer | None = None):
+    def __init__(
+        self,
+        backend: BindingBackend,
+        target_provider: Callable[[str], object] | None = None,
+        base: RDKitScorer | None = None,
+    ):
         self.backend = backend
         self.base = base or RDKitScorer()
         self._provider = target_provider
@@ -87,6 +93,7 @@ class BindingScorer:
         provider = self._provider
         if provider is None:
             from leadstudio.data.loader import get_target  # owned by the targets stream
+
             provider = get_target
         return provider(config.target_id).sequence
 
@@ -116,9 +123,15 @@ class BindingScorer:
             ok, reason = (True, "seed") if c == seed else sanity(seed, c)
             n_new = sum((_alert_counts(res.alerts) - seed_alerts).values())
             hard = sim < config.min_similarity_to_seed or res.descriptors.mw > cap or not ok
-            ex = {"sim_to_seed": sim, "mw_cap": float(cap), "new_alerts": float(n_new),
-                  "sanity_ok": float(ok), "sanity_is_fallback": float(SANITY_SOURCE == "local_fallback"),
-                  "guard_failed": float(hard), "plapt_seed_pkd": seed_pkd}
+            ex = {
+                "sim_to_seed": sim,
+                "mw_cap": float(cap),
+                "new_alerts": float(n_new),
+                "sanity_ok": float(ok),
+                "sanity_is_fallback": float(SANITY_SOURCE == "local_fallback"),
+                "guard_failed": float(hard),
+                "plapt_seed_pkd": seed_pkd,
+            }
             rows.append((res, ex, hard, c))
 
         todo = list(dict.fromkeys(c for _, _, hard, c in rows if not hard and c != seed))
@@ -135,8 +148,13 @@ class BindingScorer:
             pkd = pred[c]
             d = binding_desirability(pkd, seed_pkd)
             comps["binding"] = d
-            ex = {**ex, "plapt_pkd": pkd, "plapt_affinity": pkd,  # plapt_affinity: alias, same unit (-log10 Kd/M)
-                  "plapt_affinity_uM": 1e6 * 10 ** (-pkd), "plapt_delta_vs_seed": pkd - seed_pkd}
+            ex = {
+                **ex,
+                "plapt_pkd": pkd,
+                "plapt_affinity": pkd,  # plapt_affinity: alias, same unit (-log10 Kd/M)
+                "plapt_affinity_uM": 1e6 * 10 ** (-pkd),
+                "plapt_delta_vs_seed": pkd - seed_pkd,
+            }
             comp = d * NEW_ALERT_FACTOR ** ex["new_alerts"]
             out.append(res.model_copy(update={"composite": comp, "components": comps, "extras": ex}))
         return out

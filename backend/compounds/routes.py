@@ -35,7 +35,11 @@ def _run(request: dict) -> dict:
     try:
         return sandbox.run(request)
     except sandbox.WorkerBusy:
-        raise HTTPException(status_code=503, detail="structure processing is busy; try again shortly", headers={"Retry-After": "5"}) from None
+        raise HTTPException(
+            status_code=503,
+            detail="structure processing is busy; try again shortly",
+            headers={"Retry-After": "5"},
+        ) from None
     except sandbox.WorkerError:
         log.warning("structure worker failed")
         raise HTTPException(status_code=503, detail="structure processing failed or timed out") from None
@@ -46,21 +50,36 @@ def add_compounds(project_id: uuid.UUID, body: AddCompounds, sc: Scope = Depends
     if body.format == "smiles" and (not body.smiles or body.content is not None):
         raise HTTPException(status_code=422, detail="format 'smiles' needs a 'smiles' list and no content")
     if body.format != "smiles" and (body.smiles is not None or not body.content):
-        raise HTTPException(status_code=422, detail=f"format '{body.format}' needs 'content' and no smiles list")
+        raise HTTPException(
+            status_code=422, detail=f"format '{body.format}' needs 'content' and no smiles list"
+        )
     with sc.session() as s:  # ownership check before spending worker time
         require_project(s, sc.user.id, project_id)
-    out = _run({"op": "standardize", "format": body.format, "smiles": body.smiles, "content": body.content, "max_records": MAX_COMPOUNDS})
+    out = _run(
+        {
+            "op": "standardize",
+            "format": body.format,
+            "smiles": body.smiles,
+            "content": body.content,
+            "max_records": MAX_COMPOUNDS,
+        }
+    )
     err = out.get("error")
     if err == "too_many":
         raise HTTPException(status_code=422, detail=f"at most {MAX_COMPOUNDS} compounds per project")
     if err == "format":
-        raise HTTPException(status_code=422, detail=str(out.get("detail") or "input is not in the expected format"))
+        raise HTTPException(
+            status_code=422, detail=str(out.get("detail") or "input is not in the expected format")
+        )
     if err:
         raise HTTPException(status_code=503, detail="structure processing failed")
     records = out["records"]
     problems = [{"record": i + 1, "error": r["error"]} for i, r in enumerate(records) if not r["ok"]]
     if problems:
-        raise HTTPException(status_code=422, detail={"message": "some records were rejected; nothing was added", "problems": problems})
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "some records were rejected; nothing was added", "problems": problems},
+        )
     canon = [r["canonical"] for r in records]
     if len(set(canon)) != len(canon):
         raise HTTPException(status_code=422, detail="duplicate structures in this submission")
@@ -68,24 +87,44 @@ def add_compounds(project_id: uuid.UUID, body: AddCompounds, sc: Scope = Depends
         with sc.session() as s:
             require_project(s, sc.user.id, project_id)
             s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": str(project_id)})
-            existing = {r[0] for r in s.execute(text("SELECT canonical_smiles FROM compound WHERE project_id = :pid AND owner_id = :uid"), {"pid": project_id, "uid": sc.user.id})}
+            existing = {
+                r[0]
+                for r in s.execute(
+                    text("SELECT canonical_smiles FROM compound WHERE project_id = :pid AND owner_id = :uid"),
+                    {"pid": project_id, "uid": sc.user.id},
+                )
+            }
             if len(existing) + len(records) > MAX_COMPOUNDS:
                 raise HTTPException(status_code=422, detail=f"at most {MAX_COMPOUNDS} compounds per project")
             if existing & set(canon):
-                raise HTTPException(status_code=422, detail="a submitted structure is already in this project")
+                raise HTTPException(
+                    status_code=422, detail="a submitted structure is already in this project"
+                )
             created = []
             for r in records:
-                row = s.execute(
-                    text(
-                        "INSERT INTO compound (owner_id, project_id, smiles, canonical_smiles, label, created_at) "
-                        "VALUES (:uid, :pid, :smi, :can, :label, clock_timestamp()) RETURNING id, smiles, canonical_smiles, label"
-                    ),
-                    {"uid": sc.user.id, "pid": project_id, "smi": r["canonical"], "can": r["canonical"], "label": r.get("label")},
-                ).mappings().one()
+                row = (
+                    s.execute(
+                        text(
+                            "INSERT INTO compound (owner_id, project_id, smiles, canonical_smiles, label, created_at) "
+                            "VALUES (:uid, :pid, :smi, :can, :label, clock_timestamp()) RETURNING id, smiles, canonical_smiles, label"
+                        ),
+                        {
+                            "uid": sc.user.id,
+                            "pid": project_id,
+                            "smi": r["canonical"],
+                            "can": r["canonical"],
+                            "label": r.get("label"),
+                        },
+                    )
+                    .mappings()
+                    .one()
+                )
                 created.append(dict(row))
     except DBAPIError as e:  # the DB cap trigger is the second layer
         if getattr(e.orig, "sqlstate", None) == "23514":
-            raise HTTPException(status_code=422, detail=f"at most {MAX_COMPOUNDS} compounds per project") from None
+            raise HTTPException(
+                status_code=422, detail=f"at most {MAX_COMPOUNDS} compounds per project"
+            ) from None
         raise HTTPException(status_code=400, detail="could not store compounds") from None
     return {"compounds": created}
 
@@ -113,7 +152,10 @@ def conformer(project_id: uuid.UUID, compound_id: uuid.UUID, sc: Scope = Depends
     }
 
 
-_SVG_HEADERS = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'", "X-Content-Type-Options": "nosniff"}
+_SVG_HEADERS = {
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+    "X-Content-Type-Options": "nosniff",
+}
 Highlight = Annotated[Optional[list[int]], Query(max_length=200)]
 
 
@@ -127,7 +169,9 @@ def _depict(sc: Scope, project_id: uuid.UUID, compound_id: uuid.UUID, highlight:
 
 
 @router.get("/projects/{project_id}/compounds/{compound_id}/depiction.svg")
-def depiction(project_id: uuid.UUID, compound_id: uuid.UUID, highlight: Highlight = None, sc: Scope = Depends(scope)) -> Response:
+def depiction(
+    project_id: uuid.UUID, compound_id: uuid.UUID, highlight: Highlight = None, sc: Scope = Depends(scope)
+) -> Response:
     out = _depict(sc, project_id, compound_id, highlight)
     return Response(content=out["svg"], media_type="image/svg+xml", headers=_SVG_HEADERS)
 

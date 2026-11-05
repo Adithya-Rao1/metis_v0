@@ -5,6 +5,7 @@ anyone else's run, so user B can never read, stream or cancel user A's run. Stat
 (the service is single-process by design; see docs/OPERATIONS.md). Rate limiting of the HTTP routes is done by the
 shared database limiter in `backend.accounts.deps.rate_limit`, not here.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -36,22 +37,22 @@ def _env(name: str, default, cast=float):
 
 @dataclass
 class Settings:
-    max_concurrent: int = 2       # engine runs executing at once in this process
-    max_queue: int = 4            # waiting runs; beyond max_concurrent + max_queue active runs -> 429
-    per_user_active: int = 2      # queued + running runs one user may hold
-    per_user_streams: int = 4     # open SSE connections one user may hold
-    run_timeout: float = 90.0     # wall-clock seconds from execution start
+    max_concurrent: int = 2  # engine runs executing at once in this process
+    max_queue: int = 4  # waiting runs; beyond max_concurrent + max_queue active runs -> 429
+    per_user_active: int = 2  # queued + running runs one user may hold
+    per_user_streams: int = 4  # open SSE connections one user may hold
+    run_timeout: float = 90.0  # wall-clock seconds from execution start
     max_generations: int = 15
     max_population: int = 40
     max_heavy_atoms: int = 60
-    max_heavy_ops: int = 6        # validate / preview / applicable computations running at once in this process
-    runs_per_minute: int = 6      # per user, enforced by the shared database limiter
+    max_heavy_ops: int = 6  # validate / preview / applicable computations running at once in this process
+    runs_per_minute: int = 6  # per user, enforced by the shared database limiter
     validates_per_minute: int = 30
     heartbeat: float = 15.0
-    mock_delay: float = 0.4       # pacing of the mock replay (seconds / event)
-    replay_delay: float = 0.25    # pacing of cache replays
+    mock_delay: float = 0.4  # pacing of the mock replay (seconds / event)
+    replay_delay: float = 0.25  # pacing of cache replays
     cache_size: int = 64
-    max_runs_kept: int = 200      # finished + active runs held in memory, whole process
+    max_runs_kept: int = 200  # finished + active runs held in memory, whole process
     max_runs_per_user_kept: int = 20
     max_live_sessions_per_user: int = 20
     max_live_steps: int = 500
@@ -80,8 +81,11 @@ class Rejected(HTTPException):
     """An HTTP error with an optional Retry-After; being an HTTPException it needs no app-level handler."""
 
     def __init__(self, status: int, message: str, retry_after: int | None = None):
-        super().__init__(status_code=status, detail=message,
-                         headers={"Retry-After": str(retry_after)} if retry_after else None)
+        super().__init__(
+            status_code=status,
+            detail=message,
+            headers={"Retry-After": str(retry_after)} if retry_after else None,
+        )
         self.message = message
 
 
@@ -106,13 +110,15 @@ class Run:
     run_id: str
     owner: uuid.UUID
     config: RunConfig
-    source: str                       # live | mock | replay
+    source: str  # live | mock | replay
     cache_key: str | None = None
-    pace: float = 0.0                 # delay applied by the SSE writer (replays only)
-    scorer_wrap: Callable[[Any], Any] | None = None  # per-run scorer wrapper (a saved profile), live runs only
+    pace: float = 0.0  # delay applied by the SSE writer (replays only)
+    scorer_wrap: Callable[[Any], Any] | None = (
+        None  # per-run scorer wrapper (a saved profile), live runs only
+    )
     events: list[dict] = field(default_factory=list)
     finished: bool = False
-    status: str = "queued"            # queued | running | done | error | cancelled
+    status: str = "queued"  # queued | running | done | error | cancelled
     started: float | None = None
     created: float = field(default_factory=time.monotonic)
     lock: threading.Lock = field(default_factory=threading.Lock)
@@ -122,7 +128,9 @@ class Run:
         with self.lock:
             if self.finished:
                 return False
-            self.events.append({"type": type_, "run_id": self.run_id, "seq": len(self.events), "payload": payload})
+            self.events.append(
+                {"type": type_, "run_id": self.run_id, "seq": len(self.events), "payload": payload}
+            )
             return True
 
     def finish(self, status: str, error: str | None = None, recoverable: bool = False) -> bool:
@@ -131,8 +139,14 @@ class Run:
             if self.finished:
                 return False
             if error is not None:
-                self.events.append({"type": "error", "run_id": self.run_id, "seq": len(self.events),
-                                    "payload": {"message": error, "recoverable": recoverable}})
+                self.events.append(
+                    {
+                        "type": "error",
+                        "run_id": self.run_id,
+                        "seq": len(self.events),
+                        "payload": {"message": error, "recoverable": recoverable},
+                    }
+                )
             self.finished, self.status = True, status
             if self.timer:
                 self.timer.cancel()
@@ -159,10 +173,13 @@ class RunManager:
     def _active(self) -> list[Run]:
         return [r for r in self.runs.values() if not r.finished and r.source != "replay"]
 
-    def submit(self, owner: uuid.UUID, cfg: RunConfig, run_id: str,
-               scorer_wrap: Callable[[Any], Any] | None = None) -> Run:
+    def submit(
+        self, owner: uuid.UUID, cfg: RunConfig, run_id: str, scorer_wrap: Callable[[Any], Any] | None = None
+    ) -> Run:
         key = config_key(owner, cfg.seed_smiles, cfg)
-        cacheable = scorer_wrap is None and cfg.profile_id is None  # a profile can change between runs: never replay
+        cacheable = (
+            scorer_wrap is None and cfg.profile_id is None
+        )  # a profile can change between runs: never replay
         with self.lock:
             cached = self.cache.get(key) if cacheable else None
             if cached is not None:
@@ -179,12 +196,22 @@ class RunManager:
                 return run
             active = self._active()
             if sum(r.owner == owner for r in active) >= self.s.per_user_active:
-                raise Rejected(429, f"You already have {self.s.per_user_active} runs in progress", self._retry_after(active))
+                raise Rejected(
+                    429,
+                    f"You already have {self.s.per_user_active} runs in progress",
+                    self._retry_after(active),
+                )
             if len(active) >= self.s.max_concurrent + self.s.max_queue:
                 raise Rejected(429, "Server is busy, try again shortly", self._retry_after(active))
             source = "mock" if self.engine is None else "live"
-            run = Run(run_id, owner, cfg, source, cache_key=key if source == "live" and cacheable else None,
-                      scorer_wrap=scorer_wrap if source == "live" else None)
+            run = Run(
+                run_id,
+                owner,
+                cfg,
+                source,
+                cache_key=key if source == "live" and cacheable else None,
+                scorer_wrap=scorer_wrap if source == "live" else None,
+            )
             self._register(run)
         self.pool.submit(self._execute, run)
         return run
@@ -200,7 +227,10 @@ class RunManager:
         self.runs[run.run_id] = run
         # per-user bound first (oldest finished run of that user), then the process-wide bound
         mine = [k for k, r in self.runs.items() if r.owner == run.owner and r.finished]
-        while len([1 for r in self.runs.values() if r.owner == run.owner]) > self.s.max_runs_per_user_kept and mine:
+        while (
+            len([1 for r in self.runs.values() if r.owner == run.owner]) > self.s.max_runs_per_user_kept
+            and mine
+        ):
             self.runs.pop(mine.pop(0), None)
         while len(self.runs) > self.s.max_runs_kept:
             oldest = next((k for k, r in self.runs.items() if r.finished), None)
@@ -251,7 +281,11 @@ class RunManager:
         run.timer.daemon = True
         run.timer.start()
         try:
-            gen = self._mock_iter(run) if run.source == "mock" else self._engine_for(run).run(run.run_id, run.config)
+            gen = (
+                self._mock_iter(run)
+                if run.source == "mock"
+                else self._engine_for(run).run(run.run_id, run.config)
+            )
             try:
                 for ev in gen:
                     d = ev if isinstance(ev, dict) else ev.model_dump(mode="json")
@@ -278,8 +312,14 @@ class RunManager:
         finally:
             if run.timer:
                 run.timer.cancel()
-            log.info("run %s source=%s status=%s events=%d secs=%.1f", run.run_id[:6], run.source,
-                     run.status, len(run.events), time.monotonic() - (run.started or run.created))
+            log.info(
+                "run %s source=%s status=%s events=%d secs=%.1f",
+                run.run_id[:6],
+                run.source,
+                run.status,
+                len(run.events),
+                time.monotonic() - (run.started or run.created),
+            )
 
     def _mock_iter(self, run: Run):
         for ev in self.mock_events:

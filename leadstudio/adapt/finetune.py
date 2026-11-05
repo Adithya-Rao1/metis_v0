@@ -3,6 +3,7 @@
 Objective: for each logged step, softmax cross-entropy over the scores of ALL applicable (op, site)
 candidates of the parent, target = the edit the scientist chose. Not RL: no reward is optimised.
 """
+
 from __future__ import annotations
 
 import copy
@@ -31,22 +32,33 @@ class TooFewSteps(ValueError):
 
 @dataclass
 class BaseInfo:
-    eval_policy: object      # what runs without an adapter (may be UniformPolicy)
-    start: DQNPolicy         # DQN to copy weights from (fresh init when no checkpoint exists)
-    kind: str                # "checkpoint" | "uniform_fallback"
+    eval_policy: object  # what runs without an adapter (may be UniformPolicy)
+    start: DQNPolicy  # DQN to copy weights from (fresh init when no checkpoint exists)
+    kind: str  # "checkpoint" | "uniform_fallback"
     checkpoint_name: str
 
 
 def resolve_base(op_ids: Sequence[str]) -> BaseInfo:
     pol = load_policy(list(op_ids))
     if isinstance(pol, DQNPolicy):
-        return BaseInfo(pol, pol, "checkpoint", pol.checkpoint_loaded and pol.checkpoint_loaded.split("/")[-1] or "policy.pt")
+        return BaseInfo(
+            pol,
+            pol,
+            "checkpoint",
+            pol.checkpoint_loaded and pol.checkpoint_loaded.split("/")[-1] or "policy.pt",
+        )
     torch.manual_seed(0)
-    return BaseInfo(UniformPolicy(), DQNPolicy(list(op_ids), checkpoint=None), "uniform_fallback", "none (untrained network)")
+    return BaseInfo(
+        UniformPolicy(),
+        DQNPolicy(list(op_ids), checkpoint=None),
+        "uniform_fallback",
+        "none (untrained network)",
+    )
 
 
 class Prepared:
     """Per-parent tensors so all candidates are scored in one batched pass (mirrors QNet.q exactly)."""
+
     __slots__ = ("graph", "M", "op_idx")
 
     def __init__(self, policy: DQNPolicy, ex: Example):
@@ -78,9 +90,18 @@ class AdaptResult:
     stopped_early: bool
 
 
-def adapt(examples: Sequence[Example], base: BaseInfo, *, steps: int = DEFAULT_STEPS, lr: float = DEFAULT_LR,
-          seed: int = 0, max_seconds: float = MAX_SECONDS, deadline: float | None = None,
-          min_steps: int = MIN_VALID_STEPS, progress: Callable[[float], None] | None = None) -> AdaptResult:
+def adapt(
+    examples: Sequence[Example],
+    base: BaseInfo,
+    *,
+    steps: int = DEFAULT_STEPS,
+    lr: float = DEFAULT_LR,
+    seed: int = 0,
+    max_seconds: float = MAX_SECONDS,
+    deadline: float | None = None,
+    min_steps: int = MIN_VALID_STEPS,
+    progress: Callable[[float], None] | None = None,
+) -> AdaptResult:
     """Fine-tune a copy of base.start. `deadline` is an absolute time.monotonic() bound shared with the caller."""
     if len(examples) < min_steps:
         raise TooFewSteps(f"Need at least {min_steps} valid edits to adapt; got {len(examples)}.")

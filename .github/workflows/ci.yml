@@ -27,7 +27,7 @@ jobs:
         with: {python-version: "3.12", cache: pip}
       - run: pip install -r requirements-dev.txt -r ml/requirements.txt
       - run: ruff check backend ml leadstudio tests/foundation
-      - run: ruff format --check backend/core tests/foundation
+      - run: ruff format --check backend ml leadstudio tests/foundation
       - run: mypy
       - run: bandit -c pyproject.toml -r backend ml leadstudio
       - run: pip-audit -r requirements.txt -r ml/requirements.txt

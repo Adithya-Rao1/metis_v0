@@ -1,4 +1,5 @@
 """Rationale text. Every number comes from the descriptor deltas / alert lists; nothing is invented."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

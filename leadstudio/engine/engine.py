@@ -8,6 +8,7 @@ Per generation: propose ``population_size`` valid, lock-respecting, unseen child
 Everything random goes through one ``random.Random(config.rng_seed)``, so a run is reproducible given
 deterministic collaborators.
 """
+
 from __future__ import annotations
 
 import os
@@ -49,9 +50,18 @@ class _Emitter:
 
 
 class Engine:
-    def __init__(self, registry: Registry, scorer: Scorer, explainer: Explainer,
-                 embedder: Embedder | None, policy: Policy, *,
-                 crossover_rate: float = 0.3, niche_threshold: float = 0.85, max_rejected_events: int = 5):
+    def __init__(
+        self,
+        registry: Registry,
+        scorer: Scorer,
+        explainer: Explainer,
+        embedder: Embedder | None,
+        policy: Policy,
+        *,
+        crossover_rate: float = 0.3,
+        niche_threshold: float = 0.85,
+        max_rejected_events: int = 5,
+    ):
         self.registry, self.scorer, self.explainer = registry, scorer, explainer
         self.embedder, self.policy = embedder, policy
         self.crossover_rate, self.niche_threshold = crossover_rate, niche_threshold
@@ -101,8 +111,10 @@ class Engine:
 
         seed_block, geo[seed_smiles] = geometry.embed_3d(seed_smiles)
         seed_score = scores[seed_smiles] = self.scorer.score(seed_smiles, config)
-        yield emit("run_start", RunStartPayload(config=config, seed_molblock=seed_block,
-                                                seed_score=seed_score, source="live"))
+        yield emit(
+            "run_start",
+            RunStartPayload(config=config, seed_molblock=seed_block, seed_score=seed_score, source="live"),
+        )
 
         seed = Individual(smiles=seed_smiles, locked=seed_locked, generation=0)
         seed.set_score(seed_score)
@@ -126,7 +138,9 @@ class Engine:
                 ok, reason = check_child(p.parents[0].smiles, p.smiles)
                 if ok and p.edit_op is None and os.environ.get("STUDIO_ALL_EDITS") != "1":
                     # crossover is not a registry op: in demo-safe mode keep only near-parent children
-                    sim = DataStructs.TanimotoSimilarity(niching.fp(p.smiles), niching.fp(p.parents[0].smiles))
+                    sim = DataStructs.TanimotoSimilarity(
+                        niching.fp(p.smiles), niching.fp(p.parents[0].smiles)
+                    )
                     if sim < CROSSOVER_MIN_SIM:
                         ok, reason = False, "crossover_far"
                 if not ok:  # chemically implausible: dropped, never scored/accepted/emitted
@@ -147,8 +161,15 @@ class Engine:
                     scores[s] = sc
             kids: list[Individual] = []
             for i, p in enumerate(props):
-                kid = Individual(smiles=p.smiles, locked=p.locked, cid=f"{run_id}-g{gen}-{i}", parent=p.parents[0],
-                                 edit=p.edit, edit_op=p.edit_op, generation=gen)
+                kid = Individual(
+                    smiles=p.smiles,
+                    locked=p.locked,
+                    cid=f"{run_id}-g{gen}-{i}",
+                    parent=p.parents[0],
+                    edit=p.edit,
+                    edit_op=p.edit_op,
+                    generation=gen,
+                )
                 kid.set_score(scores[p.smiles])
                 kids.append(kid)
 
@@ -166,18 +187,30 @@ class Engine:
             pop = new_pop
 
             # 5. generation summary
-            members = [PopulationMember(smiles=i.smiles, composite=i.composite, candidate_id=i.cid) for i in pop]
+            members = [
+                PopulationMember(smiles=i.smiles, composite=i.composite, candidate_id=i.cid) for i in pop
+            ]
             map_xy, map_method = None, None
             if self.embedder is not None:
                 try:
-                    map_xy = [(float(x), float(y)) for x, y in
-                              self.embedder.map_xy([i.smiles for i in pop], anchor=seed_smiles)]
+                    map_xy = [
+                        (float(x), float(y))
+                        for x, y in self.embedder.map_xy([i.smiles for i in pop], anchor=seed_smiles)
+                    ]
                     map_method = self.embedder.method
                 except Exception:
                     map_xy, map_method = None, None  # the map is optional; never fail the run for it
-            yield emit("generation", GenerationPayload(
-                generation=gen, best=members[0], mean_composite=sum(m.composite for m in members) / len(members),
-                population=members, map_xy=map_xy, map_method=map_method))
+            yield emit(
+                "generation",
+                GenerationPayload(
+                    generation=gen,
+                    best=members[0],
+                    mean_composite=sum(m.composite for m in members) / len(members),
+                    population=members,
+                    map_xy=map_xy,
+                    map_method=map_method,
+                ),
+            )
 
             # 6. online learning + policy metrics
             yield emit("policy_metrics", self._policy_metrics(gen, kids, accepted, ops, rej_reasons))
@@ -185,7 +218,9 @@ class Engine:
 
         best = pop[0]
         self.stats = {"children": float(n_children), "seconds": time.perf_counter() - t0}
-        self.stats["children_per_second"] = n_children / self.stats["seconds"] if self.stats["seconds"] else 0.0
+        self.stats["children_per_second"] = (
+            n_children / self.stats["seconds"] if self.stats["seconds"] else 0.0
+        )
         yield emit("run_end", self._story(config, seed_smiles, seed_score, best))
 
     def _candidate(self, kid: Individual, accepted: bool, geo: dict[str, Chem.Mol], mapper) -> Candidate:
@@ -199,25 +234,44 @@ class Engine:
             edit = edit.model_copy(update={"site": [i for i in range(pmol.GetNumAtoms()) if i not in mapped]})
         expl = self.explainer.explain(parent.smiles, kid.smiles, edit, parent.score, kid.score, kid.edit_op)
         return Candidate(
-            id=kid.cid, generation=kid.generation, smiles=kid.smiles, parent_smiles=parent.smiles,
-            molblock=Chem.MolToMolBlock(cmol), parent_molblock=Chem.MolToMolBlock(pmol),
-            atom_map=[(int(p), int(c)) for p, c in amap], edit=edit, score=kid.score,
-            explanation=expl, accepted=accepted)
+            id=kid.cid,
+            generation=kid.generation,
+            smiles=kid.smiles,
+            parent_smiles=parent.smiles,
+            molblock=Chem.MolToMolBlock(cmol),
+            parent_molblock=Chem.MolToMolBlock(pmol),
+            atom_map=[(int(p), int(c)) for p, c in amap],
+            edit=edit,
+            score=kid.score,
+            explanation=expl,
+            accepted=accepted,
+        )
 
-    def _policy_metrics(self, gen: int, kids: list[Individual], accepted: list[Individual], ops: Operators,
-                        rej_reasons: dict[str, int] | None = None) -> PolicyMetrics:
+    def _policy_metrics(
+        self,
+        gen: int,
+        kids: list[Individual],
+        accepted: list[Individual],
+        ops: Operators,
+        rej_reasons: dict[str, int] | None = None,
+    ) -> PolicyMetrics:
         muts = [k for k in kids if k.edit.chosen_by in ("policy", "random")]
         reward = lambda k: k.composite - k.parent.composite  # noqa: E731
         pol = [reward(k) for k in muts if k.edit.chosen_by == "policy"]
         rnd = [reward(k) for k in muts if k.edit.chosen_by == "random"]
         notes = []
         if rej_reasons:
-            parts = ", ".join(f"{k} {v}" for k, v in sorted(rej_reasons.items(), key=lambda kv: (-kv[1], kv[0])))
+            parts = ", ".join(
+                f"{k} {v}" for k, v in sorted(rej_reasons.items(), key=lambda kv: (-kv[1], kv[0]))
+            )
             notes.append(f"rejected {sum(rej_reasons.values())}: {parts}")
         if not kids:
             notes.append("no valid new children this generation")
-        transitions = [(k.parent.smiles, k.edit_op, tuple(k.edit.site), k.smiles, reward(k))
-                       for k in accepted if k.edit_op is not None]
+        transitions = [
+            (k.parent.smiles, k.edit_op, tuple(k.edit.site), k.smiles, reward(k))
+            for k in accepted
+            if k.edit_op is not None
+        ]
         loss = None
         if transitions:
             try:
@@ -230,10 +284,13 @@ class Engine:
         if pnote:
             notes.append(str(pnote))
         return PolicyMetrics(
-            generation=gen, policy_choice_rate=len(pol) / len(muts) if muts else 0.0,
+            generation=gen,
+            policy_choice_rate=len(pol) / len(muts) if muts else 0.0,
             mean_reward_policy_edits=sum(pol) / len(pol) if pol else None,
             mean_reward_random_edits=sum(rnd) / len(rnd) if rnd else None,
-            loss=float(loss) if loss is not None else None, note="; ".join(notes) or None)
+            loss=float(loss) if loss is not None else None,
+            note="; ".join(notes) or None,
+        )
 
     @staticmethod
     def _story(config: RunConfig, seed_smiles: str, seed_score: ScoreResult, best: Individual) -> StoryCard:
@@ -251,9 +308,17 @@ class Engine:
             parts.append(f"Added {b.alerts - a.alerts} alert{'s' if b.alerts - a.alerts != 1 else ''}")
         parts.append(f"QED {a.qed:.2f} -> {b.qed:.2f}")
         parts.append(f"composite {seed_score.composite:.2f} -> {best.score.composite:.2f}")
-        headline = ", ".join(parts) + (f" in {len(path)} edit{'s' if len(path) != 1 else ''}" if path
-                                       else " (no improving edit found)")
+        headline = ", ".join(parts) + (
+            f" in {len(path)} edit{'s' if len(path) != 1 else ''}" if path else " (no improving edit found)"
+        )
         da, db = a.model_dump(), b.model_dump()
         table = {k: (float(da[k]), float(db[k])) for k in da if da[k] is not None and db[k] is not None}
-        return StoryCard(seed_smiles=seed_smiles, final_smiles=best.smiles, seed_score=seed_score,
-                         final_score=best.score, edit_path=path, headline=headline, descriptor_table=table)
+        return StoryCard(
+            seed_smiles=seed_smiles,
+            final_smiles=best.smiles,
+            seed_score=seed_score,
+            final_score=best.score,
+            edit_path=path,
+            headline=headline,
+            descriptor_table=table,
+        )

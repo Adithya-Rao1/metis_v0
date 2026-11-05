@@ -1,4 +1,5 @@
 """RDKit cleaning: standardize, dedupe by InChIKey, drop contradictory labels."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -25,8 +26,13 @@ class CleaningReport:
     n_output: int = 0
 
     def reconciles(self) -> bool:
-        removed = (self.n_unparseable + self.n_non_finite_dropped + self.n_empty_after_standardize
-                   + self.n_contradictory_records + self.n_merged_duplicates)
+        removed = (
+            self.n_unparseable
+            + self.n_non_finite_dropped
+            + self.n_empty_after_standardize
+            + self.n_contradictory_records
+            + self.n_merged_duplicates
+        )
         return self.n_input == removed + self.n_output
 
     def as_dict(self) -> dict:

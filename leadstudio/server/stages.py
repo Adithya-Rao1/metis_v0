@@ -3,6 +3,7 @@
 `Services` resolves the optional parts (target loader, binding stage, registry, pose client) lazily and lets
 tests inject fakes. Nothing here fabricates data: a missing part yields a clear 503/failed status.
 """
+
 from __future__ import annotations
 
 import copy
@@ -45,9 +46,15 @@ def _cap(name: str, default: int) -> int:
 class Services:
     """Late-bound collaborators. Every attribute may be injected (tests) or resolved on first use."""
 
-    def __init__(self, binding_factory: Callable[..., Any] | None = None, pose_client: Any = None,
-                 binding_scorer: Any = None, registry: Any = None, targets: Any = None,
-                 explainer: Any = None):
+    def __init__(
+        self,
+        binding_factory: Callable[..., Any] | None = None,
+        pose_client: Any = None,
+        binding_scorer: Any = None,
+        registry: Any = None,
+        targets: Any = None,
+        explainer: Any = None,
+    ):
         self._binding_factory, self.pose_client = binding_factory, pose_client
         self._binding_scorer, self._registry, self._targets = binding_scorer, registry, targets
         self._explainer = explainer
@@ -71,7 +78,10 @@ class Services:
         return obj if isinstance(obj, TargetInfo) else TargetInfo.model_validate(obj)
 
     def _fixture_targets(self) -> list[TargetInfo]:
-        return [TargetInfo.model_validate(json.loads(p.read_text())) for p in sorted(FIXTURES.glob("*_target.json"))]
+        return [
+            TargetInfo.model_validate(json.loads(p.read_text()))
+            for p in sorted(FIXTURES.glob("*_target.json"))
+        ]
 
     def list_targets(self) -> list[TargetInfo]:
         ld = self._loader()
@@ -204,9 +214,13 @@ def prepare_config(cfg: RunConfig, svc: Services, engine_live: bool) -> RunConfi
     if cfg.target_id is None:
         raise HTTPException(422, "stage 'binding' requires target_id")
     if not engine_live:
-        raise HTTPException(503, "Binding stage needs the live engine, but the server is running in mock mode")
+        raise HTTPException(
+            503, "Binding stage needs the live engine, but the server is running in mock mode"
+        )
     if not svc.binding_available():
-        raise HTTPException(503, "Binding stage is not available on this server (the PLAPT binding model is not installed)")
+        raise HTTPException(
+            503, "Binding stage is not available on this server (the PLAPT binding model is not installed)"
+        )
     upd: dict[str, Any] = {
         "policy_guidance": 0.0,  # stage 1 is a pure GA; the RL policy is untrained
         "use_reactions": False,

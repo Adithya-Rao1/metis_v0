@@ -1,4 +1,5 @@
 """Named objective bundles. Keys of each bundle are schema.Descriptors fields."""
+
 from __future__ import annotations
 
 from leadstudio.schema import ObjectiveSpec

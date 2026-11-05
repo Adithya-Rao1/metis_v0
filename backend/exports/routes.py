@@ -17,13 +17,21 @@ router = APIRouter(tags=["exports"])
 
 
 @router.get("/projects/{project_id}/export")
-def export_project(project_id: uuid.UUID, format: Literal["pdf", "sdf", "csv"] = Query(...), sc: Scope = Depends(scope)) -> Response:
+def export_project(
+    project_id: uuid.UUID, format: Literal["pdf", "sdf", "csv"] = Query(...), sc: Scope = Depends(scope)
+) -> Response:
     with sc.session() as s:
         proj = require_project(s, sc.user.id, project_id)
-        comps = s.execute(
-            text("SELECT id, label, canonical_smiles FROM compound WHERE project_id = :pid AND owner_id = :uid ORDER BY created_at, id"),
-            {"pid": project_id, "uid": sc.user.id},
-        ).mappings().all()
+        comps = (
+            s.execute(
+                text(
+                    "SELECT id, label, canonical_smiles FROM compound WHERE project_id = :pid AND owner_id = :uid ORDER BY created_at, id"
+                ),
+                {"pid": project_id, "uid": sc.user.id},
+            )
+            .mappings()
+            .all()
+        )
         latest = latest_predictions(s, sc.user.id, project_id)
         meas = s.execute(
             text(
@@ -33,7 +41,9 @@ def export_project(project_id: uuid.UUID, format: Literal["pdf", "sdf", "csv"] =
             {"pid": project_id, "uid": sc.user.id},
         ).all()
     items = [
-        ExportCompound(i + 1, c["label"], c["canonical_smiles"], {e: p for e, (_, p) in latest.get(c["id"], {}).items()})
+        ExportCompound(
+            i + 1, c["label"], c["canonical_smiles"], {e: p for e, (_, p) in latest.get(c["id"], {}).items()}
+        )
         for i, c in enumerate(comps)
     ]
     pos = {c["id"]: it for c, it in zip(comps, items)}
@@ -52,7 +62,9 @@ def export_project(project_id: uuid.UUID, format: Literal["pdf", "sdf", "csv"] =
             try:
                 out = sandbox.run({"op": "conformers", "smiles": [it.canonical_smiles for it in items]})
             except sandbox.WorkerError:
-                raise HTTPException(status_code=503, detail="structure processing failed or timed out") from None
+                raise HTTPException(
+                    status_code=503, detail="structure processing failed or timed out"
+                ) from None
             confs = out.get("conformers") or []
             for it, cf in zip(items, confs):
                 if cf.get("ok"):
@@ -71,5 +83,9 @@ def export_project(project_id: uuid.UUID, format: Literal["pdf", "sdf", "csv"] =
     return Response(
         content=body,
         media_type=media,
-        headers={"Content-Disposition": f'attachment; filename="metis_export.{ext}"', "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"},
+        headers={
+            "Content-Disposition": f'attachment; filename="metis_export.{ext}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
     )

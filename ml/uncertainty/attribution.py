@@ -6,6 +6,7 @@ the ensemble is re-queried; effect_i = |f(x) - f(x masked_i)|, share_i = effect_
 from resampling ensemble members (seeded). Limits: deleting atoms creates off-distribution molecules; shares
 describe the model's sensitivity, not chemistry or causality; fragments interact; only one-at-a-time masking.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,9 +20,11 @@ from backend.schemas.interfaces import FragmentShare
 
 RDLogger.DisableLog("rdApp.*")
 
-NOTE = ("Approximate, research-grade. Shares are the model's sensitivity to deleting each BRICS fragment "
-        "(one at a time), normalised to sum to 1. Masked molecules are off-distribution, so this is not "
-        "a causal or chemical explanation. Ranges are 5th-95th percentile over ensemble member resamples.")
+NOTE = (
+    "Approximate, research-grade. Shares are the model's sensitivity to deleting each BRICS fragment "
+    "(one at a time), normalised to sum to 1. Masked molecules are off-distribution, so this is not "
+    "a causal or chemical explanation. Ranges are 5th-95th percentile over ensemble member resamples."
+)
 
 
 def fragment_atoms(mol: Chem.Mol) -> list[list[int]]:
@@ -79,8 +82,15 @@ class AttributionResult:
     degenerate: bool = False  # all effects zero -> uniform shares
 
 
-def attribute(smiles: str, predict_members: Callable[[list[str]], np.ndarray], train_smiles: list[str] | None = None,
-              seed: int = 0, n_resamples: int = 100, lo_q: float = 5, hi_q: float = 95) -> AttributionResult:
+def attribute(
+    smiles: str,
+    predict_members: Callable[[list[str]], np.ndarray],
+    train_smiles: list[str] | None = None,
+    seed: int = 0,
+    n_resamples: int = 100,
+    lo_q: float = 5,
+    hi_q: float = 95,
+) -> AttributionResult:
     """predict_members(list_of_smiles) -> array (M, len(list)) of member predictions (probabilities for
     classification). Deterministic for a fixed seed."""
     mol = Chem.MolFromSmiles(smiles)
@@ -112,6 +122,13 @@ def attribute(smiles: str, predict_members: Callable[[list[str]], np.ndarray], t
     out = []
     for i, f in enumerate(frags):
         c = lambda x: float(min(max(x, 0.0), 1.0))
-        out.append(FragmentShare(atom_indices=f, share=c(point[i]), share_low=c(min(lo[i], point[i])),
-                                 share_high=c(max(hi[i], point[i])), train_frequency=train_frequency(mol, f, train_mols)))
+        out.append(
+            FragmentShare(
+                atom_indices=f,
+                share=c(point[i]),
+                share_low=c(min(lo[i], point[i])),
+                share_high=c(max(hi[i], point[i])),
+                train_frequency=train_frequency(mol, f, train_mols),
+            )
+        )
     return AttributionResult(out, n_masked_failed=len(frags) - len(ok), degenerate=degenerate)

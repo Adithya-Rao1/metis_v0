@@ -3,6 +3,7 @@
 Transition format (see studio/policy/README.md): (parent_smiles, edit_id, site, child_smiles, reward).
 Input is a list of dicts (the manual-mode export, extra keys ignored) or 5-tuples.
 """
+
 from __future__ import annotations
 
 import math
@@ -32,6 +33,7 @@ class Transition:
 @dataclass
 class Example:
     """A validated step: the parent's full applicable candidate list and the index the user chose."""
+
     transition: Transition
     candidates: list[tuple]  # [(EditOp, site)]
     target: int
@@ -45,19 +47,31 @@ class CleanReport:
     reasons: dict[str, int]
 
     def as_dict(self) -> dict:
-        return {"received": self.received, "valid": self.valid, "dropped": self.dropped, "reasons": dict(self.reasons)}
+        return {
+            "received": self.received,
+            "valid": self.valid,
+            "dropped": self.dropped,
+            "reasons": dict(self.reasons),
+        }
 
 
 def _canon(smiles: str) -> str | None:
-    mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) and 0 < len(smiles) <= MAX_SMILES_LEN else None
+    mol = (
+        Chem.MolFromSmiles(smiles) if isinstance(smiles, str) and 0 < len(smiles) <= MAX_SMILES_LEN else None
+    )
     return Chem.MolToSmiles(mol) if mol is not None and mol.GetNumAtoms() else None
 
 
 def _parse(raw: Any) -> Transition | None:
     try:
         if isinstance(raw, dict):
-            parent, edit_id, site, child, reward = (raw["parent_smiles"], raw["edit_id"], raw["site"],
-                                                    raw["child_smiles"], raw["reward"])
+            parent, edit_id, site, child, reward = (
+                raw["parent_smiles"],
+                raw["edit_id"],
+                raw["site"],
+                raw["child_smiles"],
+                raw["reward"],
+            )
         else:
             parent, edit_id, site, child, reward = raw
         if not (isinstance(parent, str) and isinstance(edit_id, str) and isinstance(child, str)):
@@ -106,7 +120,9 @@ def clean(raw: Sequence[Any], registry) -> tuple[list[Example], CleanReport]:
         cands = cand_cache.get(t.parent_smiles)
         if cands is None:
             cands = cand_cache[t.parent_smiles] = list(registry.applicable(t.parent_smiles))
-        target = next((i for i, (o, s) in enumerate(cands) if o.id == t.edit_id and tuple(sorted(s)) == key[2]), None)
+        target = next(
+            (i for i, (o, s) in enumerate(cands) if o.id == t.edit_id and tuple(sorted(s)) == key[2]), None
+        )
         if target is None:
             reasons["not_applicable"] += 1
             continue

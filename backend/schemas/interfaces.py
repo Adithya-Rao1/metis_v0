@@ -7,6 +7,7 @@
 - Docking prep (Agent 7) provides `backend.dockprep.router`.
 `backend.main.create_app` mounts whichever of these routers import successfully.
 """
+
 from __future__ import annotations
 
 from typing import Literal, Optional, Protocol, runtime_checkable
@@ -26,19 +27,22 @@ class UserCtx(BaseModel):
 
 class ModelCard(BaseModel):
     """Everything a model page shows (spec 5, 6, 12). Published only if all fields are real."""
+
     model_config = ConfigDict(extra="forbid")
     endpoint: str
     version: str
     kind: Literal["regression", "classification"]
     units: Optional[str] = None
-    datasets: list[dict] = Field(min_length=1)       # name, url, license, size, split
+    datasets: list[dict] = Field(min_length=1)  # name, url, license, size, split
     limitations: str = Field(min_length=1)
     split_type: str
-    benchmark: dict                                  # metrics vs baselines
-    coverage_by_n: dict[str, float]                  # "3","5","10","20" -> empirical coverage
+    benchmark: dict  # metrics vs baselines
+    coverage_by_n: dict[str, float]  # "3","5","10","20" -> empirical coverage
     runtime_by_n_seconds: dict[str, float]
-    default_range: tuple[float, float]               # training-data min/max for desirability (decision 0002)
-    median_calibration_width_by_n: dict[str, float] = {}  # regression only; ranking confidence uses it (spec 7)
+    default_range: tuple[float, float]  # training-data min/max for desirability (decision 0002)
+    median_calibration_width_by_n: dict[
+        str, float
+    ] = {}  # regression only; ranking confidence uses it (spec 7)
     weights_sha256: str
 
 
@@ -55,7 +59,7 @@ class PredictionDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prediction: Prediction
     fragments: list[FragmentShare] = []
-    nearest_training: list[dict] = []                # smiles, similarity, label (no private user data)
+    nearest_training: list[dict] = []  # smiles, similarity, label (no private user data)
     runtime_seconds: float = Field(ge=0)
 
 

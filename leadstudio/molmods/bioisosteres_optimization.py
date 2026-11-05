@@ -2,6 +2,7 @@ from leadstudio.molmods.modification_imports import *
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from leadstudio.molmods.logger import setup_molecule_logger
 
+
 class ModifyBioisosteres:
     def __init__(self, logger, log: bool = False):
         super(ModifyBioisosteres, self).__init__()
@@ -12,7 +13,7 @@ class ModifyBioisosteres:
         self.acidic_bioisosteres = {
             "carboxylic_acid": ["tetrazole", "phosphonic_acid", "sulfonic_acid"],
             "tetrazole": ["carboxylic_acid", "phosphonic_acid"],
-            "hydroxamic_acid": ["carboxylic_acid", "tetrazole"]
+            "hydroxamic_acid": ["carboxylic_acid", "tetrazole"],
         }
 
         self.basic_bioisosteres = {
@@ -23,7 +24,7 @@ class ModifyBioisosteres:
             "ester": ["amide", "thioester", "ketone", "sulfonamide"],
             "alkyl": ["cycloalkyl", "CF3", "tBu"],
             "phenyl": ["pyridyl", "thiophene", "furan", "pyrrole"],
-            "ketone": ["oxime", "hydrazone", "thiocarbonyl"]
+            "ketone": ["oxime", "hydrazone", "thiocarbonyl"],
         }
 
         self.fg_patterns = {
@@ -40,7 +41,7 @@ class ModifyBioisosteres:
             "sulfonamide": "[NX3][SX4](=[OX1])(=[OX1])[#6]",
             "ketone": "[CX3]=[OX1]",
             "phenyl": "c1ccccc1",
-            "pyridyl": "n1ccccc1"
+            "pyridyl": "n1ccccc1",
         }
 
     def identify_functional_groups(self, mol: Chem.Mol) -> Dict[str, List[int]]:
@@ -57,8 +58,7 @@ class ModifyBioisosteres:
         for idx in remove_indices:
             em.RemoveAtom(idx)
         return {
-            anchor: anchor - sum(1 for idx in remove_indices if idx < anchor)
-            for anchor in anchor_indices
+            anchor: anchor - sum(1 for idx in remove_indices if idx < anchor) for anchor in anchor_indices
         }
 
     def replace_carboxylic_acid_with_tetrazole(self, mol: Chem.Mol, match_atoms: Tuple[int]) -> Optional[str]:
@@ -94,7 +94,9 @@ class ModifyBioisosteres:
                 self.logger.error(f"Failed to replace carboxylic acid with tetrazole: {str(e)}")
             return None
 
-    def replace_carboxylic_acid_with_phosphonic_acid(self, mol: Chem.Mol, match_atoms: Tuple[int]) -> Optional[str]:
+    def replace_carboxylic_acid_with_phosphonic_acid(
+        self, mol: Chem.Mol, match_atoms: Tuple[int]
+    ) -> Optional[str]:
         try:
             em = Chem.EditableMol(mol)
             anchors = self._remove_atoms_preserving_anchors(em, match_atoms[1:], [match_atoms[0]])
@@ -130,11 +132,14 @@ class ModifyBioisosteres:
     def replace_amine_with_pyridine(self, mol: Chem.Mol, match_atoms: Tuple[int]) -> Optional[str]:
         try:
             amine_idx = match_atoms[0]
-            heavy_neighbors = [n.GetIdx() for n in mol.GetAtomWithIdx(amine_idx).GetNeighbors()
-                                if n.GetAtomicNum() != 1]
+            heavy_neighbors = [
+                n.GetIdx() for n in mol.GetAtomWithIdx(amine_idx).GetNeighbors() if n.GetAtomicNum() != 1
+            ]
             if len(heavy_neighbors) != 1:
                 if self.log:
-                    self.logger.warning("Amine has other than one heavy-atom substituent; skipping pyridine replacement.")
+                    self.logger.warning(
+                        "Amine has other than one heavy-atom substituent; skipping pyridine replacement."
+                    )
                 return None
             r_idx = heavy_neighbors[0]
 
@@ -167,7 +172,9 @@ class ModifyBioisosteres:
 
             except Exception:
                 if self.log:
-                    self.logger.warning(f"Amine Replacement Not Fully Sanitized. Replaced amine with pyridine.")
+                    self.logger.warning(
+                        f"Amine Replacement Not Fully Sanitized. Replaced amine with pyridine."
+                    )
                 return None
 
         except Exception as e:
@@ -176,22 +183,52 @@ class ModifyBioisosteres:
             return None
 
     _PHENYL_RING_SPECS = {
-        "pyridyl": ([6, 6, 6, 6, 6, 7],
-                    [Chem.BondType.DOUBLE, Chem.BondType.SINGLE, Chem.BondType.DOUBLE,
-                     Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.SINGLE]),
-        "thiophene": ([6, 6, 6, 6, 16],
-                      [Chem.BondType.DOUBLE, Chem.BondType.SINGLE, Chem.BondType.DOUBLE,
-                       Chem.BondType.SINGLE, Chem.BondType.SINGLE]),
-        "furan": ([6, 6, 6, 6, 8],
-                  [Chem.BondType.DOUBLE, Chem.BondType.SINGLE, Chem.BondType.DOUBLE,
-                   Chem.BondType.SINGLE, Chem.BondType.SINGLE]),
-        "pyrrole": ([6, 6, 6, 6, 7],
-                    [Chem.BondType.DOUBLE, Chem.BondType.SINGLE, Chem.BondType.DOUBLE,
-                     Chem.BondType.SINGLE, Chem.BondType.SINGLE]),
+        "pyridyl": (
+            [6, 6, 6, 6, 6, 7],
+            [
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+            ],
+        ),
+        "thiophene": (
+            [6, 6, 6, 6, 16],
+            [
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.SINGLE,
+            ],
+        ),
+        "furan": (
+            [6, 6, 6, 6, 8],
+            [
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.SINGLE,
+            ],
+        ),
+        "pyrrole": (
+            [6, 6, 6, 6, 7],
+            [
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.DOUBLE,
+                Chem.BondType.SINGLE,
+                Chem.BondType.SINGLE,
+            ],
+        ),
     }
 
-    def replace_phenyl_with_heterocycle(self, mol: Chem.Mol, match_atoms: Tuple[int],
-                                      replacement: str = "pyridyl") -> Optional[str]:
+    def replace_phenyl_with_heterocycle(
+        self, mol: Chem.Mol, match_atoms: Tuple[int], replacement: str = "pyridyl"
+    ) -> Optional[str]:
         try:
             if replacement not in self._PHENYL_RING_SPECS:
                 if self.log:
@@ -209,7 +246,9 @@ class ModifyBioisosteres:
 
             if len(external_bonds) != 1:
                 if self.log:
-                    self.logger.warning("Phenyl ring has other than one external attachment; skipping heterocycle replacement.")
+                    self.logger.warning(
+                        "Phenyl ring has other than one external attachment; skipping heterocycle replacement."
+                    )
                 return None
             _, external_idx = external_bonds[0]
 
@@ -234,7 +273,9 @@ class ModifyBioisosteres:
                 return Chem.MolToSmiles(Chem.Mol(new_mol))
             except Exception:
                 if self.log:
-                    self.logger.warning(f"Phenyl Replacement Not Fully Sanitized: Replaced phenyl with {replacement}")
+                    self.logger.warning(
+                        f"Phenyl Replacement Not Fully Sanitized: Replaced phenyl with {replacement}"
+                    )
                 return None
 
         except Exception as e:
@@ -242,8 +283,9 @@ class ModifyBioisosteres:
                 self.logger.error(f"Failed to replace phenyl with {replacement}: {str(e)}")
             return None
 
-    def replace_amide_with_bioisostere(self, mol: Chem.Mol, match_atoms: Tuple[int],
-                                     replacement: str = "sulfonamide") -> Optional[str]:
+    def replace_amide_with_bioisostere(
+        self, mol: Chem.Mol, match_atoms: Tuple[int], replacement: str = "sulfonamide"
+    ) -> Optional[str]:
         # match_atoms = (N, C(=O), O, R) from "[NX3][CX3](=[OX1])[#6]".
         try:
             if replacement == "sulfonamide":
@@ -257,19 +299,24 @@ class ModifyBioisosteres:
                 o1_idx = em.AddAtom(Chem.Atom(8))
                 o2_idx = em.AddAtom(Chem.Atom(8))
 
-                em.AddBond(n_idx, s_idx, Chem.BondType.SINGLE)   # N-S
-                em.AddBond(s_idx, r_idx, Chem.BondType.SINGLE)   # S-R
+                em.AddBond(n_idx, s_idx, Chem.BondType.SINGLE)  # N-S
+                em.AddBond(s_idx, r_idx, Chem.BondType.SINGLE)  # S-R
                 em.AddBond(s_idx, o1_idx, Chem.BondType.DOUBLE)  # S=O
                 em.AddBond(s_idx, o2_idx, Chem.BondType.DOUBLE)  # S=O
 
             elif replacement == "retroamide":
                 n_idx, c_idx, o_idx, r_idx = match_atoms
                 n_atom = mol.GetAtomWithIdx(n_idx)
-                n_external = [nb.GetIdx() for nb in n_atom.GetNeighbors()
-                              if nb.GetIdx() != c_idx and nb.GetAtomicNum() != 1]
+                n_external = [
+                    nb.GetIdx()
+                    for nb in n_atom.GetNeighbors()
+                    if nb.GetIdx() != c_idx and nb.GetAtomicNum() != 1
+                ]
                 if len(n_external) != 1:
                     if self.log:
-                        self.logger.warning("Amide nitrogen has no single external substituent; skipping retroamide.")
+                        self.logger.warning(
+                            "Amide nitrogen has no single external substituent; skipping retroamide."
+                        )
                     return None
                 n_ext_idx = n_external[0]
 
@@ -292,7 +339,9 @@ class ModifyBioisosteres:
                 return Chem.MolToSmiles(Chem.Mol(new_mol))
             except Exception:
                 if self.log:
-                    self.logger.warning(f"Amide Replacement Not Fully Sanitized: Replaced amide with {replacement}")
+                    self.logger.warning(
+                        f"Amide Replacement Not Fully Sanitized: Replaced amide with {replacement}"
+                    )
                 return None
 
         except Exception as e:
@@ -306,8 +355,13 @@ class ModifyBioisosteres:
             return []
         return list(fg_matches.get(fg_type, []))
 
-    def apply_modification(self, mol: Chem.Mol, chosen_fg_type: str, chosen_replacement: Optional[str] = None,
-                            match_index: Optional[int] = None) -> Optional[str]:
+    def apply_modification(
+        self,
+        mol: Chem.Mol,
+        chosen_fg_type: str,
+        chosen_replacement: Optional[str] = None,
+        match_index: Optional[int] = None,
+    ) -> Optional[str]:
         fg_matches = self.identify_functional_groups(mol)
 
         valid_modifications = []
@@ -331,7 +385,9 @@ class ModifyBioisosteres:
 
         if not fg_type:
             if self.log:
-                self.logger.error(f"No match in molecule for chosen bioisosteric replacement: {chosen_fg_type}.")
+                self.logger.error(
+                    f"No match in molecule for chosen bioisosteric replacement: {chosen_fg_type}."
+                )
             return None
 
         try:

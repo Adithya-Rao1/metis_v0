@@ -7,6 +7,7 @@ deterministic uuid5 the registry returns in every Prediction. A row is `publishe
 re-passes here (real card, every dataset cleared in the licence manifest, id/hash consistent); otherwise it is
 written as `draft` with licenses_cleared=false. A published row is never modified (the DB trigger forbids it);
 a conflicting row (same endpoint/version, different id or weights) is an error."""
+
 from __future__ import annotations
 
 import argparse
@@ -31,7 +32,10 @@ def gate_passed(entry: dict, endpoint: str, manifest_path=MANIFEST_PATH) -> tupl
         assert_real(card)
         if card.endpoint != endpoint:
             raise PublishRefused("card endpoint differs from manifest key")
-        if str(model_version_id(endpoint, card.version, entry["weights_sha256"])) != entry["model_version_id"]:
+        if (
+            str(model_version_id(endpoint, card.version, entry["weights_sha256"]))
+            != entry["model_version_id"]
+        ):
             raise PublishRefused("model_version_id is not the endpoint+version+weights uuid5")
         if card.weights_sha256 != entry["weights_sha256"]:
             raise PublishRefused("card weights hash differs from entry")
@@ -51,10 +55,22 @@ def rows_from_registry(root: Path | str = REGISTRY_ROOT, manifest_path=MANIFEST_
     for endpoint, e in sorted(models.items()):
         ok, why = gate_passed(e, endpoint, manifest_path)
         c = e["card"]
-        rows.append({"id": e["model_version_id"], "endpoint": endpoint, "version": c["version"],
-                     "status": "published" if ok else "draft", "datasets": c["datasets"], "licenses_cleared": ok,
-                     "limitations": c["limitations"], "split_type": c["split_type"], "benchmark": c["benchmark"],
-                     "coverage_by_n": c["coverage_by_n"], "weights_sha256": e["weights_sha256"], "_why": why})
+        rows.append(
+            {
+                "id": e["model_version_id"],
+                "endpoint": endpoint,
+                "version": c["version"],
+                "status": "published" if ok else "draft",
+                "datasets": c["datasets"],
+                "licenses_cleared": ok,
+                "limitations": c["limitations"],
+                "split_type": c["split_type"],
+                "benchmark": c["benchmark"],
+                "coverage_by_n": c["coverage_by_n"],
+                "weights_sha256": e["weights_sha256"],
+                "_why": why,
+            }
+        )
     return rows
 
 
@@ -73,20 +89,32 @@ def sync(dsn: str, root: Path | str = REGISTRY_ROOT, manifest_path=MANIFEST_PATH
     with psycopg.connect(dsn) as conn:
         for r in rows_from_registry(root, manifest_path):
             why = r.pop("_why")
-            cur = conn.execute("SELECT id::text, status, weights_sha256 FROM model_version WHERE endpoint=%s AND version=%s",
-                               (r["endpoint"], r["version"])).fetchone()
-            p = {**r, "datasets": Jsonb(r["datasets"]), "benchmark": Jsonb(r["benchmark"]), "coverage_by_n": Jsonb(r["coverage_by_n"])}
+            cur = conn.execute(
+                "SELECT id::text, status, weights_sha256 FROM model_version WHERE endpoint=%s AND version=%s",
+                (r["endpoint"], r["version"]),
+            ).fetchone()
+            p = {
+                **r,
+                "datasets": Jsonb(r["datasets"]),
+                "benchmark": Jsonb(r["benchmark"]),
+                "coverage_by_n": Jsonb(r["coverage_by_n"]),
+            }
             if cur is None:
                 conn.execute(_INSERT, p)
                 out[r["endpoint"]] = r["status"]
             elif cur[0] != r["id"] or cur[2] != r["weights_sha256"]:
-                raise SyncConflict(f"{r['endpoint']} {r['version']}: DB row {cur[0]} has different weights than the registry")
+                raise SyncConflict(
+                    f"{r['endpoint']} {r['version']}: DB row {cur[0]} has different weights than the registry"
+                )
             elif cur[1] != "draft":
                 out[r["endpoint"]] = cur[1]  # published/retired rows are immutable here
             else:
-                conn.execute("UPDATE model_version SET status=%(status)s, datasets=%(datasets)s, licenses_cleared=%(licenses_cleared)s, "
-                             "limitations=%(limitations)s, split_type=%(split_type)s, benchmark=%(benchmark)s, "
-                             "coverage_by_n=%(coverage_by_n)s WHERE id=%(id)s", p)
+                conn.execute(
+                    "UPDATE model_version SET status=%(status)s, datasets=%(datasets)s, licenses_cleared=%(licenses_cleared)s, "
+                    "limitations=%(limitations)s, split_type=%(split_type)s, benchmark=%(benchmark)s, "
+                    "coverage_by_n=%(coverage_by_n)s WHERE id=%(id)s",
+                    p,
+                )
                 out[r["endpoint"]] = r["status"]
             if r["status"] == "draft":
                 print(f"NOT published {r['endpoint']}: {why}", file=sys.stderr)
@@ -94,7 +122,9 @@ def sync(dsn: str, root: Path | str = REGISTRY_ROOT, manifest_path=MANIFEST_PATH
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Upsert model_version rows from the registry manifest (migration role)")
+    ap = argparse.ArgumentParser(
+        description="Upsert model_version rows from the registry manifest (migration role)"
+    )
     ap.add_argument("--registry-root", default=str(REGISTRY_ROOT))
     ap.add_argument("--manifest", default=str(MANIFEST_PATH), help="dataset licence manifest (datasets.yaml)")
     a = ap.parse_args(argv)

@@ -49,11 +49,22 @@ def _cell(v: object) -> object:
 def to_csv(project_name: str, compounds: list[ExportCompound], endpoints: list[str]) -> str:
     head, body = disclaimer()
     out = io.StringIO()
-    out.write(f"# {head}\n# {body}\n# Values labelled predicted are computational estimates with stated uncertainty; measured values are user-entered.\n")
+    out.write(
+        f"# {head}\n# {body}\n# Values labelled predicted are computational estimates with stated uncertainty; measured values are user-entered.\n"
+    )
     w = csv.writer(out, lineterminator="\n")
     cols = ["compound", "label", "canonical_smiles"]
     for e in endpoints:
-        cols += [f"{e}_predicted", f"{e}_interval_low", f"{e}_interval_high", f"{e}_probability", f"{e}_ensemble_n", f"{e}_coverage", f"{e}_sample_size", f"{e}_measured"]
+        cols += [
+            f"{e}_predicted",
+            f"{e}_interval_low",
+            f"{e}_interval_high",
+            f"{e}_probability",
+            f"{e}_ensemble_n",
+            f"{e}_coverage",
+            f"{e}_sample_size",
+            f"{e}_measured",
+        ]
     w.writerow(cols)
     for c in compounds:
         row: list[object] = [c.index, _cell(c.label or ""), _cell(c.canonical_smiles)]
@@ -62,7 +73,15 @@ def to_csv(project_name: str, compounds: list[ExportCompound], endpoints: list[s
             if p is None:
                 row += [""] * 7
             else:
-                row += [p.value, p.interval_low if p.interval_low is not None else "", p.interval_high if p.interval_high is not None else "", p.probability if p.probability is not None else "", p.ensemble_n, p.coverage, p.sample_size]
+                row += [
+                    p.value,
+                    p.interval_low if p.interval_low is not None else "",
+                    p.interval_high if p.interval_high is not None else "",
+                    p.probability if p.probability is not None else "",
+                    p.ensemble_n,
+                    p.coverage,
+                    p.sample_size,
+                ]
             row.append(";".join(f"{m:g}" for m in c.measured.get(e, [])))
         w.writerow(row)
     return out.getvalue()
@@ -87,7 +106,9 @@ def to_sdf(project_name: str, compounds: list[ExportCompound]) -> str:
             "canonical_smiles": c.canonical_smiles,
             "label": c.label or "",
             "conformer_method": method,
-            "conformer_label": "computed (not experimental)" if three_d else "computed 2D depiction (no 3D conformer)",
+            "conformer_label": "computed (not experimental)"
+            if three_d
+            else "computed 2D depiction (no 3D conformer)",
             "DISCLAIMER": f"{head}. {body}",
         }
         for e, p in sorted(c.predictions.items()):
@@ -125,15 +146,33 @@ def to_pdf(project_name: str, compounds: list[ExportCompound], endpoints: list[s
     pdf.set_title("Metis report")
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 14)
-    pdf.multi_cell(0, 7, _latin(f"Metis report: {project_name}"), wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(
+        0, 7, _latin(f"Metis report: {project_name}"), wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT"
+    )
     pdf.set_font("Helvetica", size=8)
-    pdf.multi_cell(0, 4, "Predicted values are computational estimates with stated uncertainty. Measured values are user-entered.", wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(
+        0,
+        4,
+        "Predicted values are computational estimates with stated uncertainty. Measured values are user-entered.",
+        wrapmode="CHAR",
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
     pdf.ln(2)
     for c in compounds:
         pdf.set_font("Helvetica", "B", 10)
-        pdf.multi_cell(0, 5, _latin(f"Compound {c.index}" + (f": {c.label}" if c.label else "")), wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(
+            0,
+            5,
+            _latin(f"Compound {c.index}" + (f": {c.label}" if c.label else "")),
+            wrapmode="CHAR",
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
         pdf.set_font("Courier", size=8)
-        pdf.multi_cell(0, 4, _latin(f"SMILES {c.canonical_smiles}"), wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(
+            0, 4, _latin(f"SMILES {c.canonical_smiles}"), wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT"
+        )
         pdf.set_font("Helvetica", size=8)
         for e in endpoints:
             p = c.predictions.get(e)

@@ -1,5 +1,6 @@
 # ruff: noqa: E501, E702, E741, B007, B008, B905, E402, SIM105, SIM108, SIM115, S603, S310
 """Errors with fixed, structure-free messages (messages must never echo uploaded content)."""
+
 from __future__ import annotations
 
 

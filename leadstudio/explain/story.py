@@ -1,11 +1,24 @@
 """Story card helper: headline + seed-vs-final table from real scores and the accepted edit path."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 
 from leadstudio.schema import ScoreResult, StoryCard
 
-_TABLE_FIELDS = ("qed", "sa", "logp", "tpsa", "mw", "hbd", "hba", "rotb", "fsp3", "lipinski_violations", "alerts")
+_TABLE_FIELDS = (
+    "qed",
+    "sa",
+    "logp",
+    "tpsa",
+    "mw",
+    "hbd",
+    "hba",
+    "rotb",
+    "fsp3",
+    "lipinski_violations",
+    "alerts",
+)
 
 
 def build_story_card(

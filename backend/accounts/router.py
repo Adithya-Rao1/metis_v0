@@ -129,7 +129,9 @@ def _audit(s: Any, uid: uuid.UUID, action: str, resource: str | None = None) -> 
     )
 
 
-def _set_cookies(resp: Response, cfg: AccountsConfig, session_token: str | None, bind: str | None = None) -> str:
+def _set_cookies(
+    resp: Response, cfg: AccountsConfig, session_token: str | None, bind: str | None = None
+) -> str:
     csrf = security.make_csrf_token(bind or security.ANON_BIND)
     if session_token:
         resp.set_cookie(
@@ -313,7 +315,9 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
         raise _invalid()
     if not row.email_verified:
         raise HTTPException(403, "email_not_verified")
-    token, jti, _exp = security.make_session_token(row.id, cfg.session_ttl_s, security.pw_version(row.password_hash))
+    token, jti, _exp = security.make_session_token(
+        row.id, cfg.session_ttl_s, security.pw_version(row.password_hash)
+    )
     csrf_token = _set_cookies(response, cfg, token, str(jti))
     with request_session(factory, row.id) as s:
         t = s.execute(text("SELECT tier FROM app_user WHERE id = :u"), {"u": row.id}).scalar_one()
@@ -328,7 +332,10 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
 # ---------------------------------------------------------- change password
 @router.post("/auth/change-password")
 def change_password(
-    body: ChangePasswordIn, sess: Annotated[Session_, Depends(authed_session)], request: Request, response: Response
+    body: ChangePasswordIn,
+    sess: Annotated[Session_, Depends(authed_session)],
+    request: Request,
+    response: Response,
 ) -> dict:
     """Authenticated + CSRF (via authed_session). Needs the current password. Every other session dies because the
     session token carries a fingerprint of the password hash; this session continues with a re-issued cookie."""
@@ -336,7 +343,8 @@ def change_password(
     rate_limit(factory, security.rl_key("user", "change_password", str(uid)), *cfg.rl_change_password_user)
     with request_session(factory, uid) as s:
         row = s.execute(
-            text("SELECT password_hash, email_lower FROM app_user WHERE id = :u AND deleted_at IS NULL"), {"u": uid}
+            text("SELECT password_hash, email_lower FROM app_user WHERE id = :u AND deleted_at IS NULL"),
+            {"u": uid},
         ).one_or_none()
     if row is None or not security.check_password(body.current_password, row.password_hash):
         raise HTTPException(403, "password_incorrect")
@@ -482,7 +490,9 @@ def account(user: Annotated[UserCtx, Depends(current_user_no_terms)], request: R
     factory, cfg = get_factory(request), get_config(request)
     with request_session(factory, user.id) as s:
         row = s.execute(
-            text("SELECT tier, is_edu, email_verified_at IS NOT NULL AS v, created_at FROM app_user WHERE id = :u"),
+            text(
+                "SELECT tier, is_edu, email_verified_at IS NOT NULL AS v, created_at FROM app_user WHERE id = :u"
+            ),
             {"u": user.id},
         ).one()
         consents = _consent_state(s, user.id)["consents"]

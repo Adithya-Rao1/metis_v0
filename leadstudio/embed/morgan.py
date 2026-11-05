@@ -5,6 +5,7 @@ union of all molecules seen so far, then Procrustes-aligned (rotation/reflection
 only, no scaling) to the previous projection of the shared molecules so points
 do not flip between generations.
 """
+
 from __future__ import annotations
 
 import threading
@@ -99,7 +100,9 @@ class StableProjector:
             return np.stack([xy[idx[k]] for k in keys]) if keys else np.zeros((0, 2))
 
 
-def _map(projector: StableProjector, smiles: Sequence[str], anchor: str | None, featurise) -> list[tuple[float, float]]:
+def _map(
+    projector: StableProjector, smiles: Sequence[str], anchor: str | None, featurise
+) -> list[tuple[float, float]]:
     """Common index-aligned map; unparsable SMILES get (0.0, 0.0) rather than raising."""
     smiles = list(smiles)
     canon_list = [canon(s) for s in smiles]

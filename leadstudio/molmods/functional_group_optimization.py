@@ -11,116 +11,127 @@ from leadstudio.molmods.modification_imports import reclaim_h_for_new_bond
 
 FUNCTIONAL_GROUPS = {
     # Format -- name: (SMARTS pattern, possible atoms/groups to bond to)
-    'methyl': ('[CH3]', ['C', 'N', 'S', 'O']),
-    'hydroxyl': ('[OH]', 1),
-    'amino': ('[NH2]', 1),
-    'carboxyl': ('[C](=O)[OH]', 1),
-    'carbonyl': ('[C]=O', 2),
-    'aldehyde': ('[CH]=O', 1),
-    'ketone': ('[C](=O)[#6]', 1),
-    'ether': ('[OD2]([#6])[#6]', 1),
-    'ester': ('[C](=O)[O][#6]', 1),
-    'amide': ('[C](=O)[N]', 1),
-    'nitro': ('[N+](=O)[O-]', 1),
-    'cyano': ('[C]#N', 1),
-    'alkene': ('[C]=[C]', 1),
-    'alkyne': ('[C]#[C]', 1),
-    'thiol': ('[SH]', 1),
-    'thioether': ('[SD2]([#6])[#6]', 1),
-    'halogen': ('[F,Cl,Br,I]', 1),
-    'phosphate': ('[P](=O)([O])[O]', 1),
-    'sulfonamide': ('[S](=O)(=O)[N]', 1),
-    'sulfone': ('[S](=O)(=O)[#6]', 1),
-    'sulfoxide': ('[S](=O)[#6]', 1),
-    'azide': ('[N-]=[N+]=[N]', 1),
-    'isocyanate': ('[N]=[C]=[O]', 1),
-    'isothiocyanate': ('[N]=[C]=[S]', 1),
-    'methylenedioxy': ('[O][C]([#6])[O]', 1)
+    "methyl": ("[CH3]", ["C", "N", "S", "O"]),
+    "hydroxyl": ("[OH]", 1),
+    "amino": ("[NH2]", 1),
+    "carboxyl": ("[C](=O)[OH]", 1),
+    "carbonyl": ("[C]=O", 2),
+    "aldehyde": ("[CH]=O", 1),
+    "ketone": ("[C](=O)[#6]", 1),
+    "ether": ("[OD2]([#6])[#6]", 1),
+    "ester": ("[C](=O)[O][#6]", 1),
+    "amide": ("[C](=O)[N]", 1),
+    "nitro": ("[N+](=O)[O-]", 1),
+    "cyano": ("[C]#N", 1),
+    "alkene": ("[C]=[C]", 1),
+    "alkyne": ("[C]#[C]", 1),
+    "thiol": ("[SH]", 1),
+    "thioether": ("[SD2]([#6])[#6]", 1),
+    "halogen": ("[F,Cl,Br,I]", 1),
+    "phosphate": ("[P](=O)([O])[O]", 1),
+    "sulfonamide": ("[S](=O)(=O)[N]", 1),
+    "sulfone": ("[S](=O)(=O)[#6]", 1),
+    "sulfoxide": ("[S](=O)[#6]", 1),
+    "azide": ("[N-]=[N+]=[N]", 1),
+    "isocyanate": ("[N]=[C]=[O]", 1),
+    "isothiocyanate": ("[N]=[C]=[S]", 1),
+    "methylenedioxy": ("[O][C]([#6])[O]", 1),
 }
 
 FG_PROPERTIES = {
-    'methyl': {'electron_donating': True, 'hydrophobic': True, 'acidic': False},
-    'hydroxyl': {'electron_donating': True, 'hydrophilic': True, 'acidic': True},
-    'amino': {'electron_donating': True, 'hydrophilic': True, 'basic': True},
-    'carboxyl': {'electron_withdrawing': True, 'hydrophilic': True, 'acidic': True},
-    'carbonyl': {'electron_withdrawing': True, 'reactive': True},
-    'aldehyde': {'electron_withdrawing': True, 'reactive': True, 'hydrophilic': True},
-    'ketone': {'electron_withdrawing': True, 'reactive': True, 'hydrophilic': True},
-    'ether': {'electron_donating': True, 'hydrophobic': True},
-    'ester': {'electron_withdrawing': True, 'hydrophobic': True, 'reactive': True},
-    'amide': {'resonance': True, 'hydrophilic': True, 'h_bonding': True},
-    'nitro': {'electron_withdrawing': True, 'reactive': True},
-    'cyano': {'electron_withdrawing': True, 'hydrophilic': True},
-    'alkene': {'electron_donating': True, 'reactive': True},
-    'alkyne': {'electron_withdrawing': True, 'reactive': True},
-    'thiol': {'electron_donating': True, 'hydrophobic': True, 'acidic': True},
-    'thioether': {'electron_donating': True, 'hydrophobic': True},
-    'halogen': {'electron_withdrawing': True, 'hydrophobic': True},
-    'phosphate': {'electron_withdrawing': True, 'hydrophilic': True, 'acidic': True},
-    'sulfonamide': {'electron_withdrawing': True, 'hydrophilic': True, 'acidic': True},
-    'sulfone': {'electron_withdrawing': True, 'hydrophilic': True},
-    'sulfoxide': {'electron_withdrawing': True, 'hydrophilic': True},
-    'azide': {'electron_withdrawing': True, 'reactive': True},
-    'isocyanate': {'electron_withdrawing': True, 'reactive': True},
-    'isothiocyanate': {'electron_withdrawing': True, 'reactive': True},
-    'methylenedioxy': {'electron_donating': True, 'hydrophobic': True}
+    "methyl": {"electron_donating": True, "hydrophobic": True, "acidic": False},
+    "hydroxyl": {"electron_donating": True, "hydrophilic": True, "acidic": True},
+    "amino": {"electron_donating": True, "hydrophilic": True, "basic": True},
+    "carboxyl": {"electron_withdrawing": True, "hydrophilic": True, "acidic": True},
+    "carbonyl": {"electron_withdrawing": True, "reactive": True},
+    "aldehyde": {"electron_withdrawing": True, "reactive": True, "hydrophilic": True},
+    "ketone": {"electron_withdrawing": True, "reactive": True, "hydrophilic": True},
+    "ether": {"electron_donating": True, "hydrophobic": True},
+    "ester": {"electron_withdrawing": True, "hydrophobic": True, "reactive": True},
+    "amide": {"resonance": True, "hydrophilic": True, "h_bonding": True},
+    "nitro": {"electron_withdrawing": True, "reactive": True},
+    "cyano": {"electron_withdrawing": True, "hydrophilic": True},
+    "alkene": {"electron_donating": True, "reactive": True},
+    "alkyne": {"electron_withdrawing": True, "reactive": True},
+    "thiol": {"electron_donating": True, "hydrophobic": True, "acidic": True},
+    "thioether": {"electron_donating": True, "hydrophobic": True},
+    "halogen": {"electron_withdrawing": True, "hydrophobic": True},
+    "phosphate": {"electron_withdrawing": True, "hydrophilic": True, "acidic": True},
+    "sulfonamide": {"electron_withdrawing": True, "hydrophilic": True, "acidic": True},
+    "sulfone": {"electron_withdrawing": True, "hydrophilic": True},
+    "sulfoxide": {"electron_withdrawing": True, "hydrophilic": True},
+    "azide": {"electron_withdrawing": True, "reactive": True},
+    "isocyanate": {"electron_withdrawing": True, "reactive": True},
+    "isothiocyanate": {"electron_withdrawing": True, "reactive": True},
+    "methylenedioxy": {"electron_donating": True, "hydrophobic": True},
 }
 
 # 0: Incompatible, 1: Possible issues, 2: Compatible
 FG_COMPATIBILITY = {
-    'hydroxyl': {'carboxyl': 1, 'carbonyl': 1, 'aldehyde': 1, 'ester': 1, 'isocyanate': 0},
-    'amino': {'carboxyl': 1, 'carbonyl': 1, 'aldehyde': 1, 'ketone': 1, 'ester': 1, 'isocyanate': 0},
-    'carboxyl': {'hydroxyl': 1, 'amino': 1, 'aldehyde': 1, 'thiol': 1},
-    'thiol': {'carboxyl': 1, 'carbonyl': 1, 'alkene': 1, 'alkyne': 1},
-    'nitro': {'amino': 1},
-    'isocyanate': {'hydroxyl': 0, 'amino': 0, 'carboxyl': 0, 'thiol': 0, 'water': 0}
+    "hydroxyl": {"carboxyl": 1, "carbonyl": 1, "aldehyde": 1, "ester": 1, "isocyanate": 0},
+    "amino": {"carboxyl": 1, "carbonyl": 1, "aldehyde": 1, "ketone": 1, "ester": 1, "isocyanate": 0},
+    "carboxyl": {"hydroxyl": 1, "amino": 1, "aldehyde": 1, "thiol": 1},
+    "thiol": {"carboxyl": 1, "carbonyl": 1, "alkene": 1, "alkyne": 1},
+    "nitro": {"amino": 1},
+    "isocyanate": {"hydroxyl": 0, "amino": 0, "carboxyl": 0, "thiol": 0, "water": 0},
 }
 
 REACTION_OUTCOMES = {
-    ('hydroxyl', 'carboxyl'): 'ester_formation',
-    ('amino', 'carboxyl'): 'amide_formation',
-    ('hydroxyl', 'isocyanate'): 'urethane_formation',
-    ('amino', 'carbonyl'): 'imine_formation'
+    ("hydroxyl", "carboxyl"): "ester_formation",
+    ("amino", "carboxyl"): "amide_formation",
+    ("hydroxyl", "isocyanate"): "urethane_formation",
+    ("amino", "carbonyl"): "imine_formation",
 }
 
 FG_FRAGMENT_SMILES = {
-    'methyl': 'C',
-    'hydroxyl': 'O',
-    'amino': 'N',
-    'carboxyl': 'C(=O)O',
-    'carbonyl': 'C=O',
-    'aldehyde': 'C=O',
-    'ketone': 'C(=O)C',
-    'ether': 'OC',
-    'ester': 'C(=O)OC',
-    'amide': 'C(=O)N',
-    'nitro': '[N+](=O)[O-]',
-    'cyano': 'C#N',
-    'thiol': 'S',
-    'thioether': 'SC',
-    'halogen': 'Cl',
-    'azide': 'N=[N+]=[N-]',
-    'sulfonamide': 'S(=O)(=O)N',
-    'sulfone': 'S(=O)(=O)C',
-    'sulfoxide': 'S(=O)C',
-    'phosphate': 'P(=O)(O)O',
+    "methyl": "C",
+    "hydroxyl": "O",
+    "amino": "N",
+    "carboxyl": "C(=O)O",
+    "carbonyl": "C=O",
+    "aldehyde": "C=O",
+    "ketone": "C(=O)C",
+    "ether": "OC",
+    "ester": "C(=O)OC",
+    "amide": "C(=O)N",
+    "nitro": "[N+](=O)[O-]",
+    "cyano": "C#N",
+    "thiol": "S",
+    "thioether": "SC",
+    "halogen": "Cl",
+    "azide": "N=[N+]=[N-]",
+    "sulfonamide": "S(=O)(=O)N",
+    "sulfone": "S(=O)(=O)C",
+    "sulfoxide": "S(=O)C",
+    "phosphate": "P(=O)(O)O",
 }
 
+
 class ModifyFunctionalGroup:
-    def __init__(self, 
-                 logger=None,
-                 functional_groups: Optional[Dict[str, Tuple[str, int]]] = None,
-                 modification_strategy: str = 'balanced',
-                 log: bool = False):
+    def __init__(
+        self,
+        logger=None,
+        functional_groups: Optional[Dict[str, Tuple[str, int]]] = None,
+        modification_strategy: str = "balanced",
+        log: bool = False,
+    ):
         self.logger = logger
         self.log = log
-        
+
         self.functional_groups = functional_groups or FUNCTIONAL_GROUPS
         self.modification_strategy = modification_strategy
-        
+
         self.drug_like_priority = [
-            'carboxyl', 'amino', 'amide', 'sulfonamide', 'hydroxyl',
-            'methyl', 'halogen', 'ether', 'ketone', 'cyano'
+            "carboxyl",
+            "amino",
+            "amide",
+            "sulfonamide",
+            "hydroxyl",
+            "methyl",
+            "halogen",
+            "ether",
+            "ketone",
+            "cyano",
         ]
 
     def identify_functional_groups(self, mol: Chem.Mol) -> Dict[str, List[int]]:
@@ -128,37 +139,37 @@ class ModifyFunctionalGroup:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
             return {}
-            
+
         result = {}
-        
+
         for fg_name, (smarts, _) in self.functional_groups.items():
             pattern = Chem.MolFromSmarts(smarts)
             if not pattern:
                 if self.log and self.logger:
                     self.logger.error(f"Invalid SMARTS pattern for {fg_name}")
                 continue
-                
+
             matches = mol.GetSubstructMatches(pattern)
             if matches:
                 central_atoms = []
                 for match in matches:
                     central_atoms.append(match[0])
-                
+
                 result[fg_name] = central_atoms
-                
+
         return result
-    
+
     def functional_group_add_sites(self, mol: Union[Chem.Mol, Chem.RWMol], fg_name: str) -> List[int]:
         if not mol:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
             return []
-            
+
         if fg_name not in self.functional_groups:
             if self.log and self.logger:
                 self.logger.error(f"Unknown functional group: {fg_name}")
             return []
-    
+
         rwmol = Chem.RWMol(mol)
         rwmol.UpdatePropertyCache(strict=False)
 
@@ -248,7 +259,9 @@ class ModifyFunctionalGroup:
                 self.logger.error(f"Failed to attach {fg_name} at site {attachment_idx}: {str(e)}")
             return None
 
-    def add_functional_group(self, mol: Union[Chem.Mol, Chem.RWMol], fg_name: str, site_idx: int) -> Optional[str]:
+    def add_functional_group(
+        self, mol: Union[Chem.Mol, Chem.RWMol], fg_name: str, site_idx: int
+    ) -> Optional[str]:
         if not mol:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
@@ -279,7 +292,9 @@ class ModifyFunctionalGroup:
                 self.logger.error(f"Error adding functional group: {str(e)}")
             return None
 
-    def remove_functional_group(self, mol: Union[Chem.Mol, Chem.RWMol], fg_name: str, instance_idx: int = 0) -> Optional[str]:
+    def remove_functional_group(
+        self, mol: Union[Chem.Mol, Chem.RWMol], fg_name: str, instance_idx: int = 0
+    ) -> Optional[str]:
         if not mol:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
@@ -296,7 +311,9 @@ class ModifyFunctionalGroup:
             match = self._match_single_attachment(mol, fg_name, instance_idx)
             if match is None:
                 if self.log and self.logger:
-                    self.logger.error(f"Functional group {fg_name} instance {instance_idx} not found or not singly-attached")
+                    self.logger.error(
+                        f"Functional group {fg_name} instance {instance_idx} not found or not singly-attached"
+                    )
                 return None
 
             match_atoms, attachment_idx = match
@@ -314,9 +331,9 @@ class ModifyFunctionalGroup:
                 self.logger.error(f"Error removing functional group: {str(e)}")
             return None
 
-    def modify_functional_group(self, mol: Union[Chem.Mol, Chem.RWMol],
-                                 source_fg: str, target_fg: str,
-                                 instance_idx: int = 0) -> Optional[str]:
+    def modify_functional_group(
+        self, mol: Union[Chem.Mol, Chem.RWMol], source_fg: str, target_fg: str, instance_idx: int = 0
+    ) -> Optional[str]:
         if not mol:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
@@ -339,7 +356,9 @@ class ModifyFunctionalGroup:
             match = self._match_single_attachment(mol, source_fg, instance_idx)
             if match is None:
                 if self.log and self.logger:
-                    self.logger.error(f"Functional group {source_fg} instance {instance_idx} not found or not singly-attached")
+                    self.logger.error(
+                        f"Functional group {source_fg} instance {instance_idx} not found or not singly-attached"
+                    )
                 return None
 
             match_atoms, attachment_idx = match
@@ -362,156 +381,175 @@ class ModifyFunctionalGroup:
 
     def _check_fg_compatibility(self, mol: Chem.Mol, source_fg: str, target_fg: str) -> int:
         compatibility = 2
-        
+
         if source_fg in FG_COMPATIBILITY and target_fg in FG_COMPATIBILITY[source_fg]:
             compatibility = min(compatibility, FG_COMPATIBILITY[source_fg][target_fg])
         elif target_fg in FG_COMPATIBILITY and source_fg in FG_COMPATIBILITY[target_fg]:
             compatibility = min(compatibility, FG_COMPATIBILITY[target_fg][source_fg])
-            
+
         fg_matches = self.identify_functional_groups(mol)
-        
+
         for other_fg in fg_matches:
             if other_fg == source_fg:
                 continue
-                
+
             if target_fg in FG_COMPATIBILITY and other_fg in FG_COMPATIBILITY[target_fg]:
                 compatibility = min(compatibility, FG_COMPATIBILITY[target_fg][other_fg])
             elif other_fg in FG_COMPATIBILITY and target_fg in FG_COMPATIBILITY[other_fg]:
                 compatibility = min(compatibility, FG_COMPATIBILITY[other_fg][target_fg])
-                
+
         return compatibility
-    
-    def suggest_modifications(self, mol: Chem.Mol, 
-                              target_property: str = None, 
-                              num_suggestions: int = 3) -> List[Tuple[str, str, str]]:
+
+    def suggest_modifications(
+        self, mol: Chem.Mol, target_property: str = None, num_suggestions: int = 3
+    ) -> List[Tuple[str, str, str]]:
         if not mol:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
             return []
-            
+
         suggestions = []
-        
+
         fg_matches = self.identify_functional_groups(mol)
         existing_fgs = list(fg_matches.keys())
-        
-        carbon_indices = [atom.GetIdx() for atom in mol.GetAtoms() 
-                         if atom.GetSymbol() == 'C' and atom.GetDegree() < 4]
-        
-        if target_property == 'solubility':
+
+        carbon_indices = [
+            atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == "C" and atom.GetDegree() < 4
+        ]
+
+        if target_property == "solubility":
             # Add hydrophilic groups
-            hydrophilic_fgs = ['hydroxyl', 'amino', 'carboxyl', 'amide', 'sulfone']
+            hydrophilic_fgs = ["hydroxyl", "amino", "carboxyl", "amide", "sulfone"]
             for fg in hydrophilic_fgs:
                 if len(suggestions) < num_suggestions and fg not in existing_fgs and carbon_indices:
-                    suggestions.append(('add', fg, f"Adding {fg} group will increase water solubility"))
-                    
+                    suggestions.append(("add", fg, f"Adding {fg} group will increase water solubility"))
+
             # Replace hydrophobic groups with hydrophilic
-            hydrophobic_fgs = ['methyl', 'halogen', 'alkene', 'alkyne']
+            hydrophobic_fgs = ["methyl", "halogen", "alkene", "alkyne"]
             for fg in hydrophobic_fgs:
                 if fg in existing_fgs and len(suggestions) < num_suggestions:
                     target = random.choice(hydrophilic_fgs)
-                    suggestions.append(('modify', f"{fg} to {target}", 
-                                      f"Converting {fg} to {target} will increase hydrophilicity"))
-                    
-        elif target_property == 'stability':
+                    suggestions.append(
+                        (
+                            "modify",
+                            f"{fg} to {target}",
+                            f"Converting {fg} to {target} will increase hydrophilicity",
+                        )
+                    )
+
+        elif target_property == "stability":
             # Add groups that increase stability
-            stability_fgs = ['methyl', 'ether', 'amide']
+            stability_fgs = ["methyl", "ether", "amide"]
             for fg in stability_fgs:
                 if len(suggestions) < num_suggestions and fg not in existing_fgs and carbon_indices:
-                    suggestions.append(('add', fg, f"Adding {fg} group will increase chemical stability"))
-                    
+                    suggestions.append(("add", fg, f"Adding {fg} group will increase chemical stability"))
+
             # Remove reactive groups
-            reactive_fgs = ['aldehyde', 'alkene', 'alkyne', 'azide', 'isocyanate']
+            reactive_fgs = ["aldehyde", "alkene", "alkyne", "azide", "isocyanate"]
             for fg in reactive_fgs:
                 if fg in existing_fgs and len(suggestions) < num_suggestions:
-                    suggestions.append(('remove', fg, f"Removing {fg} will reduce reactivity and increase stability"))
-                    
-        elif target_property == 'reactivity':
+                    suggestions.append(
+                        ("remove", fg, f"Removing {fg} will reduce reactivity and increase stability")
+                    )
+
+        elif target_property == "reactivity":
             # Add reactive groups
-            reactive_fgs = ['hydroxyl', 'amino', 'carbonyl', 'carboxyl']
+            reactive_fgs = ["hydroxyl", "amino", "carbonyl", "carboxyl"]
             for fg in reactive_fgs:
                 if len(suggestions) < num_suggestions and fg not in existing_fgs and carbon_indices:
-                    suggestions.append(('add', fg, f"Adding {fg} group will increase reactivity"))
-        
-        elif target_property == 'drug-like':
+                    suggestions.append(("add", fg, f"Adding {fg} group will increase reactivity"))
+
+        elif target_property == "drug-like":
             # Add common drug-like groups
             for fg in self.drug_like_priority:
                 if len(suggestions) < num_suggestions and fg not in existing_fgs and carbon_indices:
-                    suggestions.append(('add', fg, f"Adding {fg} group is common in drug molecules"))
-                    
+                    suggestions.append(("add", fg, f"Adding {fg} group is common in drug molecules"))
+
             mol_weight = Chem.Descriptors.MolWt(mol)
             if mol_weight > 500 and len(suggestions) < num_suggestions:
-                suggestions.append(('general', 'reduce size', 
-                                  "Molecule may be too large for drug-likeness; consider simplifying structure"))
-                                  
+                suggestions.append(
+                    (
+                        "general",
+                        "reduce size",
+                        "Molecule may be too large for drug-likeness; consider simplifying structure",
+                    )
+                )
+
         while len(suggestions) < num_suggestions:
             if not existing_fgs and not carbon_indices:
                 break
-                
+
             if existing_fgs and random.random() < 0.7:
                 source_fg = random.choice(existing_fgs)
                 target_options = [fg for fg in self.functional_groups if fg != source_fg]
                 if target_options:
                     target_fg = random.choice(target_options)
-                    suggestions.append(('modify', f"{source_fg} to {target_fg}", 
-                                      f"Changing {source_fg} to {target_fg} will alter molecular properties"))
+                    suggestions.append(
+                        (
+                            "modify",
+                            f"{source_fg} to {target_fg}",
+                            f"Changing {source_fg} to {target_fg} will alter molecular properties",
+                        )
+                    )
             elif carbon_indices:
                 fg = random.choice(list(self.functional_groups.keys()))
                 if fg not in existing_fgs:
-                    suggestions.append(('add', fg, f"Adding {fg} group will introduce new functionality"))
-                    
+                    suggestions.append(("add", fg, f"Adding {fg} group will introduce new functionality"))
+
         return suggestions[:num_suggestions]
-    
+
     def apply_suggestion(self, mol: Chem.Mol, suggestion: Tuple[str, str, str]) -> Optional[str]:
         if not mol:
             if self.log and self.logger:
                 self.logger.error("Invalid molecule provided")
             return None
-            
+
         mod_type, fg_info, _ = suggestion
-        
-        if mod_type == 'add':
-            carbon_indices = [atom.GetIdx() for atom in mol.GetAtoms() 
-                             if atom.GetSymbol() == 'C' and atom.GetDegree() < 4]
-            
+
+        if mod_type == "add":
+            carbon_indices = [
+                atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == "C" and atom.GetDegree() < 4
+            ]
+
             if not carbon_indices:
                 if self.log and self.logger:
                     self.logger.error("No suitable carbon attachment sites found")
                 return Chem.MolToSmiles(mol)
-                
+
             site_idx = random.choice(carbon_indices)
             return self.add_functional_group(mol, fg_info, site_idx)
-            
-        elif mod_type == 'remove':
+
+        elif mod_type == "remove":
             fg_matches = self.identify_functional_groups(mol)
             if fg_info not in fg_matches:
                 if self.log and self.logger:
                     self.logger.error(f"Functional group {fg_info} not found")
                 return Chem.MolToSmiles(mol)
-                
+
             return self.remove_functional_group(mol, fg_info)
-            
-        elif mod_type == 'modify':
-            parts = fg_info.split(' to ')
+
+        elif mod_type == "modify":
+            parts = fg_info.split(" to ")
             if len(parts) != 2:
                 if self.log and self.logger:
                     self.logger.error(f"Invalid modification format: {fg_info}")
                 return Chem.MolToSmiles(mol)
-                
+
             source_fg, target_fg = parts
-            
+
             fg_matches = self.identify_functional_groups(mol)
             if source_fg not in fg_matches:
                 if self.log and self.logger:
                     self.logger.error(f"Source functional group {source_fg} not found")
                 return Chem.MolToSmiles(mol)
-                
+
             return self.modify_functional_group(mol, source_fg, target_fg)
-            
+
         return Chem.MolToSmiles(mol)
 
     def batch_process(self, smiles_list: List[str], modifications: List[Tuple[str, str, int]]) -> List[str]:
         results = []
-        
+
         for smiles in smiles_list:
             mol = Chem.MolFromSmiles(smiles)
             if not mol:
@@ -519,67 +557,66 @@ class ModifyFunctionalGroup:
                     self.logger.error(f"Invalid SMILES: {smiles}")
                 results.append(smiles)
                 continue
-                
+
             curr_mol = mol
-            
+
             for operation, fg, param in modifications:
-                if operation == 'add':
+                if operation == "add":
                     new_smiles = self.add_functional_group(curr_mol, fg, param)
                     if new_smiles:
                         curr_mol = Chem.MolFromSmiles(new_smiles)
-                        
-                elif operation == 'remove':
+
+                elif operation == "remove":
                     new_smiles = self.remove_functional_group(curr_mol, fg, param)
                     if new_smiles:
                         curr_mol = Chem.MolFromSmiles(new_smiles)
-                        
-                elif operation == 'modify':
+
+                elif operation == "modify":
                     new_smiles = self.modify_functional_group(curr_mol, fg, param)
                     if new_smiles:
                         curr_mol = Chem.MolFromSmiles(new_smiles)
-                        
+
             results.append(Chem.MolToSmiles(curr_mol))
-            
+
         return results
 
 
 def main():
     import logging
-    
-    logging.basicConfig(level=logging.INFO, 
-                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger('FunctionalGroupModifier')
-    
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logger = logging.getLogger("FunctionalGroupModifier")
+
     modifier = ModifyFunctionalGroup(logger=logger, log=True)
-    
-    aspirin = 'CC(=O)OC1=CC=CC=C1C(=O)O'  # Aspirin
-    caffeine = 'CN1C=NC2=C1C(=O)N(C(=O)N2C)C'  # Caffeine
-    ibuprofen = 'CC(C)CC1=CC=C(C=C1)C(C)C(=O)O'  # Ibuprofen
-    
+
+    aspirin = "CC(=O)OC1=CC=CC=C1C(=O)O"  # Aspirin
+    caffeine = "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"  # Caffeine
+    ibuprofen = "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O"  # Ibuprofen
+
     print("Testing functional group identification:")
     mol = Chem.MolFromSmiles(aspirin)
     fg_matches = modifier.identify_functional_groups(mol)
     print(f"Found functional groups in aspirin: {fg_matches}")
-    
+
     print("\nTesting addition of functional group:")
-    new_smiles = modifier.add_functional_group(mol, 'amino', 1)
+    new_smiles = modifier.add_functional_group(mol, "amino", 1)
     print(f"Added amino group: {new_smiles}")
-    
+
     print("\nTesting removal of functional group:")
-    new_smiles = modifier.remove_functional_group(mol, 'carboxyl')
+    new_smiles = modifier.remove_functional_group(mol, "carboxyl")
     print(f"Removed carboxyl group: {new_smiles}")
-    
+
     print("\nTesting modification of functional group:")
-    new_smiles = modifier.modify_functional_group(mol, 'carboxyl', 'amide')
+    new_smiles = modifier.modify_functional_group(mol, "carboxyl", "amide")
     print(f"Modified carboxyl to amide: {new_smiles}")
-    
+
     print("\nTesting suggestion of modifications:")
-    suggestions = modifier.suggest_modifications(mol, target_property='solubility')
+    suggestions = modifier.suggest_modifications(mol, target_property="solubility")
     for mod_type, fg_info, rationale in suggestions:
         print(f"Suggestion: {mod_type} {fg_info} - {rationale}")
-        
+
     print("\nBatch processing example:")
-    modifications = [('add', 'hydroxyl', 5), ('remove', 'carboxyl', 0)]
+    modifications = [("add", "hydroxyl", 5), ("remove", "carboxyl", 0)]
     results = modifier.batch_process([aspirin, caffeine, ibuprofen], modifications)
     for i, result in enumerate(results):
-        print(f"Molecule {i+1} modified: {result}")
+        print(f"Molecule {i + 1} modified: {result}")

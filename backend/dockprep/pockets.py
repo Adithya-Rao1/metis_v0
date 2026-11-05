@@ -2,6 +2,7 @@
 """Pocket detection. (1) fpocket CLI wrapper (GPL-2.0 binary; run as a separate process, never linked).
 (2) A simple geometric buriedness finder in pure numpy, clearly labelled as a fallback: it is not fpocket and
 its score is its own (pocket volume weighted by mean buriedness)."""
+
 from __future__ import annotations
 
 import os
@@ -16,12 +17,27 @@ from .errors import DockprepError
 from .limits import MAX_POCKET_GRID_CELLS, SUBPROCESS_TIMEOUT_S
 from .pdbio import Atom, write_pdb
 
-_DIRS = np.array([d for d in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-                              *[(a, b, c) for a in (-1, 1) for b in (-1, 1) for c in (-1, 1)])], dtype=float)
+_DIRS = np.array(
+    [
+        d
+        for d in (
+            (1, 0, 0),
+            (-1, 0, 0),
+            (0, 1, 0),
+            (0, -1, 0),
+            (0, 0, 1),
+            (0, 0, -1),
+            *[(a, b, c) for a in (-1, 1) for b in (-1, 1) for c in (-1, 1)],
+        )
+    ],
+    dtype=float,
+)
 GEOMETRIC_METHOD = "metis-geometric-v1"
-GEOMETRIC_NOTE = ("Grid-based buriedness search (fallback, not fpocket): 1.0 A grid, points 3.0 A or more from any heavy atom, "
-                  "14 rays of 10 A, point kept if at least 9 rays hit protein; connected points form a pocket. "
-                  "Score = pocket volume in A^3 x mean buriedness fraction.")
+GEOMETRIC_NOTE = (
+    "Grid-based buriedness search (fallback, not fpocket): 1.0 A grid, points 3.0 A or more from any heavy atom, "
+    "14 rays of 10 A, point kept if at least 9 rays hit protein; connected points form a pocket. "
+    "Score = pocket volume in A^3 x mean buriedness fraction."
+)
 
 
 def _stamp(idx: np.ndarray, shape: tuple[int, int, int], radius_cells: int, r2_cells: float) -> np.ndarray:
@@ -38,7 +54,9 @@ def _stamp(idx: np.ndarray, shape: tuple[int, int, int], radius_cells: int, r2_c
     return mask
 
 
-def geometric_pockets(atoms: list[Atom], min_points: int = 30, max_pockets: int = 10, min_hits: int = 9) -> list[dict]:
+def geometric_pockets(
+    atoms: list[Atom], min_points: int = 30, max_pockets: int = 10, min_hits: int = 9
+) -> list[dict]:
     heavy = np.array([[a.x, a.y, a.z] for a in atoms if not a.is_h], dtype=float)
     if len(heavy) < 20:
         return []
@@ -46,11 +64,15 @@ def geometric_pockets(atoms: list[Atom], min_points: int = 30, max_pockets: int 
     origin = heavy.min(axis=0) - 12.0
     dims = tuple(int(x) + 1 for x in (heavy.max(axis=0) + 12.0 - origin) / g)
     if dims[0] * dims[1] * dims[2] > MAX_POCKET_GRID_CELLS:
-        raise DockprepError("too_extended", "Structure extent is too large for pocket detection (grid limit exceeded); "
-                            "select fewer chains or define the site by residues, ligand or box.", 422)
+        raise DockprepError(
+            "too_extended",
+            "Structure extent is too large for pocket detection (grid limit exceeded); "
+            "select fewer chains or define the site by residues, ligand or box.",
+            422,
+        )
     idx = np.rint((heavy - origin) / g).astype(int)
-    solid = _stamp(idx, dims, 2, 4.0)           # protein body: within 2.0 A of an atom centre
-    near = _stamp(idx, dims, 3, 9.0)            # too close for a ligand atom: within 3.0 A
+    solid = _stamp(idx, dims, 2, 4.0)  # protein body: within 2.0 A of an atom centre
+    near = _stamp(idx, dims, 3, 9.0)  # too close for a ligand atom: within 3.0 A
     free = ~near
     cand = np.argwhere(free)
     # axis rays first (cheap pre-filter), then the 8 diagonals
@@ -60,7 +82,11 @@ def geometric_pockets(atoms: list[Atom], min_points: int = 30, max_pockets: int 
         if d_i == 6:  # after axis rays, drop points with < 3 axis hits
             m = hits[keep] >= 3
             keep = keep[m]
-        step = np.rint(d / np.linalg.norm(d) * np.arange(1, 11)[:, None]).astype(int) if d_i >= 6 else (d * np.arange(1, 11)[:, None]).astype(int)
+        step = (
+            np.rint(d / np.linalg.norm(d) * np.arange(1, 11)[:, None]).astype(int)
+            if d_i >= 6
+            else (d * np.arange(1, 11)[:, None]).astype(int)
+        )
         pts = cand[keep]
         hit = np.zeros(len(pts), dtype=bool)
         for s in step:
@@ -100,11 +126,18 @@ def geometric_pockets(atoms: list[Atom], min_points: int = 30, max_pockets: int 
         if m.sum() < min_points:
             continue
         xyz = pts[m] * g + origin
-        out.append({
-            "points": xyz, "n_points": int(m.sum()), "volume_A3": float(m.sum() * g ** 3), "mean_buriedness": float(bur[m].mean()),
-            "score": float(m.sum() * g ** 3 * bur[m].mean()), "center": xyz.mean(axis=0).tolist(),
-            "bbox_min": xyz.min(axis=0).tolist(), "bbox_max": xyz.max(axis=0).tolist(),
-        })
+        out.append(
+            {
+                "points": xyz,
+                "n_points": int(m.sum()),
+                "volume_A3": float(m.sum() * g**3),
+                "mean_buriedness": float(bur[m].mean()),
+                "score": float(m.sum() * g**3 * bur[m].mean()),
+                "center": xyz.mean(axis=0).tolist(),
+                "bbox_min": xyz.min(axis=0).tolist(),
+                "bbox_max": xyz.max(axis=0).tolist(),
+            }
+        )
     out.sort(key=lambda p: -p["score"])
     return out[:max_pockets]
 
@@ -117,7 +150,7 @@ def lining_residues(atoms: list[Atom], points: np.ndarray, cutoff: float = 4.5) 
     sub = points[:: max(1, len(points) // 400)]
     res: set[tuple] = set()
     for s in range(0, len(xyz), 500):
-        d = np.linalg.norm(xyz[s:s + 500, None, :] - sub[None, :, :], axis=2).min(axis=1)
+        d = np.linalg.norm(xyz[s : s + 500, None, :] - sub[None, :, :], axis=2).min(axis=1)
         for k in np.nonzero(d <= cutoff)[0]:
             a = heavy[s + k]
             res.add((a.chain, a.resseq, a.icode, a.resname))
@@ -172,8 +205,14 @@ def run_fpocket(atoms: list[Atom], timeout: int = SUBPROCESS_TIMEOUT_S) -> list[
     with tempfile.TemporaryDirectory(prefix="mdf_") as td:
         Path(td, "prot.pdb").write_text(write_pdb([a for a in atoms if a.record == "ATOM"]))
         try:
-            r = subprocess.run([exe, "-f", "prot.pdb"], cwd=td, capture_output=True, timeout=timeout, check=False,  # nosec B603
-                               env={"PATH": os.environ.get("PATH", ""), "HOME": td})
+            r = subprocess.run(
+                [exe, "-f", "prot.pdb"],
+                cwd=td,
+                capture_output=True,
+                timeout=timeout,
+                check=False,  # nosec B603
+                env={"PATH": os.environ.get("PATH", ""), "HOME": td},
+            )
         except subprocess.TimeoutExpired:
             return None
         out = Path(td, "prot_out")

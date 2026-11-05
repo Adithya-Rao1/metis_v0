@@ -3,6 +3,7 @@
 Atom indices always refer to ``Chem.MolFromSmiles(smiles)`` of the SMILES passed in
 (heavy atoms only; hydrogens are removed after embedding, which preserves heavy-atom order).
 """
+
 from __future__ import annotations
 
 from rdkit import Chem
@@ -47,8 +48,11 @@ def mcs_match(parent: MolLike, child: MolLike) -> list[tuple[int, int]]:
     if p is None or c is None:
         return []
     res = rdFMCS.FindMCS(
-        [p, c], timeout=MCS_TIMEOUT_S, ringMatchesRingOnly=True,
-        atomCompare=rdFMCS.AtomCompare.CompareElements, bondCompare=rdFMCS.BondCompare.CompareOrder,
+        [p, c],
+        timeout=MCS_TIMEOUT_S,
+        ringMatchesRingOnly=True,
+        atomCompare=rdFMCS.AtomCompare.CompareElements,
+        bondCompare=rdFMCS.BondCompare.CompareOrder,
     )
     if res.numAtoms == 0:
         return []

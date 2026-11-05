@@ -6,6 +6,7 @@ Hard rules enforced here (tests prove them):
   * deterministic: member seeds = base_seed*1000 + k; splits seeded; resumable via per-member checkpoints.
 Artifacts go to ml/registry/artifacts/<endpoint>/<version>/ (git-ignored). Wave 2: never run on real data.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +27,10 @@ from ml.uncertainty.conformal import N_VALUES, SplitConformal, ConformalByN
 from ml.uncertainty.similarity import SimilarityErrorModel, SimilarityIndex
 
 REQUIRED = ("endpoint", "version", "datasets", "kind", "backend")
-ALLOWED_SPLITS = ("scaffold", "butina")  # time split needs per-compound dates, which the local loader does not carry
+ALLOWED_SPLITS = (
+    "scaffold",
+    "butina",
+)  # time split needs per-compound dates, which the local loader does not carry
 
 
 def load_config(path: Path | str) -> dict:
@@ -48,15 +52,23 @@ def gate(cfg: dict, manifest_path=MANIFEST_PATH) -> list:
 
 def default_loader(cfg: dict) -> list[tuple[str, float, str]]:
     from ml.data.loader import load_local
+
     rows = []
     for d in cfg["datasets"]:
         rows += [(s, y, d) for s, y in load_local(d, cfg.get("data_cache_dir", "data"))]
     return rows
 
 
-def run_training(cfg: dict, *, manifest_path=MANIFEST_PATH, loader: Callable[[dict], list] = default_loader,
-                 artifacts_root: Path | str = B.ARTIFACTS_ROOT, member_cls=None, resume: bool = True,
-                 on_member=None) -> Path:
+def run_training(
+    cfg: dict,
+    *,
+    manifest_path=MANIFEST_PATH,
+    loader: Callable[[dict], list] = default_loader,
+    artifacts_root: Path | str = B.ARTIFACTS_ROOT,
+    member_cls=None,
+    resume: bool = True,
+    on_member=None,
+) -> Path:
     entries = gate(cfg, manifest_path)  # FIRST: nothing below runs for non-cleared data
     kind = cfg["kind"]
     for e in entries:
@@ -66,7 +78,10 @@ def run_training(cfg: dict, *, manifest_path=MANIFEST_PATH, loader: Callable[[di
     seen, smiles, y, ds_of = set(), [], [], []
     for s, v, d in rows:  # first occurrence wins (data is expected pre-cleaned by ml.data.clean)
         if s not in seen:
-            seen.add(s); smiles.append(s); y.append(float(v)); ds_of.append(d)
+            seen.add(s)
+            smiles.append(s)
+            y.append(float(v))
+            ds_of.append(d)
     y = np.asarray(y)
     seed = int(cfg.get("seed", 0))
     frac = tuple(cfg.get("split_frac", (0.7, 0.15, 0.15)))
@@ -91,27 +106,54 @@ def run_training(cfg: dict, *, manifest_path=MANIFEST_PATH, loader: Callable[[di
         err_models = {N: SimilarityErrorModel.fit(sim_cal, np.abs(y[ca] - P[:N].mean(0))) for N in N_VALUES}
     B.save_calibration(root, conformal, class_cal, err_models, {"n_cal": len(ca)})
     (root / "train_data.json").write_text(json.dumps({"smiles": tr_s, "y": [float(v) for v in y[tr]]}))
-    meta = {"endpoint": cfg["endpoint"], "version": cfg["version"], "kind": kind, "backend": cfg["backend"],
-            "member_params": cfg.get("member_params", {}), "n_members": pool.n_members, "base_seed": seed,
-            "member_seeds": [seed * 1000 + k for k in range(pool.n_members)],
-            "split": cfg.get("split", "scaffold"), "split_sizes": [len(tr), len(ca), len(te)],
-            "split_indices": {"train": [int(i) for i in tr], "cal": [int(i) for i in ca], "test": [int(i) for i in te]},
-            "datasets": [{"id": e.id, "sha256": B.dataset_sha256([s for s, d in zip(smiles, ds_of) if d == e.id],
-                                                                  [v for v, d in zip(y, ds_of) if d == e.id]),
-                          "n": sum(1 for d in ds_of if d == e.id),
-                          # snapshot of the cleared manifest entry; publish re-derives and compares (F-104)
-                          "name": e.name, "source_url": e.source_url, "license_as_stated": e.license_as_stated,
-                          "kind": e.kind} for e in entries],
-            "dataset_of_row": ds_of,
-            "units": entries[0].units, "default_range": [float(y[tr].min()), float(y[tr].max())],
-            "code_commit": B.code_commit(), "weights_sha256": B.weights_sha256(root / "members"),
-            "all_smiles": smiles, "all_y": [float(v) for v in y]}
+    meta = {
+        "endpoint": cfg["endpoint"],
+        "version": cfg["version"],
+        "kind": kind,
+        "backend": cfg["backend"],
+        "member_params": cfg.get("member_params", {}),
+        "n_members": pool.n_members,
+        "base_seed": seed,
+        "member_seeds": [seed * 1000 + k for k in range(pool.n_members)],
+        "split": cfg.get("split", "scaffold"),
+        "split_sizes": [len(tr), len(ca), len(te)],
+        "split_indices": {
+            "train": [int(i) for i in tr],
+            "cal": [int(i) for i in ca],
+            "test": [int(i) for i in te],
+        },
+        "datasets": [
+            {
+                "id": e.id,
+                "sha256": B.dataset_sha256(
+                    [s for s, d in zip(smiles, ds_of) if d == e.id],
+                    [v for v, d in zip(y, ds_of) if d == e.id],
+                ),
+                "n": sum(1 for d in ds_of if d == e.id),
+                # snapshot of the cleared manifest entry; publish re-derives and compares (F-104)
+                "name": e.name,
+                "source_url": e.source_url,
+                "license_as_stated": e.license_as_stated,
+                "kind": e.kind,
+            }
+            for e in entries
+        ],
+        "dataset_of_row": ds_of,
+        "units": entries[0].units,
+        "default_range": [float(y[tr].min()), float(y[tr].max())],
+        "code_commit": B.code_commit(),
+        "weights_sha256": B.weights_sha256(root / "members"),
+        "all_smiles": smiles,
+        "all_y": [float(v) for v in y],
+    }
     (root / "meta.json").write_text(json.dumps(meta))
     return root
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Train one Metis endpoint (license-gated; owner runs this, not CI)")
+    ap = argparse.ArgumentParser(
+        description="Train one Metis endpoint (license-gated; owner runs this, not CI)"
+    )
     ap.add_argument("--config", required=True)
     ap.add_argument("--artifacts-dir", default=str(B.ARTIFACTS_ROOT))
     ap.add_argument("--no-resume", action="store_true")
@@ -122,8 +164,12 @@ def main(argv=None) -> int:
     except (LicenseError, KeyError) as e:
         print(f"REFUSED (license gate): {e}", file=sys.stderr)
         return 2
-    root = run_training(cfg, artifacts_root=a.artifacts_dir, resume=not a.no_resume,
-                        on_member=lambda k, reused: print(f"member {k:02d} {'reused' if reused else 'trained'}"))
+    root = run_training(
+        cfg,
+        artifacts_root=a.artifacts_dir,
+        resume=not a.no_resume,
+        on_member=lambda k, reused: print(f"member {k:02d} {'reused' if reused else 'trained'}"),
+    )
     print(f"wrote {root}")
     return 0
 

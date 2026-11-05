@@ -1,4 +1,5 @@
 """Baselines: RF on Morgan FP, General Solubility Equation, Crippen logP."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -6,9 +7,11 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, Crippen
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-GSE_NOTE = ("General Solubility Equation: logS = 0.5 - 0.01*(MP-25) - logP. Melting point is usually not "
-            "available; when missing, the (MP-25) term is dropped (assumes a liquid or low-melting solid), "
-            "so logS is an upper-bound approximation for crystalline solids. Crippen logP is used for logP.")
+GSE_NOTE = (
+    "General Solubility Equation: logS = 0.5 - 0.01*(MP-25) - logP. Melting point is usually not "
+    "available; when missing, the (MP-25) term is dropped (assumes a liquid or low-melting solid), "
+    "so logS is an upper-bound approximation for crystalline solids. Crippen logP is used for logP."
+)
 
 
 def morgan_matrix(smiles: list[str], radius: int = 2, n_bits: int = 2048) -> np.ndarray:
