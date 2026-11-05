@@ -96,10 +96,10 @@ class RunConfig(BaseModel):
     )  # id of a saved scoring profile (/lead/profiles)
     adapter_id: str | None = Field(
         default=None, max_length=MAX_ID
-    )  # per-user policy adapter: NOT available in Metis
+    )  # id of one of the caller's adapters ("Adapt to my edits")
     seed_molblock: str | None = Field(
         default=None, max_length=MAX_MOLFILE
-    )  # accepted but ignored by the engine
+    )  # optional 3D seed; must be the seed molecule (checked server-side)
 
 
 # ------------------------------------------------------------------- explaining
@@ -191,7 +191,7 @@ class ErrorPayload(BaseModel):
     recoverable: bool = False
 
 
-PAYLOAD_MODELS = {
+PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "run_start": RunStartPayload,
     "generation": GenerationPayload,
     "candidate": Candidate,

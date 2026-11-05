@@ -99,7 +99,7 @@ def test_run_validation_and_server_caps(factory, users):
     assert post({"seed_smiles": NITRO, "objectives": {"__class__": {}}}).status_code == 422
     assert post({"seed_smiles": NITRO, "objectives": {"qed": {"weight": 99}}}).status_code == 422
     assert post({"seed_smiles": NITRO, "objectives": {f"o{i}": {} for i in range(21)}}).status_code == 422
-    assert post({"seed_smiles": NITRO, "adapter_id": "x"}).status_code == 422
+    assert post({"seed_smiles": NITRO, "adapter_id": "x"}).status_code == 404       # unknown adapter (was 422: unsupported)
     assert post({"seed_smiles": NITRO, "stage": "manual"}).status_code == 422
     assert post({"seed_smiles": NITRO, "target_id": "nope"}).status_code == 422
     assert post({"seed_smiles": NITRO, "stage": "binding", "target_id": "egfr"}).status_code == 503  # mock mode

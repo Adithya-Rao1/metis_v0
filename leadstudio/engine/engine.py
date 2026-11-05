@@ -15,17 +15,28 @@ import os
 import random
 import time
 from collections.abc import Iterator
+from typing import Literal
 
 from rdkit import Chem, DataStructs
 
 from leadstudio.contracts import Embedder, Explainer, Policy, Registry, Scorer
 from leadstudio.engine import geometry
-from leadstudio.engine.ga import Individual, Locks, Niching, Operators, Proposal, canonical_valid
+from leadstudio.engine.ga import (
+    Individual,
+    Locks,
+    Niching,
+    Operators,
+    Proposal,
+    canonical_valid,
+    evolved,
+    scored,
+)
 from leadstudio.sanity.checks import check_child
 from leadstudio.schema import (
     Candidate,
     ErrorPayload,
     Event,
+    EventType,
     GenerationPayload,
     PolicyMetrics,
     PopulationMember,
@@ -39,11 +50,20 @@ CROSSOVER_MIN_SIM = 0.5  # demo-safe mode: a crossover child must stay this Tani
 ATTEMPT_FACTOR = 8  # proposal attempts per wanted child before a generation gives up
 
 
+def _map_method(name: str) -> Literal["morgan_pca", "chemberta_pca"] | None:
+    """The embedder's method name as the schema's literal (None for a name the schema does not know)."""
+    if name == "morgan_pca":
+        return "morgan_pca"
+    if name == "chemberta_pca":
+        return "chemberta_pca"
+    return None
+
+
 class _Emitter:
     def __init__(self, run_id: str):
         self.run_id, self.seq = run_id, 0
 
-    def __call__(self, type_: str, payload) -> Event:
+    def __call__(self, type_: EventType, payload) -> Event:
         ev = Event(type=type_, run_id=self.run_id, seq=self.seq, payload=payload.model_dump(mode="json"))
         self.seq += 1
         return ev
@@ -109,7 +129,12 @@ class Engine:
                 amaps[(p, c)] = geometry.atom_map(p, c)
             return amaps[(p, c)]
 
-        seed_block, geo[seed_smiles] = geometry.embed_3d(seed_smiles)
+        from_user = (
+            geometry.seed_from_block(seed_smiles, config.seed_molblock) if config.seed_molblock else None
+        )
+        seed_block, geo[seed_smiles] = from_user or geometry.embed_3d(
+            seed_smiles
+        )  # an unusable block: embed instead
         seed_score = scores[seed_smiles] = self.scorer.score(seed_smiles, config)
         yield emit(
             "run_start",
@@ -197,7 +222,7 @@ class Engine:
                         (float(x), float(y))
                         for x, y in self.embedder.map_xy([i.smiles for i in pop], anchor=seed_smiles)
                     ]
-                    map_method = self.embedder.method
+                    map_method = _map_method(self.embedder.method)
                 except Exception:
                     map_xy, map_method = None, None  # the map is optional; never fail the run for it
             yield emit(
@@ -224,17 +249,18 @@ class Engine:
         yield emit("run_end", self._story(config, seed_smiles, seed_score, best))
 
     def _candidate(self, kid: Individual, accepted: bool, geo: dict[str, Chem.Mol], mapper) -> Candidate:
-        parent = kid.parent
+        parent, edit, cid = evolved(kid)
         pmol, cmol = geo[parent.smiles], geo[kid.smiles]
         amap = mapper(parent.smiles, kid.smiles)
         geometry.align_to(cmol, pmol, amap)
-        edit = kid.edit
         if edit.category == "crossover":  # site = parent atoms that were not carried over
             mapped = {p for p, _ in amap}
             edit = edit.model_copy(update={"site": [i for i in range(pmol.GetNumAtoms()) if i not in mapped]})
-        expl = self.explainer.explain(parent.smiles, kid.smiles, edit, parent.score, kid.score, kid.edit_op)
+        expl = self.explainer.explain(
+            parent.smiles, kid.smiles, edit, scored(parent), scored(kid), kid.edit_op
+        )
         return Candidate(
-            id=kid.cid,
+            id=cid,
             generation=kid.generation,
             smiles=kid.smiles,
             parent_smiles=parent.smiles,
@@ -242,7 +268,7 @@ class Engine:
             parent_molblock=Chem.MolToMolBlock(pmol),
             atom_map=[(int(p), int(c)) for p, c in amap],
             edit=edit,
-            score=kid.score,
+            score=scored(kid),
             explanation=expl,
             accepted=accepted,
         )
@@ -255,10 +281,10 @@ class Engine:
         ops: Operators,
         rej_reasons: dict[str, int] | None = None,
     ) -> PolicyMetrics:
-        muts = [k for k in kids if k.edit.chosen_by in ("policy", "random")]
-        reward = lambda k: k.composite - k.parent.composite  # noqa: E731
-        pol = [reward(k) for k in muts if k.edit.chosen_by == "policy"]
-        rnd = [reward(k) for k in muts if k.edit.chosen_by == "random"]
+        muts = [k for k in kids if evolved(k)[1].chosen_by in ("policy", "random")]
+        reward = lambda k: k.composite - evolved(k)[0].composite  # noqa: E731
+        pol = [reward(k) for k in muts if evolved(k)[1].chosen_by == "policy"]
+        rnd = [reward(k) for k in muts if evolved(k)[1].chosen_by == "random"]
         notes = []
         if rej_reasons:
             parts = ", ".join(
@@ -268,7 +294,7 @@ class Engine:
         if not kids:
             notes.append("no valid new children this generation")
         transitions = [
-            (k.parent.smiles, k.edit_op, tuple(k.edit.site), k.smiles, reward(k))
+            (evolved(k)[0].smiles, k.edit_op, tuple(evolved(k)[1].site), k.smiles, reward(k))
             for k in accepted
             if k.edit_op is not None
         ]
@@ -295,19 +321,20 @@ class Engine:
     @staticmethod
     def _story(config: RunConfig, seed_smiles: str, seed_score: ScoreResult, best: Individual) -> StoryCard:
         path: list[str] = []
-        node = best
+        node: Individual | None = best
         while node is not None and node.cid is not None:
             path.append(node.cid)
             node = node.parent
         path.reverse()
-        a, b = seed_score.descriptors, best.score.descriptors
+        best_score = scored(best)
+        a, b = seed_score.descriptors, best_score.descriptors
         parts = []
         if b.alerts < a.alerts:
             parts.append(f"Removed {a.alerts - b.alerts} alert{'s' if a.alerts - b.alerts != 1 else ''}")
         elif b.alerts > a.alerts:
             parts.append(f"Added {b.alerts - a.alerts} alert{'s' if b.alerts - a.alerts != 1 else ''}")
         parts.append(f"QED {a.qed:.2f} -> {b.qed:.2f}")
-        parts.append(f"composite {seed_score.composite:.2f} -> {best.score.composite:.2f}")
+        parts.append(f"composite {seed_score.composite:.2f} -> {best_score.composite:.2f}")
         headline = ", ".join(parts) + (
             f" in {len(path)} edit{'s' if len(path) != 1 else ''}" if path else " (no improving edit found)"
         )
@@ -317,7 +344,7 @@ class Engine:
             seed_smiles=seed_smiles,
             final_smiles=best.smiles,
             seed_score=seed_score,
-            final_score=best.score,
+            final_score=best_score,
             edit_path=path,
             headline=headline,
             descriptor_table=table,

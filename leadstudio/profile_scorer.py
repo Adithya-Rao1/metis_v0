@@ -21,6 +21,38 @@ from leadstudio.profiles import MAX_SMARTS_ATOMS, ProfileBody
 from leadstudio.schema import AlertHit, RunConfig, ScoreResult
 
 USER_PENALTY = 0.8
+
+
+class AllowlistRegistry:
+    """Read-only view of a registry restricted to the edit ids of a saved profile (`edit_allowlist`).
+
+    The GA's mutation step only sees `applicable()`, so filtering there confines every proposed edit to the list.
+    The wrapped registry is never changed (it is shared by all runs). BRICS crossover is not a registry edit and
+    stays governed by `RunConfig.use_crossover`. An id the registry does not know is simply never matched."""
+
+    def __init__(self, inner, allowed):
+        self._inner = inner
+        self.allowed = frozenset(allowed)
+
+    def __getattr__(self, name):  # demo_safe etc.: anything else is the inner registry's
+        return getattr(self._inner, name)
+
+    def all(self):
+        return [op for op in self._inner.all() if op.id in self.allowed]
+
+    def get(self, edit_id):
+        if edit_id not in self.allowed:
+            raise KeyError(edit_id)
+        return self._inner.get(edit_id)
+
+    def applicable(self, smiles, locked_atoms=(), *args, **kw):
+        return [
+            (op, site)
+            for op, site in self._inner.applicable(smiles, locked_atoms, *args, **kw)
+            if op.id in self.allowed
+        ]
+
+
 SCORE_MATCH_BUDGET_S = 0.5
 
 

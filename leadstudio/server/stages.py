@@ -138,6 +138,8 @@ class Services:
         with self._lock:
             if key not in self._engines:
                 fn = self._binding_factory
+                if fn is None:
+                    raise HTTPException(503, "Binding stage is not available on this server")
                 params = inspect.signature(fn).parameters
                 avail = {"target_id": config.target_id, "config": config}
                 kw = {k: v for k, v in avail.items() if k in params}
@@ -179,6 +181,18 @@ class StageEngine:
         never mutated, so concurrent runs of other users keep their own scoring."""
         clone = copy.copy(self.base)
         clone.scorer = wrap(self.base.scorer)
+        return StageEngine(clone, self.svc)
+
+    def with_registry(self, wrap: Callable[[Any], Any]) -> StageEngine:
+        """A copy whose edit registry is `wrap(base.registry)` (a profile's edit allow-list); see `with_scorer`."""
+        clone = copy.copy(self.base)
+        clone.registry = wrap(self.base.registry)
+        return StageEngine(clone, self.svc)
+
+    def with_policy(self, policy: Any) -> StageEngine:
+        """A copy that proposes edits with `policy` (a user's adapter); the shared engine is never mutated."""
+        clone = copy.copy(self.base)
+        clone.policy = policy
         return StageEngine(clone, self.svc)
 
     def run(self, run_id: str, config: RunConfig):

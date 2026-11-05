@@ -22,13 +22,13 @@ def check_smarts(s: str) -> str | None:
         return "empty pattern"
     if len(s) > MAX_SMARTS_LEN:
         return f"longer than {MAX_SMARTS_LEN} characters"
-    RDLogger.DisableLog("rdApp.*")
+    RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
     try:
         q = Chem.MolFromSmarts(s)
     except Exception:
         q = None
     finally:
-        RDLogger.EnableLog("rdApp.*")
+        RDLogger.EnableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
     if q is None or q.GetNumAtoms() == 0:
         return "not a valid SMARTS pattern"
     if q.GetNumAtoms() > MAX_SMARTS_ATOMS:
@@ -92,10 +92,19 @@ class ProfileBody(BaseModel):
     def _allow(cls, v):
         if len(v) > MAX_ALLOW:
             raise ValueError(f"at most {MAX_ALLOW} edit ids")
+        if not v:
+            return v
         known = known_edit_ids()
+        if (
+            known is None
+        ):  # cannot tell which names are real: refuse rather than store names that match nothing
+            raise ValueError("the edit list is unavailable right now, try again later")
+        out: list[str] = []
         for e in v:
             if not isinstance(e, str) or len(e) > 80:
                 raise ValueError("edit id too long")
-            if known is not None and e not in known:
+            if e not in known:
                 raise ValueError(f"unknown edit id: {e[:40]}")
-        return v
+            if e not in out:
+                out.append(e)
+        return out

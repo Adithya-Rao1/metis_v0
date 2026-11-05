@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -98,6 +99,32 @@ def weights_path(owner: str, adapter_id: str) -> Path | None:
         return None
     p = owner_dir(owner) / f"{adapter_id}.pt"
     return p if p.exists() else None
+
+
+MAX_WEIGHTS_BYTES = 64 * 1024 * 1024  # an adapter is a small MLP; anything larger is not one of ours
+
+
+def read_weights(owner: str, adapter_id: str, sha256: str | None = None) -> bytes | None:
+    """The adapter's weight bytes (at most MAX_WEIGHTS_BYTES), or None if missing, too large, or not matching the
+    pinned `sha256`. The caller loads these exact bytes, so there is no gap between the check and the use."""
+    p = weights_path(owner, adapter_id)
+    if p is None:
+        return None
+    try:
+        with p.open("rb") as f:
+            data = f.read(MAX_WEIGHTS_BYTES + 1)
+    except OSError:
+        return None
+    if len(data) > MAX_WEIGHTS_BYTES:
+        return None
+    if sha256 is not None and not hmac.compare_digest(hashlib.sha256(data).hexdigest(), sha256):
+        return None
+    return data
+
+
+def weights_sha256(owner: str, adapter_id: str) -> str | None:
+    data = read_weights(owner, adapter_id)
+    return hashlib.sha256(data).hexdigest() if data is not None else None
 
 
 def list_adapters(owner: str) -> list[dict]:

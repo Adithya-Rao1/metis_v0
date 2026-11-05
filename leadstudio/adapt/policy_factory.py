@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 from collections.abc import Sequence
 
@@ -21,8 +22,13 @@ def _fallback(op_ids: Sequence[str], adapter_id: str, reason: str):
     return pol
 
 
-def load_adapted_policy(adapter_id: str, owner: str, op_ids: Sequence[str] | None = None):
-    """Policy with the owner's adapted weights. `op_ids` defaults to the live registry's op ids."""
+def load_adapted_policy(
+    adapter_id: str, owner: str, op_ids: Sequence[str] | None = None, sha256: str | None = None
+):
+    """Policy with the owner's adapted weights. `op_ids` defaults to the live registry's op ids.
+
+    With `sha256` the weights are read once, hashed, and loaded from those same bytes (`weights_only=True`: tensors
+    and plain containers only, no pickled code), so a file swapped after the check is never used."""
     if op_ids is None:
         from leadstudio.registry import get_registry
 
@@ -36,7 +42,13 @@ def load_adapted_policy(adapter_id: str, owner: str, op_ids: Sequence[str] | Non
             op_ids, adapter_id, "edit set changed since the adapter was trained (op-id hash differs)"
         )
     try:
-        ck = torch.load(path, map_location="cpu", weights_only=True)
+        if sha256 is not None:
+            data = store.read_weights(owner, adapter_id, sha256)
+            if data is None:
+                return _fallback(op_ids, adapter_id, "adapter file changed or too large")
+            ck = torch.load(io.BytesIO(data), map_location="cpu", weights_only=True)
+        else:
+            ck = torch.load(path, map_location="cpu", weights_only=True)
         if list(ck["op_ids"]) != op_ids:
             return _fallback(op_ids, adapter_id, "op ids differ")
         pol = DQNPolicy(op_ids, checkpoint=None)

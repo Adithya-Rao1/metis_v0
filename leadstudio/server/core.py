@@ -170,6 +170,9 @@ class Run:
     profile: ProfileBody | None = (
         None  # the caller's saved scoring profile, live runs only (sent to the child)
     )
+    adapter: dict[str, str] | None = (
+        None  # the caller's verified adapter {owner, adapter_id, sha256} (live runs)
+    )
     events: list[dict] = field(default_factory=list)
     finished: bool = False
     status: str = "queued"  # queued | running | done | error | cancelled
@@ -239,12 +242,17 @@ class RunManager:
         return [r for r in self.runs.values() if not r.finished and r.source != "replay"]
 
     def submit(
-        self, owner: uuid.UUID, cfg: RunConfig, run_id: str, profile: ProfileBody | None = None
+        self,
+        owner: uuid.UUID,
+        cfg: RunConfig,
+        run_id: str,
+        profile: ProfileBody | None = None,
+        adapter: dict[str, str] | None = None,
     ) -> Run:
         key = config_key(owner, cfg.seed_smiles, cfg)
         cacheable = (
-            profile is None and cfg.profile_id is None
-        )  # a profile can change between runs: never replay
+            profile is None and cfg.profile_id is None and adapter is None
+        )  # a profile can change between runs and an adapter can be deleted: never replay
         with self.lock:
             cached = self.cache.get(key) if cacheable else None
             if cached is not None:
@@ -276,6 +284,7 @@ class RunManager:
                 source,
                 cache_key=key if source == "live" and cacheable else None,
                 profile=profile if source == "live" else None,
+                adapter=adapter if source == "live" else None,
             )
             self._register(run)
         self.pool.submit(self._execute, run)
@@ -458,6 +467,7 @@ class RunManager:
             "run_id": run.run_id,
             "config": run.config.model_dump(mode="json"),
             "profile": run.profile.model_dump(mode="json") if run.profile else None,
+            "adapter": run.adapter,
             "mem_mb": self.s.child_mem_mb,
             "max_seconds": self.s.run_timeout + 5,
         }
@@ -517,9 +527,12 @@ class RunManager:
             yield ev
 
     def _remember(self, run: Run) -> None:
+        key = run.cache_key
+        if key is None:
+            return
         with self.lock:
-            self.cache[run.cache_key] = list(run.events)
-            self._cache_owner[run.cache_key] = run.owner
+            self.cache[key] = list(run.events)
+            self._cache_owner[key] = run.owner
             while len(self.cache) > self.s.cache_size:
                 old, _ = self.cache.popitem(last=False)
                 self._cache_owner.pop(old, None)

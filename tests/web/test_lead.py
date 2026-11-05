@@ -178,6 +178,30 @@ def test_run_is_created_and_streamed_to_completion(lead_page):
     assert real_errors(pg) == []
 
 
+def test_a_selected_adapter_is_shown_in_run_settings_and_sent_with_the_run(lead_page):
+    pg = lead_page()
+    open_lead(pg)
+    pharmacology(pg)
+    aid = "abcdef0123456789"
+    assert pg.evaluate("document.getElementById('cfg-adapter').hidden") is True
+    pg.evaluate(
+        "(id) => { window.MetisStudio = window.MetisStudio || {}; window.MetisStudio.extraConfig = { adapter_id: id };"
+        " window.dispatchEvent(new CustomEvent('metis:adapter-selected', { detail: { adapter_id: id } })); }", aid)
+    assert pg.evaluate("document.getElementById('cfg-adapter').hidden") is False
+    assert "adapted policy" in pg.evaluate("document.getElementById('cfg-adapter').textContent") and aid[:6] in pg.evaluate("document.getElementById('cfg-adapter').textContent")
+    pg.click("#btn-stage-run")
+    wait_done(pg)
+    sent = [b for m, p, b in pg.lead.calls if (m, p) == ("POST", "/api/runs")]
+    assert len(sent) == 1 and sent[0]["stage"] == "pharmacology" and sent[0]["adapter_id"] == aid
+    pg.evaluate("() => { delete window.MetisStudio.extraConfig.adapter_id; window.dispatchEvent(new CustomEvent('metis:adapter-selected', { detail: { adapter_id: null } })); }")
+    assert pg.evaluate("document.getElementById('cfg-adapter').hidden") is True
+    pg.click("#btn-stage-run")
+    wait_for(pg, "document.getElementById('btn-stage-run').disabled === false && window.metis.store.status === 'done'", 20)
+    sent = [b for m, p, b in pg.lead.calls if (m, p) == ("POST", "/api/runs")]
+    assert len(sent) == 2 and "adapter_id" not in sent[1]
+    assert real_errors(pg) == []
+
+
 def test_unreachable_backend_is_said_plainly_not_faked(lead_page):
     pg = lead_page(lead=LeadMockApi(fail_health=True))
     pg.goto(pg.base + "/lead/index.html")

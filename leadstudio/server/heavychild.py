@@ -55,6 +55,31 @@ def op_parse(args: dict) -> list[dict]:
     return out
 
 
+def op_seed_block(args: dict) -> dict:
+    """A client-supplied seed 3D block, checked against the seed SMILES: returns the block re-written in the seed's
+    atom order, or a 422 answer if it is not the same molecule / has no 3D coordinates."""
+    from fastapi import HTTPException
+
+    from leadstudio.engine import geometry
+    from leadstudio.schema import MAX_MOLFILE
+    from leadstudio.server import molio
+
+    block = args.get("molblock")
+    if not isinstance(block, str) or len(block) > MAX_MOLFILE or "\x00" in block:
+        raise HTTPException(422, "seed_molblock is not valid")
+    block = block.replace("\r\n", "\n").split("$$$$")[0]
+    if "M  END" not in block:
+        raise HTTPException(422, "seed_molblock is not a MOL block")
+    try:
+        molio.parse_molecule(molfile=block)  # sanitize + the heavy-atom cap
+    except molio.InvalidMolecule:
+        raise HTTPException(422, "seed_molblock could not be read") from None
+    res = geometry.seed_from_block(args["smiles"], block)
+    if res is None:
+        raise HTTPException(422, "seed_molblock must be 3D coordinates of the seed molecule")
+    return {"molblock": res[0]}
+
+
 def op_validate(args: dict) -> dict:
     from leadstudio.schema import RunConfig
     from leadstudio.server import molio
@@ -114,6 +139,7 @@ def op_smarts(args: dict) -> list[dict]:
 OPS: dict[str, Callable[[dict], Any]] = {
     "parse": op_parse,
     "validate": op_validate,
+    "seed_block": op_seed_block,
     "applicable": op_applicable,
     "preview": op_preview,
     "step_reward": op_step_reward,
@@ -157,7 +183,7 @@ def serve() -> None:
     procutil.limit_address_space(mem)
     from rdkit import RDLogger
 
-    RDLogger.DisableLog("rdApp.*")
+    RDLogger.DisableLog("rdApp.*")  # type: ignore[attr-defined]  # rdkit stubs omit this C++-backed name
     _preload()
     _answer({"ready": True})  # from here on the parent's per-job time limit applies to the job alone
     while True:

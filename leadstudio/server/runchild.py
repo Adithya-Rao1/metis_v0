@@ -23,8 +23,52 @@ def default_builder() -> Any:
     return build_engine()
 
 
+class _AdapterPolicy:
+    """The user's adapted policy for one run: frozen (no learning from the run) and with a note the run reports."""
+
+    def __init__(self, inner: Any, note: str):
+        self._inner, self.note = inner, note
+        self.checkpoint_loaded = getattr(inner, "checkpoint_loaded", None)
+
+    def rank(self, smiles: Any, candidates: Any) -> Any:
+        return self._inner.rank(smiles, candidates)
+
+    def update(self, transitions: Any) -> None:
+        return None
+
+
+def _adapter_policy(pin: dict[str, str]) -> Any:
+    """Load the pinned adapter (sha256 checked on the bytes that are loaded, `weights_only=True`). If it cannot be
+    used the run goes on with the base policy and says so in its policy notes."""
+    from leadstudio.adapt.policy_factory import load_adapted_policy
+
+    pol = load_adapted_policy(pin["adapter_id"], pin["owner"], sha256=pin["sha256"])
+    info = getattr(pol, "adapter_info", {}) or {}
+    if info.get("used"):
+        return _AdapterPolicy(pol, "your adapted policy is in use")
+    return _AdapterPolicy(
+        pol, "your adapted policy was not used (" + str(info.get("reason", "unknown"))[:60] + ")"
+    )
+
+
 def _send(obj: dict) -> None:
     procutil.write_event_line(json.dumps(obj, separators=(",", ":")).encode())
+
+
+def assemble(engine: Any, spec: dict) -> Any:
+    """The run's own engine: the shared one with the caller's saved profile (scoring and edit allow-list) and adapted
+    policy applied to a copy. Nothing shared is mutated, and each part is applied only if the spec carries it."""
+    if spec.get("profile") is not None:
+        from leadstudio.profile_scorer import AllowlistRegistry, ProfileScorer
+        from leadstudio.profiles import ProfileBody
+
+        prof = ProfileBody.model_validate(spec["profile"])
+        engine = engine.with_scorer(lambda base: ProfileScorer(base, prof))
+        if prof.edit_allowlist:  # the GA proposes only these edits
+            engine = engine.with_registry(lambda reg: AllowlistRegistry(reg, prof.edit_allowlist))
+    if spec.get("adapter") is not None:
+        engine = engine.with_policy(_adapter_policy(spec["adapter"]))
+    return engine
 
 
 def serve(builder: Callable[[], Any] | None = None) -> None:
@@ -42,13 +86,7 @@ def serve(builder: Callable[[], Any] | None = None) -> None:
         from leadstudio.schema import RunConfig
         from leadstudio.server.stages import Services, StageEngine
 
-        engine = StageEngine((builder or default_builder)(), Services())
-        if spec.get("profile") is not None:
-            from leadstudio.profile_scorer import ProfileScorer
-            from leadstudio.profiles import ProfileBody
-
-            prof = ProfileBody.model_validate(spec["profile"])
-            engine = engine.with_scorer(lambda base: ProfileScorer(base, prof))
+        engine = assemble(StageEngine((builder or default_builder)(), Services()), spec)
         cfg = RunConfig.model_validate(spec["config"])
         for ev in engine.run(spec["run_id"], cfg):
             d = ev if isinstance(ev, dict) else ev.model_dump(mode="json")
@@ -63,7 +101,7 @@ def serve(builder: Callable[[], Any] | None = None) -> None:
     except Exception as exc:
         _send({"fail": type(exc).__name__})
         code = 2
-    sys.stdout = sys.stderr = None  # type: ignore[assignment]
+    sys.stdout = sys.stderr = None
     os._exit(code)
 
 

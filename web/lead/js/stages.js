@@ -179,6 +179,16 @@ function paintRunButton() {
 
 export function closeStream() { stream?.close(); stream = null; }
 
+/** The adapter chosen in the "Adapt to my edits" panel (pharmacology runs only), or null. */
+const selectedAdapter = () => window.MetisStudio?.extraConfig?.adapter_id || null;
+
+function paintAdapter() {
+  const el = $("cfg-adapter"), id = selectedAdapter();
+  if (!el) return;
+  el.hidden = !id;
+  el.textContent = id ? "Using your adapted policy for pharmacology runs (adapter " + id.slice(0, 6) + ")." : "";
+}
+
 function runConfig(stage, seed) {
   const g = (id, d) => parseInt($(id).value, 10) || d;
   if (stage === "binding") {
@@ -195,6 +205,8 @@ function runConfig(stage, seed) {
     policy_guidance: parseFloat($("cfg-guid").value), locked_atoms: [...store.locked].sort((a, b) => a - b),
   };
   if (pose?.ligandBlock) cfg.seed_molblock = pose.ligandBlock;
+  const adapter = selectedAdapter();
+  if (adapter) cfg.adapter_id = adapter;
   return cfg;
 }
 
@@ -360,6 +372,7 @@ export function mountStages() {
   $("leads-table").onkeydown = (e) => { if (e.key === "Enter") e.target.click?.(); };
 
   const refresh = () => { if (store.config?.stage === "binding" || S.stage === "binding") renderLeads(); };
+  window.addEventListener("metis:adapter-selected", paintAdapter);
   bus.on("run:start", () => { document.body.dataset.run = "1"; renderLeads(); renderChips(); });
   bus.on("run:candidate", refresh);
   bus.on("run:generation", refresh);

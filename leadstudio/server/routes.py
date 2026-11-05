@@ -152,6 +152,32 @@ def _profile_wrapper(sc: Scope, cfg: RunConfig) -> ProfileBody | None:
     return prof
 
 
+def _torch_available() -> bool:
+    return importlib.util.find_spec("torch") is not None
+
+
+def _adapter_pin(sc: Scope, cfg: RunConfig, st: LeadState) -> dict[str, str] | None:
+    """The caller's own adapter for this run as {owner, adapter_id, sha256}, else None when none was asked for.
+
+    An unknown id, a malformed id and another user's adapter all answer the same 404 (adapters are looked up in the
+    caller's own directory only). The weights file is hashed here and the run's child process loads exactly those
+    bytes (`weights_only=True`), so a file replaced in between is not used. Needs the live engine and torch (503)."""
+    if cfg.adapter_id is None:
+        return None
+    if cfg.stage != "pharmacology":
+        raise HTTPException(422, "adapter_id applies to the pharmacology stage only")
+    from leadstudio.adapt import store as adapter_store
+
+    owner = str(sc.user.id)
+    meta = adapter_store.get_meta(owner, cfg.adapter_id)
+    digest = adapter_store.weights_sha256(owner, cfg.adapter_id) if meta is not None else None
+    if digest is None:
+        raise not_found()
+    if st.source != "live" or not _torch_available():
+        raise Rejected(503, "Policy adapters are not available on this server")
+    return {"owner": owner, "adapter_id": cfg.adapter_id, "sha256": digest}
+
+
 @api.post("/runs", response_model=RunCreated)
 def create_run(cfg: RunConfig, sc: Scope = Depends(scope), st: LeadState = Depends(get_state)) -> RunCreated:
     s = st.settings
@@ -159,12 +185,16 @@ def create_run(cfg: RunConfig, sc: Scope = Depends(scope), st: LeadState = Depen
     bad = sorted(set(cfg.objectives) - OBJECTIVE_KEYS)
     if bad:
         raise HTTPException(422, "unknown objective name")
-    if cfg.adapter_id is not None:
-        raise HTTPException(422, "policy adapters are not available in this service")
     try:
         seed_canonical, n = st.heavy.parse(cfg.seed_smiles)
     except molio.InvalidMolecule as exc:
         raise HTTPException(422, str(exc)) from None
+    seed_block = None
+    if cfg.seed_molblock:  # checked against the seed in a worker process; the run gets the re-written block
+        seed_block = st.heavy.call("seed_block", {"smiles": seed_canonical, "molblock": cfg.seed_molblock})[
+            "molblock"
+        ]
+    adapter = _adapter_pin(sc, cfg, st)
     if any(i < 0 or i >= n for i in cfg.locked_atoms):
         raise HTTPException(422, "locked_atoms index out of range")
     cfg = stages.prepare_config(cfg, st.svc, st.engine is not None)
@@ -177,10 +207,10 @@ def create_run(cfg: RunConfig, sc: Scope = Depends(scope), st: LeadState = Depen
             "policy_guidance": max(0.0, min(cfg.policy_guidance, 1.0)),
             "locked_atoms": sorted(set(cfg.locked_atoms)),
             "use_reactions": cfg.use_reactions if st.engine is not None else False,
-            "seed_molblock": None,  # the engine builds its own 3D seed; a client-supplied block is never used
+            "seed_molblock": seed_block,
         }
     )
-    run = st.mgr.submit(sc.user.id, cfg, secrets.token_urlsafe(9), profile=wrap)
+    run = st.mgr.submit(sc.user.id, cfg, secrets.token_urlsafe(9), profile=wrap, adapter=adapter)
     log.info(
         "run %s created source=%s heavy_atoms=%d gens=%d pop=%d",
         run.run_id[:6],
