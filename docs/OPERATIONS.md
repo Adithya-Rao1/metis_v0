@@ -120,3 +120,21 @@ predictions, notes, consents, terms, sessions, jobs). The cookies are cleared.
 
 The `audit_log` keeps the user id (no email) after deletion; there is no retention job for it. **[unverified]**
 Backup tooling and retention in production are outside this repository.
+
+## 7. Lead Studio (Beta), mounted at `/lead`
+
+`leadstudio/` is mounted by `backend.main` (`/lead/api`, `/lead/library`, `/lead/profiles`). Every route needs the Metis session, CSRF on mutations and accepted terms.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `METIS_LEAD_DOCK_URL` | unset | Allow-list entry for the DynamicBind docking service. By default only a loopback `STUDIO_DYNAMICBIND_URL` is accepted; any other host must equal this value exactly (scheme, host, port). The URL is never taken from a request. |
+| `STUDIO_DYNAMICBIND_URL` | `http://127.0.0.1:8100` | Docking service. Down means `503` with a plain message; precomputed poses work without it. |
+| `STUDIO_FORCE_MOCK` | off | Serves recorded mock runs; every response states `source: "mock"` or `"live"`. |
+| `STUDIO_MAX_GENERATIONS`, `STUDIO_MAX_POPULATION`, `STUDIO_BINDING_MAX_GENERATIONS`, `STUDIO_BINDING_MAX_POPULATION` | 15, 40, set in code | Server caps. |
+| `STUDIO_PER_USER_RUNS`, `STUDIO_MAX_CONCURRENT`, `STUDIO_MAX_QUEUE` | 2, 2, 4 | Per-user and per-process run limits. |
+| `STUDIO_RUN_TIMEOUT` | 90 | Seconds, cooperative. |
+| `STUDIO_RUNS_PER_MIN`, `STUDIO_VALIDATES_PER_MIN` | 6, 30 | Per-user limits in the shared database limiter. |
+| `STUDIO_HEARTBEAT`, `STUDIO_MOCK_DELAY`, `STUDIO_REPLAY_DELAY` | 15, 0.4, 0.25 | SSE pacing. |
+| `STUDIO_STRUCTURES_DIR`, `STUDIO_POSES_DIR` | bundled data | Override data directories. |
+
+Caveats: run and live manual-session state is in memory of one process, so run a single worker (or sticky routing) for these routes. The PLAPT binding stage is not shipped (`binding_module` is absent); binding-stage runs answer 503 and the pharmacology stage works. The DQN policy needs optional torch and a checkpoint; without them the uniform policy is used.

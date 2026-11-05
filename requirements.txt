@@ -15,5 +15,6 @@ PyJWT==2.15.1
 fpdf2==2.9.0
 rdkit==2026.9.1
 numpy==2.5.4
+deap==1.4.4  # LGPL-3.0, Lead Studio GA (see docs/LICENSES.md)
 pdb2pqr==3.8.0
 propka==3.5.1

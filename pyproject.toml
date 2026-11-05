@@ -60,6 +60,16 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 "ml/uncertainty/conformal.py" = ["B905", "E501", "SIM300", "UP037"]
 "ml/uncertainty/decompose.py" = ["E501"]
 "ml/uncertainty/similarity.py" = ["UP037"]
+# Lead Studio (leadstudio/): copied from the owner's MIT GraphDQN repo. The edit operators in molmods/ are kept as they were
+# (star imports, long lines, demo-era style), only their import paths changed, so they are exempt from every rule.
+"leadstudio/molmods/*.py" = ["ALL"]
+# Rest of leadstudio/: E501 = lines up to ~120 chars, B905 = zip() without strict= (copied code, equal-length inputs by
+# construction), S311 = random.Random(seed) for the reproducible GA / policy RNG (never used for security), B008 = FastAPI Depends().
+"leadstudio/**/*.py" = ["E501", "B905"]
+"leadstudio/server/routes.py" = ["B008"]
+"leadstudio/engine/*.py" = ["S311"]
+"leadstudio/policy/*.py" = ["S311"]
+"leadstudio/adapt/*.py" = ["S311"]
 
 [tool.mypy]
 python_version = "3.12"

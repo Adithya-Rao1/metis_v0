@@ -6,11 +6,11 @@ install:
 test:
 	$(PY) -m pytest -q
 lint:
-	ruff check backend ml tests/foundation && ruff format --check backend/core tests/foundation
+	ruff check backend ml leadstudio tests/foundation && ruff format --check backend/core tests/foundation
 type:
 	mypy
 sec:
-	bandit -c pyproject.toml -r backend ml && pip-audit -r requirements.txt -r ml/requirements.txt
+	bandit -c pyproject.toml -r backend ml leadstudio && pip-audit -r requirements.txt -r ml/requirements.txt
 migrate:
 	$(PY) -m backend.core.migrate
 demo:  # local demo on http://127.0.0.1:8080 with SYNTHETIC sample models (see scripts/demo.py)

@@ -13,13 +13,14 @@ repos:
     rev: 1.8.0
     hooks:
       - id: bandit
-        args: [-c, pyproject.toml, -r, backend, ml]
+        args: [-c, pyproject.toml, -r, backend, ml, leadstudio]
         additional_dependencies: ["bandit[toml]"]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: check-added-large-files
         args: [--maxkb=500]
+        exclude: ^leadstudio/(data|sa)/
       - id: detect-private-key
       - id: check-yaml
       - id: end-of-file-fixer

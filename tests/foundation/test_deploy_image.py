@@ -27,9 +27,10 @@ def _runtime_packages(top: str) -> list[str]:
 def test_dockerfile_copies_backend_and_ml_wholesale():
     srcs = _copied_sources()
     assert "backend/" in srcs
+    assert "leadstudio/" in srcs  # Lead Studio, mounted by backend.main
     assert "ml/" in srcs  # whole tree: covers every present and future subpackage
     # every runtime package directory is therefore inside a copied tree
-    for top in ("backend", "ml"):
+    for top in ("backend", "ml", "leadstudio"):
         pkgs = _runtime_packages(top)
         assert pkgs, top
         assert all(f"{top}/" in srcs for _ in pkgs)
@@ -75,9 +76,9 @@ def test_ci_and_makefile_run_same_scope():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
     mk = (ROOT / "Makefile").read_text()
     for cmd in (
-        "ruff check backend ml tests/foundation",
+        "ruff check backend ml leadstudio tests/foundation",
         "ruff format --check backend/core tests/foundation",
-        "bandit -c pyproject.toml -r backend ml",
+        "bandit -c pyproject.toml -r backend ml leadstudio",
         "pip-audit -r requirements.txt -r ml/requirements.txt",
     ):
         assert cmd in ci and cmd in mk, cmd

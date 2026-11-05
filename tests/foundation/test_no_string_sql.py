@@ -13,6 +13,7 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "backend"
+LEAD = ROOT / "leadstudio"
 
 CALL = re.compile(r"\b(?:execute|executemany|exec_driver_sql|text|prepare)\s*\(")
 
@@ -44,7 +45,7 @@ def violations(src: str) -> list[tuple[int, str]]:
 
 
 def backend_files():
-    for p in BACKEND.rglob("*.py"):
+    for p in [*BACKEND.rglob("*.py"), *LEAD.rglob("*.py")]:
         if "migrations" in p.parts or "__pycache__" in p.parts:
             continue
         yield p

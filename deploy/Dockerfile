@@ -15,6 +15,7 @@ COPY --from=build /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=root:root backend/ /app/backend/
 COPY --chown=root:root ml/ /app/ml/
+COPY --chown=root:root leadstudio/ /app/leadstudio/
 # The exports module reads docs/legal/DISCLAIMER.md at runtime (fails closed without it).
 COPY --chown=root:root docs/legal/ /app/docs/legal/
 COPY --chown=root:root deploy/uvicorn_log_config.json /app/uvicorn_log_config.json
