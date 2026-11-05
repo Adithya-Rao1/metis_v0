@@ -61,8 +61,13 @@ Every data region has loading, empty and error states (`stateBox` in `chrome.js`
 - Time estimate: before starting, the page shows `sum(runtime_by_n_seconds[N]) x compounds` from the model cards, labelled approximate; the authoritative number is `estimated_seconds` from `POST .../predict`.
 - Names pasted with SMILES are sent as a CSV (`smiles,name`) because the SMILES-list request has no label field.
 - Conformers are shown only with the "computed conformer, not an experimental structure" label; one shared 3Dmol viewer per page; without WebGL a notice appears and the 2D depictions stay.
-- Ketcher 3.18.0 (Apache-2.0) is vendored in `web/vendor/ketcher/` (pinned, hashed in `web/vendor/VERSIONS.txt`) and loaded in a same-origin iframe only when the Draw tab opens.
-  It needs `style-src 'unsafe-inline'`, granted to `/vendor/ketcher/*` only; its policy has `connect-src 'none'` and `frame-ancestors 'self'`.
+- Ketcher 3.18.0 (Apache-2.0) is vendored in `web/vendor/ketcher/` (pinned, hashed in `web/vendor/VERSIONS.txt`, unmodified) and runs in a SANDBOXED iframe
+  (`sandbox="allow-scripts"`, opaque origin) hosted by `web/draw/frame.html`, loaded only when the Draw tab opens. The page reads and sets the drawing through a
+  postMessage bridge (`web/draw/client.js`, `web/draw/bridge.js`). `style-src 'unsafe-inline'` is granted to the frame page only; its policy has `connect-src 'none'`, `frame-ancestors 'self'` and `sandbox allow-scripts`.
+- Routes assumed from the Wave 4 backend contract (mock: `tests/web/mockapi.py`): `GET /auth/me` returns `email`; `PATCH /projects/{id}` `{name}`; `DELETE /projects/{id}/compounds/{cid}`;
+  `DELETE /projects/{id}/measurements/{mid}`; `POST /dockprep/depiction` `{smiles}` -> `image/svg+xml` (used for docking-prep ligands and nearest training compounds; absent route = no picture, no error);
+  model card `higher_is_better` (boolean, optional: default ranking direction and a row on the model page); 403 `terms_reaccept_required` (also accepted: `terms_reacceptance_required`) on any route, GET included.
+  There is no notes UI, so no note delete control.
 
 ## Tests
 
@@ -73,9 +78,7 @@ Every data region has loading, empty and error states (`stateBox` in `chrome.js`
 ## Known gaps (BACKEND-GAP items are in the handoff)
 
 - No endpoint returns a time estimate before a job starts (`POST .../predict` is the first source), so the pre-start estimate is derived from model cards.
-- `GET /auth/me` returns no email address, so the account page cannot show it; there is no `.edu` upgrade route (the upgrade happens when the email is verified).
-- No depiction endpoint for an arbitrary SMILES: docking-prep ligands typed as SMILES have no 2D picture (project compounds do).
-- Nearest training compounds come back as SMILES text only (no depiction route for them).
-- Project rename, compound delete and note/measurement delete have no routes, so the UI has none.
+- There is no `.edu` upgrade route (the upgrade happens when the email is verified).
+- The SMILES depiction route, project rename and compound/measurement delete are wired against the Wave 4 contract above; confirm the exact paths when the backend lands (the web side is one constant per call).
 - PDB-ID fetch is off unless the server sets `METIS_DOCKPREP_FETCH=1`; the page then says to upload a file.
 - `tests/security/*` still reference the removed fixtures and the old page structure; QA owns them (see the handoff).
