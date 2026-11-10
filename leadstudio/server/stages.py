@@ -137,7 +137,10 @@ class Services:
         key = config.target_id
         with self._lock:
             if key not in self._engines:
+                # A run child builds a fresh Services() and never called binding_available(): resolve it here.
                 fn = self._binding_factory
+                if fn is None and self.binding_available():
+                    fn = self._binding_factory
                 if fn is None:
                     raise HTTPException(503, "Binding stage is not available on this server")
                 params = inspect.signature(fn).parameters
